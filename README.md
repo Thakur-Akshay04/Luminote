@@ -75,3 +75,4 @@ npm run dev
 | OPENAI_API_KEY | OpenAI API key (for embeddings) |
 | JWT_SECRET | Secret key for JWT signing |
 # Luminote
+"# Luminote" 
