@@ -1,0 +1,55 @@
+export interface User {
+  user_id: string;
+  email: string;
+  access_token: string;
+}
+
+export interface Note {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string;
+  summary: string | null;
+  tags: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteCreate {
+  title?: string;
+  content: string;
+}
+
+export interface NoteUpdate {
+  title?: string;
+  content?: string;
+}
+
+export interface SearchResultItem {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string;
+  summary: string | null;
+  tags: string[] | null;
+  similarity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+  cached: boolean;
+}
+
+export interface AskResponse {
+  answer: string;
+  note_id: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user_id: string;
+  email: string;
+}
