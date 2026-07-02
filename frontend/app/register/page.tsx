@@ -51,17 +51,11 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/4 -right-1/4 w-[600px] h-[600px] rounded-full bg-accent-violet/10 blur-[120px] animate-pulse-slow" />
-        <div className="absolute -bottom-1/4 -left-1/4 w-[500px] h-[500px] rounded-full bg-brand-600/8 blur-[120px] animate-pulse-slow" />
-      </div>
-
       <div className="relative w-full max-w-sm animate-slide-up">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-violet to-brand-500 flex items-center justify-center shadow-glow mb-4">
-            <Sparkles className="w-7 h-7 text-white" />
+          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-4 shadow-sm">
+            <Sparkles className="w-6 h-6 text-black" />
           </div>
           <h1 className="text-2xl font-bold text-gradient">Create account</h1>
           <p className="text-gray-500 text-sm mt-1">Start taking smarter notes today</p>

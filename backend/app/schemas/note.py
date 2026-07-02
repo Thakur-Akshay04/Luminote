@@ -35,3 +35,15 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     note_id: uuid.UUID
+
+
+class SummarizeRequest(BaseModel):
+    format: str = "paragraph"  # "paragraph", "bullets", "actions"
+    extract_alerts: bool = True
+
+
+from app.schemas.alert import AlertResponse
+
+class SummarizeResponse(BaseModel):
+    note: NoteResponse
+    alerts: list[AlertResponse]

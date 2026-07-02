@@ -53,3 +53,20 @@ export interface AuthResponse {
   user_id: string;
   email: string;
 }
+
+export interface Alert {
+  id: string;
+  user_id: string;
+  note_id: string;
+  title: string;
+  alert_time: string;
+  is_notified: boolean;
+  created_by_ai: boolean;
+  created_at: string;
+  note_title?: string;
+}
+
+export interface SummarizeResponse {
+  note: Note;
+  alerts: Alert[];
+}

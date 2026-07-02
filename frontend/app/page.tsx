@@ -9,9 +9,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      router.replace("/notes");
+      router.replace("/dashboard");
     } else {
-      router.replace("/login");
+      router.replace("/landing");
     }
   }, [router]);
 

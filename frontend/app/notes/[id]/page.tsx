@@ -299,7 +299,7 @@ export default function NoteEditorPage() {
         {/* AI Panel */}
         {showAI && note && (
           <div className="hidden lg:flex flex-col w-80 xl:w-96 border-l border-white/[0.06] overflow-y-auto p-4">
-            <AIPanel note={{ ...note, summary: note.summary, tags: note.tags }} />
+            <AIPanel note={note} onUpdateNote={setNote} />
           </div>
         )}
       </div>
@@ -307,7 +307,7 @@ export default function NoteEditorPage() {
       {/* Mobile AI panel (bottom sheet) */}
       {showAI && note && (
         <div className="lg:hidden border-t border-white/[0.06] max-h-64 overflow-y-auto p-4">
-          <AIPanel note={{ ...note, summary: note.summary, tags: note.tags }} />
+          <AIPanel note={note} onUpdateNote={setNote} />
         </div>
       )}
     </div>

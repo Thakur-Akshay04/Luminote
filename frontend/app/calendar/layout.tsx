@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 
-export const metadata: Metadata = { title: "Semantic Search" };
+export const metadata: Metadata = { title: "Calendar Page" };
 
-export default function SearchLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function CalendarLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="min-h-screen flex bg-surface-800">
       <Navbar />

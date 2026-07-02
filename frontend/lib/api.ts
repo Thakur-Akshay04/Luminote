@@ -7,6 +7,8 @@ import type {
   NoteUpdate,
   SearchResponse,
   AskResponse,
+  Alert,
+  SummarizeResponse,
 } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -52,6 +54,16 @@ export const notesApi = {
   delete: (id: string) => api.delete(`/notes/${id}`),
   ask: (id: string, question: string) =>
     api.post<AskResponse>(`/notes/${id}/ask`, { question }),
+  summarize: (id: string, format: string, extractAlerts: boolean) =>
+    api.post<SummarizeResponse>(`/notes/${id}/summarize`, { format, extract_alerts: extractAlerts }),
+};
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+export const alertsApi = {
+  list: () => api.get<Alert[]>("/alerts"),
+  create: (data: { note_id: string; title: string; alert_time: string }) =>
+    api.post<Alert>("/alerts", data),
+  delete: (id: string) => api.delete(`/alerts/${id}`),
 };
 
 // ── Search ────────────────────────────────────────────────────────────────────

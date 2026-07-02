@@ -8,7 +8,8 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.note import Note
-from app.services.ai_service import get_ai_enrichment, get_embedding
+from app.models.alert import Alert
+from app.services.ai_service import get_embedding, summarize_note_with_ai
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,18 @@ logger = logging.getLogger(__name__)
 async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
+        current_time_str = datetime.now(timezone.utc).isoformat()
         enrichment, embedding = await asyncio.gather(
-            get_ai_enrichment(content),
+            summarize_note_with_ai(content, format="paragraph", extract_alerts=True, current_time_str=current_time_str),
             get_embedding(content),
         )
 
         async with session_factory() as db:
+            note = await db.get(Note, note_id)
+            if not note:
+                logger.warning("Note %s not found during AI pipeline execution", note_id)
+                return
+
             values: dict = {
                 "summary": enrichment.get("summary"),
                 "tags": enrichment.get("tags", []),
@@ -31,6 +38,34 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
                 values["embedding"] = embedding
 
             await db.execute(update(Note).where(Note.id == note_id).values(**values))
+
+            # Sync AI Alerts
+            # 1. Delete previous AI alerts for this note
+            await db.execute(delete(Alert).where(Alert.note_id == note_id, Alert.created_by_ai == True))
+
+            # 2. Insert new AI-extracted alerts
+            for alert_data in enrichment.get("alerts", []):
+                try:
+                    title = alert_data.get("title", "Note Reminder")
+                    date_str = alert_data.get("date")
+                    if not date_str:
+                        continue
+                    time_str = alert_data.get("time", "09:00:00")
+                    # Parse alert time
+                    alert_time = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
+
+                    new_alert = Alert(
+                        id=uuid.uuid4(),
+                        user_id=note.user_id,
+                        note_id=note_id,
+                        title=title,
+                        alert_time=alert_time,
+                        created_by_ai=True
+                    )
+                    db.add(new_alert)
+                except Exception as parse_err:
+                    logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+
             await db.commit()
 
         logger.info("AI pipeline complete for note %s", note_id)

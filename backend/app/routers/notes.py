@@ -1,12 +1,13 @@
 import uuid
 from typing import Optional
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate
-from app.services.ai_service import ask_question
+from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate, SummarizeRequest, SummarizeResponse
+from app.services.ai_service import ask_question, summarize_note_with_ai
 from app.services.auth_service import decode_token
 from app.services.note_service import (
     create_note,
@@ -15,6 +16,9 @@ from app.services.note_service import (
     get_notes,
     update_note,
 )
+from app.models.alert import Alert
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -87,3 +91,67 @@ async def ask(
     note = await get_note(note_id, uuid.UUID(user_id), db)
     answer = await ask_question(note.content, body.question)
     return AskResponse(answer=answer, note_id=note_id)
+
+
+@router.post("/{note_id}/summarize", response_model=SummarizeResponse)
+async def summarize(
+    note_id: uuid.UUID,
+    body: SummarizeRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    from sqlalchemy import delete
+    
+    note = await get_note(note_id, uuid.UUID(user_id), db)
+    current_time_str = datetime.now(timezone.utc).isoformat()
+    
+    enrichment = await summarize_note_with_ai(
+        content=note.content,
+        format=body.format,
+        extract_alerts=body.extract_alerts,
+        current_time_str=current_time_str
+    )
+    
+    note.summary = enrichment.get("summary")
+    note.tags = enrichment.get("tags", [])
+    note.updated_at = datetime.now(timezone.utc)
+    
+    new_alerts = []
+    if body.extract_alerts:
+        # Delete old AI alerts
+        await db.execute(delete(Alert).where(Alert.note_id == note_id, Alert.created_by_ai == True))
+        
+        for alert_data in enrichment.get("alerts", []):
+            try:
+                title = alert_data.get("title", "Note Reminder")
+                date_str = alert_data.get("date")
+                if not date_str:
+                    continue
+                time_str = alert_data.get("time", "09:00:00")
+                alert_time = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
+                
+                new_alert = Alert(
+                    id=uuid.uuid4(),
+                    user_id=uuid.UUID(user_id),
+                    note_id=note_id,
+                    title=title,
+                    alert_time=alert_time,
+                    created_by_ai=True
+                )
+                db.add(new_alert)
+                new_alerts.append(new_alert)
+            except Exception as parse_err:
+                logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+                
+    await db.commit()
+    await db.refresh(note)
+    
+    # Attach note title to returned alerts for validation serialization mapping
+    for a in new_alerts:
+        a.note_title = note.title
+        
+    return {
+        "note": note,
+        "alerts": new_alerts
+    }

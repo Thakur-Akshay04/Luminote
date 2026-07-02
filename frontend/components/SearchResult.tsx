@@ -18,7 +18,7 @@ export default function SearchResult({ item, rank }: SearchResultProps) {
         {/* Rank + similarity */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-300 text-xs font-bold flex items-center justify-center">
+            <span className="w-6 h-6 rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs font-bold flex items-center justify-center">
               {rank}
             </span>
             <h3 className="font-semibold text-sm text-gray-100 group-hover:text-white transition-colors">
@@ -34,7 +34,7 @@ export default function SearchResult({ item, rank }: SearchResultProps) {
         {/* Similarity bar */}
         <div className="h-1 bg-surface-600 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-brand-500 to-accent-violet rounded-full transition-all"
+            className="h-full bg-white rounded-full transition-all"
             style={{ width: `${similarityPct}%` }}
           />
         </div>

@@ -40,5 +40,5 @@ async def init_db() -> None:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
         )
-        from app.models import user, note  # noqa: F401 — register models
+        from app.models import user, note, alert  # noqa: F401 — register models
         await conn.run_sync(Base.metadata.create_all)

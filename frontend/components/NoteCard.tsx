@@ -25,14 +25,14 @@ export default function NoteCard({ note, className }: NoteCardProps) {
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="shrink-0 w-8 h-8 rounded-lg bg-brand-500/15 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-brand-400" />
+            <div className="shrink-0 w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-neutral-400" />
             </div>
             <h3 className="font-semibold text-gray-100 truncate text-sm">
               {note.title || "Untitled note"}
             </h3>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
+          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-white shrink-0 transition-colors" />
         </div>
 
         {/* Preview */}
@@ -55,7 +55,7 @@ export default function NoteCard({ note, className }: NoteCardProps) {
         </div>
 
         {/* Hover glow line */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neutral-700 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </Link>
   );
