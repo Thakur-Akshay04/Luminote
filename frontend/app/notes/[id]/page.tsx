@@ -284,7 +284,7 @@ export default function NoteEditorPage() {
               <Eye className="w-3.5 h-3.5 text-gray-600" />
               <span className="text-xs text-gray-600 font-medium">Preview</span>
             </div>
-            <div className="flex-1 p-4 sm:p-6 prose-notiq overflow-y-auto">
+            <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
               {content ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {content}

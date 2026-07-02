@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Notiq API",
+    title="Luminote API",
     version="1.0.0",
     description="AI-Powered Notes — summarization, semantic search, and Q&A",
     lifespan=lifespan,
@@ -46,4 +46,4 @@ app.include_router(search.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "notiq-api"}
+    return {"status": "ok", "service": "luminote-api"}

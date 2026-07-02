@@ -1,7 +1,7 @@
 import Cookies from "js-cookie";
 
-const TOKEN_KEY = "notiq_token";
-const USER_KEY = "notiq_user";
+const TOKEN_KEY = "luminote_token";
+const USER_KEY = "luminote_user";
 
 export interface StoredUser {
   user_id: string;

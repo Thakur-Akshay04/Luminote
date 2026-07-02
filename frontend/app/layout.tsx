@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Notiq", template: "%s | Notiq" },
+  title: { default: "Luminote", template: "%s | Luminote" },
   description:
     "AI-powered notes with semantic search, auto-summarization, and intelligent Q&A — powered by Groq and pgvector.",
   keywords: ["notes", "AI", "summarization", "semantic search", "productivity"],

@@ -1,4 +1,4 @@
-# Notiq — AI-Powered Notes
+# Luminote — AI-Powered Notes
 
 Full-stack notes application with AI summarization, semantic search, and Q&A.
 
@@ -76,3 +76,4 @@ npm run dev
 | JWT_SECRET | Secret key for JWT signing |
 # Luminote
 "# Luminote" 
+# Luminote

@@ -34,7 +34,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-accent-violet flex items-center justify-center shadow-glow-sm">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-lg tracking-tight text-gradient">Notiq</span>
+          <span className="font-bold text-lg tracking-tight text-gradient">Luminote</span>
         </Link>
 
         {/* Nav Links */}

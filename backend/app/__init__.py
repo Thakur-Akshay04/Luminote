@@ -1,1 +1,1 @@
-# Notiq Backend Application
+# Luminote Backend Application

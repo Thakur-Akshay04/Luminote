@@ -50,7 +50,7 @@ export default function LoginPage() {
             <Sparkles className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gradient">Welcome back</h1>
-          <p className="text-gray-500 text-sm mt-1">Sign in to your Notiq account</p>
+          <p className="text-gray-500 text-sm mt-1">Sign in to your Luminote account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass p-6 flex flex-col gap-4">
