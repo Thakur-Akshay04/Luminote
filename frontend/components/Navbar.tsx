@@ -64,17 +64,20 @@ export default function Navbar() {
     <aside className="w-64 h-screen border-r border-surface-600 bg-surface-800 flex flex-col justify-between py-6 px-4 shrink-0 sticky top-0 animate-fade-in">
       <div className="flex flex-col gap-8">
         {/* Profile / Header */}
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0">
+        <Link 
+          href="/settings"
+          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-700/50 transition-colors cursor-pointer group"
+        >
+          <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:border-brand-500/40 transition-colors">
             <Sparkles className="w-4 h-4 fill-brand-500" />
           </div>
           <div className="flex-1 min-w-0 flex items-center justify-between">
-            <span className="text-sm font-semibold text-neutral-200 truncate">
+            <span className="text-sm font-semibold text-neutral-200 truncate group-hover:text-white transition-colors">
               {user.email.split("@")[0]}
             </span>
-            <span className="text-[10px] text-neutral-500">▼</span>
+            <span className="text-[10px] text-neutral-500 group-hover:text-neutral-300 transition-colors">▼</span>
           </div>
-        </div>
+        </Link>
 
         {/* Nav Links */}
         <div className="flex flex-col gap-1.5">

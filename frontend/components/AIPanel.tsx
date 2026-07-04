@@ -76,7 +76,7 @@ export default function AIPanel({ note, onUpdateNote }: AIPanelProps) {
         <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-black shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-black" />
         </div>
-        <span className="font-semibold text-sm text-neutral-900">AI Insights</span>
+        <span className="font-semibold text-sm text-white">AI Insights</span>
         {(isPending || summarizing) && (
           <span className="ml-auto flex items-center gap-1 text-xs text-gray-500 animate-pulse">
             <Loader2 className="w-3 h-3 animate-spin" /> Processing…
