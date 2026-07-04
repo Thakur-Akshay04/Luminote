@@ -15,6 +15,7 @@ from app.services.note_service import (
     get_note,
     get_notes,
     update_note,
+    sync_ai_alerts,
 )
 from app.models.alert import Alert
 
@@ -101,7 +102,6 @@ async def summarize(
     db: AsyncSession = Depends(get_db),
 ):
     from datetime import datetime, timezone
-    from sqlalchemy import delete
     
     note = await get_note(note_id, uuid.UUID(user_id), db)
     current_time_str = datetime.now(timezone.utc).isoformat()
@@ -119,30 +119,7 @@ async def summarize(
     
     new_alerts = []
     if body.extract_alerts:
-        # Delete old AI alerts
-        await db.execute(delete(Alert).where(Alert.note_id == note_id, Alert.created_by_ai == True))
-        
-        for alert_data in enrichment.get("alerts", []):
-            try:
-                title = alert_data.get("title", "Note Reminder")
-                date_str = alert_data.get("date")
-                if not date_str:
-                    continue
-                time_str = alert_data.get("time", "09:00:00")
-                alert_time = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
-                
-                new_alert = Alert(
-                    id=uuid.uuid4(),
-                    user_id=uuid.UUID(user_id),
-                    note_id=note_id,
-                    title=title,
-                    alert_time=alert_time,
-                    created_by_ai=True
-                )
-                db.add(new_alert)
-                new_alerts.append(new_alert)
-            except Exception as parse_err:
-                logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+        new_alerts = await sync_ai_alerts(db, uuid.UUID(user_id), note_id, enrichment.get("alerts", []))
                 
     await db.commit()
     await db.refresh(note)

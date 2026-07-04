@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Optional
 
-from openai import AsyncOpenAI
+from fastembed import TextEmbedding
 
 from app.config import settings
 from app.redis_client import get_redis
@@ -11,18 +11,35 @@ from app.groq_client import client, MODEL
 
 logger = logging.getLogger(__name__)
 
-_openai_client: Optional[AsyncOpenAI] = None
+_embedding_model: Optional[TextEmbedding] = None
 
 
-def _openai() -> AsyncOpenAI:
-    global _openai_client
-    if _openai_client is None:
-        _openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-    return _openai_client
+def _get_embedding_model() -> TextEmbedding:
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = TextEmbedding()
+    return _embedding_model
 
 
 def _md5(text: str) -> str:
     return hashlib.md5(text.encode()).hexdigest()
+
+
+def _extract_json_content(raw: str) -> str:
+    raw = raw.strip()
+    if "```" in raw:
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if (part.startswith("{") and part.endswith("}")) or (part.startswith("[") and part.endswith("]")):
+                return part
+    start_idx = raw.find("{")
+    end_idx = raw.rfind("}")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        return raw[start_idx : end_idx + 1]
+    return raw
 
 
 async def get_ai_enrichment(content: str) -> dict:
@@ -62,15 +79,8 @@ Note content:
             max_tokens=512,
         )
         raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
-
-        result = json.loads(raw)
+        json_str = _extract_json_content(raw)
+        result = json.loads(json_str)
         if "summary" not in result:
             result["summary"] = ""
         if "tags" not in result:
@@ -87,16 +97,16 @@ Note content:
 
 async def get_embedding(text: str) -> list[float]:
     """
-    Generate a 1536-dimensional embedding using OpenAI text-embedding-3-small.
+    Generate a 384-dimensional embedding locally using BAAI/bge-small-en-v1.5 via fastembed.
     """
     try:
-        response = await _openai().embeddings.create(
-            model="text-embedding-3-small",
-            input=text[:8000],
-        )
-        return response.data[0].embedding
+        model = _get_embedding_model()
+        embeddings = list(model.embed([text[:8000]]))
+        if embeddings:
+            return embeddings[0].tolist()
+        return []
     except Exception as e:
-        logger.error("OpenAI embedding error: %s", e)
+        logger.error("Local fastembed embedding error: %s", e)
         return []
 
 
@@ -193,15 +203,8 @@ Note content:
             max_tokens=1024,
         )
         raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
-
-        result = json.loads(raw)
+        json_str = _extract_json_content(raw)
+        result = json.loads(json_str)
         if "summary" not in result:
             result["summary"] = ""
         if "tags" not in result:

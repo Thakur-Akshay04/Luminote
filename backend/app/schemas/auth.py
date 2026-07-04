@@ -16,3 +16,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
     email: str
+
+
+class UpdatePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str

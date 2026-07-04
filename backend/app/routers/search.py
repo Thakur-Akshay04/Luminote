@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -29,6 +30,10 @@ async def semantic_search(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Check if query is empty or contains no alphanumeric characters
+    if not body.query or not re.search(r"\w", body.query):
+        return SearchResponse(results=[], cached=False)
+
     query_hash = hashlib.md5(f"{user_id}:{body.query}".encode()).hexdigest()
     cache_key = f"search:{query_hash}"
 
@@ -43,24 +48,48 @@ async def semantic_search(
     if not query_embedding:
         return SearchResponse(results=[], cached=False)
 
-    # pgvector cosine similarity search
+    # pgvector + Full-text search hybrid search
     embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
     stmt = text(
         """
-        SELECT
-            id, user_id, title, content, summary, tags,
-            created_at, updated_at,
-            1 - (embedding <=> CAST(:embedding AS vector)) AS similarity
-        FROM notes
-        WHERE user_id = :user_id
-          AND embedding IS NOT NULL
-        ORDER BY embedding <=> CAST(:embedding AS vector)
+        WITH scored_notes AS (
+            SELECT
+                id, user_id, title, content, summary, tags,
+                created_at, updated_at,
+                CASE 
+                    WHEN embedding IS NOT NULL THEN 1 - (embedding <=> CAST(:embedding AS vector))
+                    ELSE 0.55
+                END AS raw_semantic,
+                ts_rank(
+                    to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(array_to_string(tags, ' '), '')),
+                    plainto_tsquery('english', :query)
+                ) AS fts_rank
+            FROM notes
+            WHERE user_id = :user_id
+        ),
+        hybrid_notes AS (
+            SELECT
+                *,
+                GREATEST(0.0, (raw_semantic - 0.45) / 0.40) AS scaled_semantic,
+                LEAST(fts_rank * 10.0, 1.0) AS keyword_score
+            FROM scored_notes
+        ),
+        final_notes AS (
+            SELECT
+                *,
+                GREATEST(scaled_semantic, keyword_score) AS similarity
+            FROM hybrid_notes
+        )
+        SELECT *
+        FROM final_notes
+        WHERE similarity >= 0.35
+        ORDER BY similarity DESC
         LIMIT 5
         """
     )
     result = await db.execute(
         stmt,
-        {"embedding": embedding_str, "user_id": user_id},
+        {"embedding": embedding_str, "user_id": user_id, "query": body.query},
     )
     rows = result.fetchall()
 

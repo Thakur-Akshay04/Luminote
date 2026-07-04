@@ -7,7 +7,7 @@ load_dotenv()
 
 # Load GROQ_API_KEY and GROQ_MODEL from environment variables
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.6-27b")
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # Initialize a single Groq client instance
 client = AsyncGroq(api_key=GROQ_API_KEY)

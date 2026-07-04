@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -39,3 +40,11 @@ class Alert(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    @property
+    def note_title(self) -> Optional[str]:
+        return getattr(self, "_note_title", None)
+
+    @note_title.setter
+    def note_title(self, value: Optional[str]) -> None:
+        self._note_title = value

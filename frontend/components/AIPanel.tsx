@@ -19,7 +19,15 @@ export default function AIPanel({ note, onUpdateNote }: AIPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Summarize state
-  const [format, setFormat] = useState<"paragraph" | "bullets" | "actions">("paragraph");
+  const [format, setFormat] = useState<"paragraph" | "bullets" | "actions">(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("luminote_ai_format");
+      if (stored === "paragraph" || stored === "bullets" || stored === "actions") {
+        return stored;
+      }
+    }
+    return "paragraph";
+  });
   const [summarizing, setSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
 
@@ -43,7 +51,10 @@ export default function AIPanel({ note, onUpdateNote }: AIPanelProps) {
     setSummarizing(true);
     setSummarizeError(null);
     try {
-      const res = await notesApi.summarize(note.id, format, true);
+      const extractAlerts = typeof window !== "undefined"
+        ? localStorage.getItem("luminote_ai_extract_alerts") !== "false"
+        : true;
+      const res = await notesApi.summarize(note.id, format, extractAlerts);
       if (onUpdateNote) {
         onUpdateNote(res.data.note);
       }

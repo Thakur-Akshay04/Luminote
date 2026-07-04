@@ -14,6 +14,41 @@ from app.services.ai_service import get_embedding, summarize_note_with_ai
 logger = logging.getLogger(__name__)
 
 
+async def sync_ai_alerts(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    note_id: uuid.UUID,
+    alerts_data: list[dict],
+) -> list[Alert]:
+    """Delete previous AI alerts for this note and insert new AI-extracted alerts."""
+    await db.execute(delete(Alert).where(Alert.note_id == note_id, Alert.created_by_ai == True))
+
+    new_alerts = []
+    for alert_data in alerts_data:
+        try:
+            title = alert_data.get("title", "Note Reminder")
+            date_str = alert_data.get("date")
+            if not date_str:
+                continue
+            time_str = alert_data.get("time", "09:00:00")
+            alert_time = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
+
+            new_alert = Alert(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                note_id=note_id,
+                title=title,
+                alert_time=alert_time,
+                created_by_ai=True
+            )
+            db.add(new_alert)
+            new_alerts.append(new_alert)
+        except Exception as parse_err:
+            logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+
+    return new_alerts
+
+
 async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
@@ -40,31 +75,7 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
             await db.execute(update(Note).where(Note.id == note_id).values(**values))
 
             # Sync AI Alerts
-            # 1. Delete previous AI alerts for this note
-            await db.execute(delete(Alert).where(Alert.note_id == note_id, Alert.created_by_ai == True))
-
-            # 2. Insert new AI-extracted alerts
-            for alert_data in enrichment.get("alerts", []):
-                try:
-                    title = alert_data.get("title", "Note Reminder")
-                    date_str = alert_data.get("date")
-                    if not date_str:
-                        continue
-                    time_str = alert_data.get("time", "09:00:00")
-                    # Parse alert time
-                    alert_time = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
-
-                    new_alert = Alert(
-                        id=uuid.uuid4(),
-                        user_id=note.user_id,
-                        note_id=note_id,
-                        title=title,
-                        alert_time=alert_time,
-                        created_by_ai=True
-                    )
-                    db.add(new_alert)
-                except Exception as parse_err:
-                    logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+            await sync_ai_alerts(db, note.user_id, note_id, enrichment.get("alerts", []))
 
             await db.commit()
 
@@ -104,7 +115,7 @@ async def get_notes(
 ) -> list[Note]:
     stmt = select(Note).where(Note.user_id == user_id).order_by(Note.updated_at.desc())
     if tag:
-        stmt = stmt.where(Note.tags.any(tag))
+        stmt = stmt.where(Note.tags.contains([tag]))
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

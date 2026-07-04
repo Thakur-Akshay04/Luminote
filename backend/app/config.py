@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://notiq:notiq_secret@localhost:5432/notiq_db"
     redis_url: str = "redis://localhost:6379"
     groq_api_key: str = ""
-    openai_api_key: str = ""
     jwt_secret: str = "changeme"
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7

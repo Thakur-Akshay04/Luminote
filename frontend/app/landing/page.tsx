@@ -76,7 +76,7 @@ export default function LandingPage() {
           </div>
           <h3 className="text-base font-semibold text-white">AI Summarization</h3>
           <p className="text-xs text-neutral-400 leading-relaxed">
-            Instantly compile summaries, identify actionable takeaways, and generate categorizing tags directly from your text using Llama models.
+            Instantly compile summaries, identify actionable takeaways, and generate categorizing tags directly from your text using GPT OSS 120B and Qwen3.6 27B models.
           </p>
         </div>
 

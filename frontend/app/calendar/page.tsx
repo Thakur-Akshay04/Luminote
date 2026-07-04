@@ -19,17 +19,11 @@ import {
 import Link from "next/link";
 import {
   format,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameDay,
-  addMonths,
-  subMonths,
   parseISO,
   isToday,
+  isSameDay,
 } from "date-fns";
+import { useCalendar } from "@/hooks/useCalendar";
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -40,8 +34,15 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Calendar view state
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const {
+    currentMonth,
+    handlePrevMonth,
+    handleNextMonth,
+    daysGrid,
+    getAlertsForDay,
+  } = useCalendar(new Date(), alerts);
 
   // Manual alert creation state
   const [noteId, setNoteId] = useState("");
@@ -78,30 +79,6 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  // Navigate months
-  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-
-  // Compute days grid
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
-
-  const daysGrid = eachDayOfInterval({ start: startDate, end: endDate });
-
-  // Get alerts for specific day
-  const getAlertsForDay = (day: Date) => {
-    return alerts.filter((alert) => {
-      try {
-        const time = parseISO(alert.alert_time);
-        return isSameDay(time, day);
-      } catch {
-        return false;
-      }
-    });
-  };
 
   // Create alert handler
   const handleCreateAlert = async (e: React.FormEvent) => {
@@ -218,7 +195,10 @@ export default function CalendarPage() {
               return (
                 <button
                   key={idx}
-                  onClick={() => setSelectedDate(day)}
+                  onClick={() => {
+                    setSelectedDate(day);
+                    setAlertDate(format(day, "yyyy-MM-dd"));
+                  }}
                   className={`
                     relative aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-150
                     ${isCurrentMonthDay ? "text-gray-200" : "text-gray-600"}

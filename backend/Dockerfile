@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download the default fastembed model BAAI/bge-small-en-v1.5 to cache it in the image
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding()"
+
 COPY . .
 
 EXPOSE 8000

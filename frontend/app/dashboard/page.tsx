@@ -26,41 +26,19 @@ import {
   format,
   isSameDay,
   isToday,
-  parseISO,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  addMonths,
-  subMonths,
 } from "date-fns";
+import { useCalendar } from "@/hooks/useCalendar";
 
 // ── Mini Calendar Component ──────────────────────────────────────────────────
 
 function MiniCalendar({ alerts }: { alerts: Alert[] }) {
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  
-  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
-
-  const daysGrid = eachDayOfInterval({ start: startDate, end: endDate });
-
-  const getAlertsForDay = (day: Date) => {
-    return alerts.filter((alert) => {
-      try {
-        const time = parseISO(alert.alert_time);
-        return isSameDay(time, day);
-      } catch {
-        return false;
-      }
-    });
-  };
+  const {
+    currentMonth,
+    handlePrevMonth,
+    handleNextMonth,
+    daysGrid,
+    getAlertsForDay,
+  } = useCalendar(new Date(), alerts);
 
   const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 

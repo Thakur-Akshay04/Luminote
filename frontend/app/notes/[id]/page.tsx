@@ -41,6 +41,8 @@ export default function NoteEditorPage() {
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirty = useRef(false);
+  const titleRef = useRef("");
+  const contentRef = useRef("");
 
   useEffect(() => {
     if (!isAuthenticated()) router.replace("/login");
@@ -52,6 +54,8 @@ export default function NoteEditorPage() {
       setNote(res.data);
       setTitle(res.data.title ?? "");
       setContent(res.data.content);
+      titleRef.current = res.data.title ?? "";
+      contentRef.current = res.data.content;
     } catch {
       setError("Note not found.");
     } finally {
@@ -88,8 +92,8 @@ export default function NoteEditorPage() {
     setSaving(true);
     try {
       const res = await notesApi.update(noteId, {
-        title: title || undefined,
-        content,
+        title: titleRef.current || undefined,
+        content: contentRef.current,
       });
       setNote(res.data);
       isDirty.current = false;
@@ -100,7 +104,7 @@ export default function NoteEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [noteId, title, content]);
+  }, [noteId]);
 
   const scheduleAutosave = useCallback(() => {
     isDirty.current = true;
@@ -174,6 +178,7 @@ export default function NoteEditorPage() {
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
+            titleRef.current = e.target.value;
             scheduleAutosave();
           }}
         />
@@ -264,6 +269,7 @@ export default function NoteEditorPage() {
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
+                contentRef.current = e.target.value;
                 scheduleAutosave();
               }}
               spellCheck

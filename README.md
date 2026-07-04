@@ -8,7 +8,7 @@ Full-stack notes application with AI summarization, semantic search, and Q&A.
 - **Backend**: ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
 - **Database**: ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) + `pgvector`
 - **Cache**: ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
-- **LLM**: ![Groq](https://img.shields.io/badge/Groq-orange?style=flat-square) (llama-3.3-70b-versatile)
+- **LLM**: ![Groq](https://img.shields.io/badge/Groq-orange?style=flat-square) (GPT OSS 120B / Qwen3.6 27B)
 - **Embeddings**: ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white) (text-embedding-3-small)
 
 ## Quick Start
