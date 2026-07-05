@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Settings,
   HelpCircle,
+  FileSpreadsheet,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -35,6 +36,7 @@ export default function Navbar() {
     ? [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
         { href: "/notes",  label: "Notes",  icon: BookOpen },
+        { href: "/spreadsheets", label: "Spreadsheets", icon: FileSpreadsheet },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/search", label: "Search", icon: Search },
       ]

@@ -18,25 +18,25 @@
   }
 
   body {
-    @apply bg-[#0B0B0C] text-neutral-200 font-sans antialiased min-h-screen;
+    @apply bg-surface-base text-text-primary font-sans antialiased min-h-screen text-base;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight text-white;
+    @apply font-bold tracking-tight text-text-primary;
   }
 
   ::selection {
-    @apply bg-brand-500/30 text-white;
+    @apply bg-brand-500/30 text-text-primary;
   }
 
   ::-webkit-scrollbar {
     @apply w-1.5 h-1.5;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-[#0B0B0C];
+    @apply bg-surface-base;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-surface-600 rounded-full;
+    @apply bg-surface-strong rounded-xs;
   }
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-neutral-700;
@@ -46,25 +46,25 @@
 @layer components {
   /* Panel -> Clean flat panel with borders */
   .glass {
-    @apply bg-surface-900 border border-surface-600 rounded-xl;
+    @apply bg-surface-raised border border-border-muted rounded-xs;
   }
 
   .glass-hover {
-    @apply glass transition-all duration-200 hover:bg-surface-700 hover:border-surface-600;
+    @apply glass transition-all duration-instant hover:bg-surface-strong hover:border-border-muted;
   }
 
   /* Input */
   .input {
-    @apply w-full bg-surface-900 border border-surface-600 rounded-lg px-4 py-3
-           text-white placeholder-neutral-500 text-sm
+    @apply w-full bg-surface-raised border border-border-muted rounded-xs px-4 py-3
+           text-text-primary placeholder-text-tertiary text-sm
            focus:outline-none focus:border-brand-500 focus:ring-0
-           transition-all duration-200;
+           transition-all duration-instant;
   }
 
   /* Button variants - solid high-contrast white & black in dark mode */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
-           bg-white text-black font-semibold text-sm
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xs
+           bg-text-primary text-text-inverse font-semibold text-sm
            transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
            hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-neutral-100
            hover:shadow-[0_0_20px_rgba(219,39,119,0.3)]
@@ -73,16 +73,16 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
-           bg-transparent border border-surface-600 text-neutral-300 font-semibold text-sm
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xs
+           bg-transparent border border-border-muted text-text-secondary font-semibold text-sm
            transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
-           hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-surface-700 hover:text-white
+           hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-surface-strong hover:text-text-primary
            hover:border-brand-500/30 hover:shadow-[0_0_15px_rgba(219,39,119,0.15)]
            active:scale-[0.97] active:translate-y-0;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xs
            bg-transparent border border-red-900/30 text-red-400 font-semibold text-sm
            transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
            hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-950/20
@@ -92,41 +92,41 @@
 
   /* Tag pill */
   .tag {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold
-           bg-surface-700 text-neutral-300 border border-surface-600;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-xs text-[10px] font-semibold
+           bg-surface-strong text-text-secondary border border-border-muted;
   }
 
   /* Skeleton shimmer */
   .skeleton {
-    @apply bg-gradient-to-r from-surface-700 via-surface-600 to-surface-700 animate-shimmer
-           rounded-md;
+    @apply bg-gradient-to-r from-surface-strong via-surface-600 to-surface-strong animate-shimmer
+           rounded-xs;
     background-size: 200% 100%;
   }
 
   /* Markdown rendered content */
   .prose-luminote {
-    @apply text-neutral-300 leading-relaxed;
+    @apply text-text-secondary leading-relaxed;
   }
-  .prose-luminote h1 { @apply text-2xl font-bold text-white mt-6 mb-3; }
-  .prose-luminote h2 { @apply text-xl font-semibold text-white mt-5 mb-2; }
-  .prose-luminote h3 { @apply text-lg font-semibold text-white mt-4 mb-2; }
-  .prose-luminote p  { @apply mb-3 text-neutral-300; }
-  .prose-luminote ul { @apply list-disc list-inside mb-3 space-y-1 text-neutral-400; }
-  .prose-luminote ol { @apply list-decimal list-inside mb-3 space-y-1 text-neutral-400; }
-  .prose-luminote blockquote { @apply border-l-2 border-surface-500 pl-4 italic text-neutral-500 my-3; }
+  .prose-luminote h1 { @apply text-2xl font-bold text-text-primary mt-6 mb-3; }
+  .prose-luminote h2 { @apply text-xl font-semibold text-text-primary mt-5 mb-2; }
+  .prose-luminote h3 { @apply text-lg font-semibold text-text-primary mt-4 mb-2; }
+  .prose-luminote p  { @apply mb-3 text-text-secondary; }
+  .prose-luminote ul { @apply list-disc list-inside mb-3 space-y-1 text-text-tertiary; }
+  .prose-luminote ol { @apply list-decimal list-inside mb-3 space-y-1 text-text-tertiary; }
+  .prose-luminote blockquote { @apply border-l-2 border-surface-strong pl-4 italic text-text-tertiary my-3; }
   .prose-luminote code {
-    @apply font-mono text-sm bg-surface-800 text-neutral-200 px-1.5 py-0.5 rounded;
+    @apply font-mono text-sm bg-surface-strong text-text-primary px-1.5 py-0.5 rounded-xs;
   }
   .prose-luminote pre {
-    @apply bg-surface-900 rounded-lg p-4 overflow-x-auto mb-4 border border-surface-600;
+    @apply bg-surface-raised rounded-xs p-4 overflow-x-auto mb-4 border border-border-muted;
   }
-  .prose-luminote pre code { @apply bg-transparent p-0 text-neutral-300; }
-  .prose-luminote a { @apply text-white font-semibold hover:underline underline-offset-2; }
-  .prose-luminote strong { @apply text-white font-semibold; }
-  .prose-luminote hr { @apply border-surface-600 my-4; }
+  .prose-luminote pre code { @apply bg-transparent p-0 text-text-secondary; }
+  .prose-luminote a { @apply text-text-primary font-semibold hover:underline underline-offset-2; }
+  .prose-luminote strong { @apply text-text-primary font-semibold; }
+  .prose-luminote hr { @apply border-border-muted my-4; }
   .prose-luminote table { @apply w-full border-collapse mb-4 text-sm; }
-  .prose-luminote th { @apply border border-surface-600 bg-surface-700 px-3 py-2 text-left font-medium text-neutral-200; }
-  .prose-luminote td { @apply border border-surface-600 px-3 py-2 text-neutral-400; }
+  .prose-luminote th { @apply border border-border-muted bg-surface-strong px-3 py-2 text-left font-medium text-text-primary; }
+  .prose-luminote td { @apply border border-border-muted px-3 py-2 text-text-secondary; }
 }
 
 @layer utilities {
@@ -135,7 +135,7 @@
   }
 
   .border-gradient {
-    @apply border border-surface-600;
+    @apply border border-border-muted;
     border-radius: inherit;
   }
 }

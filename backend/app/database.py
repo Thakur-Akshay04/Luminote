@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -22,7 +23,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency — yields a database session."""
     async with AsyncSessionLocal() as session:
         try:
@@ -40,5 +41,5 @@ async def init_db() -> None:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
         )
-        from app.models import user, note, alert  # noqa: F401 — register models
+        from app.models import user, note, alert, spreadsheet  # noqa: F401 — register models
         await conn.run_sync(Base.metadata.create_all)

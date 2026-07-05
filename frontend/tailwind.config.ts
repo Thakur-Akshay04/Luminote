@@ -10,10 +10,68 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Oxygen",
+          "Ubuntu",
+          "Cantarell",
+          "Fira Sans",
+          "Droid Sans",
+          "Helvetica Neue",
+          "sans-serif"
+        ],
         mono: ["JetBrains Mono", "Fira Code", "monospace"],
       },
+      fontSize: {
+        xs: "12px",
+        sm: "13.01px",
+        base: "13.008px",
+        md: "14px",
+        lg: "15px",
+        xl: "18px",
+      },
+      spacing: {
+        "space-1": "2px",
+        "space-2": "4px",
+        "space-3": "6px",
+        "space-4": "8px",
+        "space-5": "12px",
+        "space-6": "14px",
+        "space-7": "15px",
+        "space-8": "40px",
+      },
+      borderRadius: {
+        "radius-xs": "4px",
+        "radius-sm": "9999px",
+        xs: "4px",
+        sm: "9999px",
+      },
+      transitionDuration: {
+        instant: "100ms",
+      },
       colors: {
+        text: {
+          primary: "#f4f4f5",
+          secondary: "#a1a1aa",
+          tertiary: "#71717a",
+          inverse: "#09090b",
+        },
+        surface: {
+          base: "#09090b",
+          raised: "#18181b",
+          strong: "#27272a",
+          900: "#18181b", // raised card/sidebar
+          800: "#09090b", // base background
+          700: "#27272a", // strong (hover states)
+          600: "#27272a", // border muted
+          500: "#71717a", // tertiary text
+        },
+        border: {
+          muted: "#27272a",
+        },
         brand: {
           50:  "#fdf2f8",
           100: "#fce7f3",
@@ -27,13 +85,6 @@ const config: Config = {
           900: "#701a3e",
           950: "#50132c",
         },
-        surface: {
-          900: "#131316",
-          800: "#0B0B0C",
-          700: "#1E1E22",
-          600: "#27272A",
-          500: "#52525B",
-        },
         accent: {
           violet: "#8b5cf6",
           cyan:   "#06b6d4",
@@ -44,7 +95,7 @@ const config: Config = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "hero-gradient":
-          "linear-gradient(135deg, #0B0B0C 0%, #131316 100%)",
+          "linear-gradient(135deg, #09090b 0%, #18181b 100%)",
       },
       animation: {
         "fade-in":    "fadeIn 0.4s ease-out",

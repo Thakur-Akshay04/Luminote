@@ -9,6 +9,9 @@ import type {
   AskResponse,
   Alert,
   SummarizeResponse,
+  Spreadsheet,
+  SpreadsheetCreate,
+  SpreadsheetUpdate,
 } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -74,4 +77,14 @@ export const alertsApi = {
 export const searchApi = {
   semantic: (query: string) =>
     api.post<SearchResponse>("/search", { query }),
+};
+
+// ── Spreadsheets ──────────────────────────────────────────────────────────────
+export const spreadsheetsApi = {
+  list: () => api.get<Spreadsheet[]>("/spreadsheets"),
+  get: (id: string) => api.get<Spreadsheet>(`/spreadsheets/${id}`),
+  create: (data: SpreadsheetCreate) => api.post<Spreadsheet>("/spreadsheets", data),
+  update: (id: string, data: SpreadsheetUpdate) =>
+    api.put<Spreadsheet>(`/spreadsheets/${id}`, data),
+  delete: (id: string) => api.delete(`/spreadsheets/${id}`),
 };

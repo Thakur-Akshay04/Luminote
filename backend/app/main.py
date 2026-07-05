@@ -12,7 +12,7 @@ from app.database import AsyncSessionLocal, init_db
 from app.models.alert import Alert
 from app.models.note import Note
 from app.redis_client import close_redis
-from app.routers import alerts, auth, notes, search
+from app.routers import alerts, auth, notes, search, spreadsheets
 
 logging.basicConfig(
     level=logging.INFO,
@@ -114,6 +114,7 @@ app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(search.router)
 app.include_router(alerts.router)
+app.include_router(spreadsheets.router)
 
 
 @app.get("/health")
