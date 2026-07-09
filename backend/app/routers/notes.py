@@ -69,7 +69,9 @@ async def update(
     db: AsyncSession = Depends(get_db),
 ):
     return await update_note(
-        note_id, uuid.UUID(user_id), body.title, body.content, db, background_tasks
+        note_id, uuid.UUID(user_id), body.title, body.content, db, background_tasks,
+        note_type=body.note_type,
+        checklist_items=body.checklist_items,
     )
 
 

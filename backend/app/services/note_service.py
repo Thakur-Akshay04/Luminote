@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -7,9 +8,12 @@ from typing import Optional
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.note import Note
 from app.models.alert import Alert
+from app.redis_client import get_redis
 from app.services.ai_service import get_embedding, summarize_note_with_ai
+
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +143,8 @@ async def update_note(
     content: Optional[str],
     db: AsyncSession,
     background_tasks,
+    note_type: Optional[str] = None,
+    checklist_items: Optional[list] = None,
 ) -> Note:
     note = await get_note(note_id, user_id, db)
 
@@ -149,10 +155,26 @@ async def update_note(
         values["title"] = title
     if content is not None:
         values["content"] = content
+    if note_type is not None:
+        values["note_type"] = note_type
+    if checklist_items is not None:
+        # Store as JSONB list — validated upstream by Pydantic
+        values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]
 
     await db.execute(update(Note).where(Note.id == note_id).values(**values))
     await db.commit()
     await db.refresh(note)
+
+    # Invalidate checklist cache if items were updated — O(1)
+    if checklist_items is not None:
+        try:
+            redis = await get_redis()
+            await redis.delete(f"checklist:{note_id}")
+            # Cache new value — O(1)
+            cache_val = json.dumps(values["checklist_items"])
+            await redis.setex(f"checklist:{note_id}", settings.checklist_cache_ttl, cache_val)
+        except Exception as e:
+            logger.warning("Redis checklist cache update failed: %s", e)
 
     if content_changed:
         from app.database import AsyncSessionLocal

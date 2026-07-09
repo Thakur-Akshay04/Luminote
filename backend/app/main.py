@@ -1,18 +1,21 @@
 import asyncio
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Dict, List
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal, init_db
 from app.models.alert import Alert
 from app.models.note import Note
 from app.redis_client import close_redis
-from app.routers import alerts, auth, notes, search, spreadsheets
+from app.routers import alerts, auth, notes, search
+from app.routers import drawing, audio, checklist, tasks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,6 +89,11 @@ async def lifespan(app: FastAPI):
     logging.getLogger(__name__).info("Initializing database...")
     await init_db()
 
+    # Ensure media directories exist
+    media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
+    os.makedirs(os.path.join(media_base, "drawings"), exist_ok=True)
+    os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
+
     # Setup connection manager and start background alert checker
     app.state.alert_manager = ConnectionManager()
     app.state.alerts_task = asyncio.create_task(check_alerts_loop(app.state.alert_manager))
@@ -114,7 +122,15 @@ app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(search.router)
 app.include_router(alerts.router)
-app.include_router(spreadsheets.router)
+app.include_router(drawing.router)
+app.include_router(audio.router)
+app.include_router(checklist.router)
+app.include_router(tasks.router)
+
+# Static file serving for /media/ (drawings, audio)
+media_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
+os.makedirs(media_path, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_path), name="media")
 
 
 @app.get("/health")

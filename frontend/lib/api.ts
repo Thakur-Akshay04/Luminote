@@ -9,9 +9,9 @@ import type {
   AskResponse,
   Alert,
   SummarizeResponse,
-  Spreadsheet,
-  SpreadsheetCreate,
-  SpreadsheetUpdate,
+  DrawingResponse,
+  TranscriptResponse,
+  ExtractTasksResponse,
 } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -63,6 +63,27 @@ export const notesApi = {
     api.post<AskResponse>(`/notes/${id}/ask`, { question }),
   summarize: (id: string, format: string, extractAlerts: boolean) =>
     api.post<SummarizeResponse>(`/notes/${id}/summarize`, { format, extract_alerts: extractAlerts }),
+
+  // ── Feature 1: Freehand Drawing ──────────────────────────────────────────
+  saveDrawing: (id: string, base64Image: string) =>
+    api.post<DrawingResponse>(`/notes/${id}/drawing`, { image: base64Image }),
+  getDrawing: (id: string) =>
+    api.get<DrawingResponse>(`/notes/${id}/drawing`),
+
+  // ── Feature 2: Audio Recording & Transcription ───────────────────────────
+  uploadAudio: (id: string, audioBlob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "recording.webm");
+    return api.post<TranscriptResponse>(`/notes/${id}/audio`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // ── Feature 3: To-do Checklist ───────────────────────────────────────────
+  toggleChecklistItem: (id: string, index: number, checked: boolean) =>
+    api.patch(`/notes/${id}/checklist/${index}`, { checked }),
+  extractTasks: (id: string) =>
+    api.post<ExtractTasksResponse>(`/notes/${id}/extract-tasks`),
 };
 
 // ── Alerts ────────────────────────────────────────────────────────────────────
@@ -79,12 +100,3 @@ export const searchApi = {
     api.post<SearchResponse>("/search", { query }),
 };
 
-// ── Spreadsheets ──────────────────────────────────────────────────────────────
-export const spreadsheetsApi = {
-  list: () => api.get<Spreadsheet[]>("/spreadsheets"),
-  get: (id: string) => api.get<Spreadsheet>(`/spreadsheets/${id}`),
-  create: (data: SpreadsheetCreate) => api.post<Spreadsheet>("/spreadsheets", data),
-  update: (id: string, data: SpreadsheetUpdate) =>
-    api.put<Spreadsheet>(`/spreadsheets/${id}`, data),
-  delete: (id: string) => api.delete(`/spreadsheets/${id}`),
-};

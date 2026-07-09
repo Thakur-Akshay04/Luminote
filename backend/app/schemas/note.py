@@ -1,8 +1,15 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+class ChecklistItem(BaseModel):
+    """Single checklist item — validates id, text, checked fields."""
+    id: str
+    text: str
+    checked: bool
 
 
 class NoteCreate(BaseModel):
@@ -13,6 +20,24 @@ class NoteCreate(BaseModel):
 class NoteUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    note_type: Optional[str] = None
+    checklist_items: Optional[list[ChecklistItem]] = None
+
+    @field_validator("checklist_items", mode="before")
+    @classmethod
+    def validate_checklist_items(cls, v: Any) -> Any:
+        """Validate all items have id, text, and checked — return 422 if malformed."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("checklist_items must be a JSON array")
+        for i, item in enumerate(v):
+            if not isinstance(item, dict):
+                raise ValueError(f"Item at index {i} must be an object")
+            for field in ("id", "text", "checked"):
+                if field not in item:
+                    raise ValueError(f"Item at index {i} missing required field: {field}")
+        return v
 
 
 class NoteResponse(BaseModel):
@@ -22,6 +47,10 @@ class NoteResponse(BaseModel):
     content: str
     summary: Optional[str]
     tags: Optional[list[str]]
+    note_type: Optional[str] = "text"
+    media_url: Optional[str] = None
+    transcript: Optional[str] = None
+    checklist_items: Optional[list[dict]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -47,3 +76,4 @@ from app.schemas.alert import AlertResponse
 class SummarizeResponse(BaseModel):
     note: NoteResponse
     alerts: list[AlertResponse]
+

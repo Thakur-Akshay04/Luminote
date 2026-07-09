@@ -36,10 +36,25 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables and enable pgvector extension."""
+    """Create all tables, enable pgvector extension, and run migrations."""
     async with engine.begin() as conn:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
         )
-        from app.models import user, note, alert, spreadsheet  # noqa: F401 — register models
+        from app.models import user, note, alert  # noqa: F401 — register models
         await conn.run_sync(Base.metadata.create_all)
+
+        # ── Schema migration for Features 1–4 (idempotent) ───────────────────
+        migration_sql = """
+        ALTER TABLE notes ADD COLUMN IF NOT EXISTS note_type VARCHAR(20) DEFAULT 'text';
+        ALTER TABLE notes ADD COLUMN IF NOT EXISTS media_url TEXT;
+        ALTER TABLE notes ADD COLUMN IF NOT EXISTS transcript TEXT;
+        ALTER TABLE notes ADD COLUMN IF NOT EXISTS checklist_items JSONB;
+        CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes (note_type);
+        CREATE INDEX IF NOT EXISTS idx_notes_checklist ON notes USING GIN (checklist_items);
+        """
+        for stmt in migration_sql.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                await conn.execute(__import__("sqlalchemy").text(stmt))
+

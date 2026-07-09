@@ -4,6 +4,7 @@ from typing import Optional
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import ARRAY, DateTime, ForeignKey, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -23,6 +24,15 @@ class Note(Base):
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String), nullable=True)
     embedding: Mapped[Optional[list[float]]] = mapped_column(Vector(384), nullable=True)
+
+    # ── New columns for Features 1–4 ──────────────────────────────────────────
+    note_type: Mapped[Optional[str]] = mapped_column(
+        String(20), server_default=text("'text'"), nullable=False, index=True
+    )
+    media_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    checklist_items: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
