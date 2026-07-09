@@ -36,8 +36,8 @@ async def decode_token(token: str) -> str:
     """Decode JWT and verify it exists in Redis. Returns user_id string."""
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        user_id: str = payload.get("sub")
-        if not user_id:
+        user_id = payload.get("sub")
+        if not isinstance(user_id, str) or not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

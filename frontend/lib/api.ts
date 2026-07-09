@@ -12,6 +12,7 @@ import type {
   DrawingResponse,
   TranscriptResponse,
   ExtractTasksResponse,
+  AudioUploadResponse,
 } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -73,11 +74,13 @@ export const notesApi = {
   // ── Feature 2: Audio Recording & Transcription ───────────────────────────
   uploadAudio: (id: string, audioBlob: Blob) => {
     const formData = new FormData();
-    formData.append("file", audioBlob, "recording.webm");
-    return api.post<TranscriptResponse>(`/notes/${id}/audio`, formData, {
+    formData.append("file", audioBlob, "recording.mp3");
+    return api.post<AudioUploadResponse>(`/notes/${id}/audio`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  transcribeAudio: (id: string) =>
+    api.post<TranscriptResponse>(`/notes/${id}/transcribe`),
 
   // ── Feature 3: To-do Checklist ───────────────────────────────────────────
   toggleChecklistItem: (id: string, index: number, checked: boolean) =>

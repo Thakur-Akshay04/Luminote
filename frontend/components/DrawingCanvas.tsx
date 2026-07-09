@@ -11,7 +11,7 @@
  * - Loads existing drawing on mount for continued editing
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { notesApi } from "@/lib/api";
 import {
   Pen,
@@ -35,174 +35,187 @@ const PRESET_COLORS = [
   "#09090b", // black
 ];
 
+export interface DrawingCanvasRef {
+  save: () => Promise<void>;
+}
+
 interface DrawingCanvasProps {
   noteId: string;
   mediaUrl: string | null;
+  onDrawingSave?: (mediaUrl: string) => void;
 }
 
-export default function DrawingCanvas({ noteId, mediaUrl }: DrawingCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  // Undo stack: stores Fabric path objects — O(1) push/pop
-  const strokeHistory = useRef<any[]>([]);
+const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
+  ({ noteId, mediaUrl, onDrawingSave }, ref) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const fabricRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    // Undo stack: stores Fabric path objects — O(1) push/pop
+    const strokeHistory = useRef<any[]>([]);
 
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [color, setColor] = useState("#f4f4f5");
-  const [hexInput, setHexInput] = useState("#f4f4f5");
-  const [strokeSize, setStrokeSize] = useState(3);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+    const [tool, setTool] = useState<"pen" | "eraser">("pen");
+    const [color, setColor] = useState("#f4f4f5");
+    const [hexInput, setHexInput] = useState("#f4f4f5");
+    const [strokeSize, setStrokeSize] = useState(3);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [showColorPicker, setShowColorPicker] = useState(false);
 
-  // Initialize Fabric.js canvas
-  useEffect(() => {
-    let mounted = true;
+    useImperativeHandle(ref, () => ({
+      save: handleSave,
+    }));
 
-    const initCanvas = async () => {
-      if (!canvasRef.current || fabricRef.current) return;
+    // Initialize Fabric.js canvas
+    useEffect(() => {
+      let mounted = true;
 
-      const fabricModule = await import("fabric");
-      const fabric = fabricModule;
+      const initCanvas = async () => {
+        if (!canvasRef.current || fabricRef.current) return;
 
-      if (!mounted || !canvasRef.current) return;
+        const fabricModule = await import("fabric");
+        const fabric = fabricModule;
 
-      const container = containerRef.current;
-      const width = container ? container.clientWidth : 800;
+        if (!mounted || !canvasRef.current) return;
 
-      const canvas = new fabric.Canvas(canvasRef.current, {
-        width,
-        height: 400,
-        backgroundColor: "#18181b",
-        isDrawingMode: true,
-      });
+        const container = containerRef.current;
+        const width = container ? container.clientWidth : 800;
 
-      canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-      canvas.freeDrawingBrush.color = color;
-      canvas.freeDrawingBrush.width = strokeSize;
+        const canvas = new fabric.Canvas(canvasRef.current, {
+          width,
+          height: 400,
+          backgroundColor: "#18181b",
+          isDrawingMode: true,
+        });
 
-      // Track each stroke for undo — O(1) push per path:created event
-      canvas.on("path:created", (e: any) => {
-        if (e.path) {
-          strokeHistory.current.push(e.path);
+        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+        canvas.freeDrawingBrush.color = color;
+        canvas.freeDrawingBrush.width = strokeSize;
+
+        // Track each stroke for undo — O(1) push per path:created event
+        canvas.on("path:created", (e: any) => {
+          if (e.path) {
+            strokeHistory.current.push(e.path);
+          }
+        });
+
+        fabricRef.current = canvas;
+
+        // Load existing drawing if available
+        if (mediaUrl) {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+            const imgUrl = `${baseUrl}${mediaUrl}?t=${Date.now()}`;
+            const imgEl = new Image();
+            imgEl.crossOrigin = "anonymous";
+            imgEl.src = imgUrl;
+            imgEl.onload = () => {
+              if (!fabricRef.current) return;
+              const fImg = new fabric.FabricImage(imgEl, {
+                left: 0,
+                top: 0,
+                selectable: false,
+                evented: false,
+              });
+              // Scale to fit canvas
+              const scaleX = canvas.width! / imgEl.width;
+              const scaleY = canvas.height! / imgEl.height;
+              const scale = Math.min(scaleX, scaleY);
+              fImg.scale(scale);
+              canvas.add(fImg);
+              canvas.sendObjectToBack(fImg);
+              canvas.renderAll();
+            };
+          } catch {
+            // Silently handle load failure — user can draw fresh
+          }
         }
-      });
+      };
 
-      fabricRef.current = canvas;
+      initCanvas();
 
-      // Load existing drawing if available
-      if (mediaUrl) {
-        try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-          const imgUrl = `${baseUrl}${mediaUrl}?t=${Date.now()}`;
-          const imgEl = new Image();
-          imgEl.crossOrigin = "anonymous";
-          imgEl.src = imgUrl;
-          imgEl.onload = () => {
-            if (!fabricRef.current) return;
-            const fImg = new fabric.FabricImage(imgEl, {
-              left: 0,
-              top: 0,
-              selectable: false,
-              evented: false,
-            });
-            // Scale to fit canvas
-            const scaleX = canvas.width! / imgEl.width;
-            const scaleY = canvas.height! / imgEl.height;
-            const scale = Math.min(scaleX, scaleY);
-            fImg.scale(scale);
-            canvas.add(fImg);
-            canvas.sendObjectToBack(fImg);
-            canvas.renderAll();
-          };
-        } catch {
-          // Silently handle load failure — user can draw fresh
+      return () => {
+        mounted = false;
+        if (fabricRef.current) {
+          fabricRef.current.dispose();
+          fabricRef.current = null;
         }
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Handle window resize
+    useEffect(() => {
+      const handleResize = () => {
+        if (!fabricRef.current || !containerRef.current) return;
+        const width = containerRef.current.clientWidth;
+        fabricRef.current.setWidth(width);
+        fabricRef.current.renderAll();
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    // Update brush settings when tool/color/size changes
+    useEffect(() => {
+      if (!fabricRef.current) return;
+      const canvas = fabricRef.current;
+
+      if (tool === "eraser") {
+        canvas.freeDrawingBrush.color = "#18181b"; // match background
+        canvas.freeDrawingBrush.width = strokeSize * 3;
+      } else {
+        canvas.freeDrawingBrush.color = color;
+        canvas.freeDrawingBrush.width = strokeSize;
       }
-    };
+    }, [tool, color, strokeSize]);
 
-    initCanvas();
-
-    return () => {
-      mounted = false;
-      if (fabricRef.current) {
-        fabricRef.current.dispose();
-        fabricRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (!fabricRef.current || !containerRef.current) return;
-      const width = containerRef.current.clientWidth;
-      fabricRef.current.setWidth(width);
+    // Undo last stroke — O(1) pop from stack
+    const handleUndo = useCallback(() => {
+      if (!fabricRef.current || strokeHistory.current.length === 0) return;
+      const lastPath = strokeHistory.current.pop();
+      fabricRef.current.remove(lastPath);
       fabricRef.current.renderAll();
+    }, []);
+
+    // Clear all strokes
+    const handleClear = useCallback(() => {
+      if (!fabricRef.current) return;
+      fabricRef.current.clear();
+      fabricRef.current.backgroundColor = "#18181b";
+      fabricRef.current.renderAll();
+      strokeHistory.current = [];
+    }, []);
+
+    // Save drawing as base64 PNG
+    const handleSave = useCallback(async () => {
+      if (!fabricRef.current) return;
+      setSaving(true);
+      setMessage(null);
+
+      try {
+        const dataUrl = fabricRef.current.toDataURL({
+          format: "png",
+          quality: 1,
+          multiplier: 1,
+        });
+        const res = await notesApi.saveDrawing(noteId, dataUrl);
+        setMessage({ type: "success", text: "Drawing saved" });
+        setTimeout(() => setMessage(null), 3000);
+        if (onDrawingSave) {
+          onDrawingSave(res.data.media_url);
+        }
+      } catch {
+        setMessage({ type: "error", text: "Failed to save drawing — please try again" });
+      } finally {
+        setSaving(false);
+      }
+    }, [noteId, onDrawingSave]);
+
+    const handleColorSelect = (c: string) => {
+      setColor(c);
+      setHexInput(c);
+      setTool("pen");
     };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Update brush settings when tool/color/size changes
-  useEffect(() => {
-    if (!fabricRef.current) return;
-    const canvas = fabricRef.current;
-
-    if (tool === "eraser") {
-      canvas.freeDrawingBrush.color = "#18181b"; // match background
-      canvas.freeDrawingBrush.width = strokeSize * 3;
-    } else {
-      canvas.freeDrawingBrush.color = color;
-      canvas.freeDrawingBrush.width = strokeSize;
-    }
-  }, [tool, color, strokeSize]);
-
-  // Undo last stroke — O(1) pop from stack
-  const handleUndo = useCallback(() => {
-    if (!fabricRef.current || strokeHistory.current.length === 0) return;
-    const lastPath = strokeHistory.current.pop();
-    fabricRef.current.remove(lastPath);
-    fabricRef.current.renderAll();
-  }, []);
-
-  // Clear all strokes
-  const handleClear = useCallback(() => {
-    if (!fabricRef.current) return;
-    fabricRef.current.clear();
-    fabricRef.current.backgroundColor = "#18181b";
-    fabricRef.current.renderAll();
-    strokeHistory.current = [];
-  }, []);
-
-  // Save drawing as base64 PNG
-  const handleSave = useCallback(async () => {
-    if (!fabricRef.current) return;
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const dataUrl = fabricRef.current.toDataURL({
-        format: "png",
-        quality: 1,
-        multiplier: 1,
-      });
-      await notesApi.saveDrawing(noteId, dataUrl);
-      setMessage({ type: "success", text: "Drawing saved" });
-      setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setMessage({ type: "error", text: "Failed to save drawing — please try again" });
-    } finally {
-      setSaving(false);
-    }
-  }, [noteId]);
-
-  const handleColorSelect = (c: string) => {
-    setColor(c);
-    setHexInput(c);
-    setTool("pen");
-  };
 
   const handleHexSubmit = () => {
     if (/^#[0-9a-fA-F]{6}$/.test(hexInput)) {
@@ -399,4 +412,7 @@ export default function DrawingCanvas({ noteId, mediaUrl }: DrawingCanvasProps) 
       </div>
     </div>
   );
-}
+});
+
+DrawingCanvas.displayName = "DrawingCanvas";
+export default DrawingCanvas;

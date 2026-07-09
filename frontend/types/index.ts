@@ -94,3 +94,7 @@ export interface TranscriptResponse {
 export interface ExtractTasksResponse {
   tasks: ChecklistItem[];
 }
+
+export interface AudioUploadResponse {
+  media_url: string;
+}

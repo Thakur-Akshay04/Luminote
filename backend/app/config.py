@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://notiq:notiq_secret@localhost:5432/notiq_db"
     redis_url: str = "redis://localhost:6379"
     groq_api_key: str = ""
-    groq_whisper_model: str = "whisper-large-v3"
+    groq_whisper_model: str = "whisper-large-v3-turbo"
     groq_task_model: str = "qwen/qwen3.6-27b"
     jwt_secret: str = "changeme"
     jwt_algorithm: str = "HS256"

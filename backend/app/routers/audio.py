@@ -1,7 +1,8 @@
 """
-Feature 2 — Audio Recording & Transcription: upload audio, transcribe via Groq Whisper.
+Feature 2 — Audio Recording & Transcription: upload audio as mp3, transcribe on-demand via Groq Whisper.
 
-POST /notes/{note_id}/audio — validate audio, save to disk, transcribe, cache result
+POST  /notes/{note_id}/audio — save audio as .mp3 on disk + DB, invalidate cache
+POST  /notes/{note_id}/transcribe — transcribe saved .mp3 via Groq Whisper, cache result
 """
 import logging
 import os
@@ -43,32 +44,32 @@ async def get_current_user(authorization: str = Header(...)) -> str:
 
 from pydantic import BaseModel
 
+class AudioUploadResponse(BaseModel):
+    media_url: str
+
+
 class TranscriptResponse(BaseModel):
     transcript: str
 
 
-@router.post("/{note_id}/audio", response_model=TranscriptResponse, status_code=200)
+@router.post("/{note_id}/audio", response_model=AudioUploadResponse, status_code=200)
 async def upload_audio(
     note_id: uuid.UUID,
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload audio for transcription via Groq Whisper.
+    """Upload audio, save directly as .mp3 file, update media_url.
 
-    - Validates note exists and belongs to authenticated user
-    - Validates file is a valid audio format — rejects non-audio uploads with 400
-    - Saves to /media/audio/{note_id}.webm — overwrites if exists — O(1) write
-    - Sends to Groq Whisper (whisper-large-v3) for transcription
-    - On Groq error, returns 502 "Transcription service unavailable"
-    - Saves transcript to transcript column by primary key — O(log n)
-    - Caches in Redis: transcript:{note_id} TTL 7 days — O(1)
-    - Invalidates stale cache before write
+    - Validates note exists and belongs to authenticated user.
+    - Saves to /media/audio/{note_id}.mp3 — overwrites if exists.
+    - Updates media_url in notes table.
+    - Invalidates stale transcript cache.
     """
-    # Validate note ownership — returns 404 if not found
+    # Validate note ownership
     await get_note(note_id, uuid.UUID(user_id), db)
 
-    # Validate file type — O(1)
+    # Validate file type
     content_type = file.content_type or ""
     if content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
@@ -92,24 +93,77 @@ async def upload_audio(
     # Ensure media directory exists
     os.makedirs(MEDIA_DIR, exist_ok=True)
 
-    # Determine file extension from content type
-    ext = "webm"
-    if "wav" in content_type:
-        ext = "wav"
-    elif "mpeg" in content_type or "mp3" in content_type:
-        ext = "mp3"
-    elif "flac" in content_type:
-        ext = "flac"
-
-    # Save to disk — O(1) write (overwrites if exists)
-    file_path = os.path.join(MEDIA_DIR, f"{note_id}.{ext}")
+    # Save to disk as .mp3 — O(1) write (overwrites if exists)
+    file_path = os.path.join(MEDIA_DIR, f"{note_id}.mp3")
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(audio_bytes)
+
+    media_url = f"/media/audio/{note_id}.mp3"
+
+    # Update media_url in DB by primary key — O(log n)
+    await db.execute(
+        update(Note).where(Note.id == note_id).values(media_url=media_url)
+    )
+    await db.commit()
+
+    # Invalidate stale transcript cache
+    redis = await get_redis()
+    cache_key = f"transcript:{note_id}"
+    await redis.delete(cache_key)
+
+    return AudioUploadResponse(media_url=media_url)
+
+
+@router.post("/{note_id}/transcribe", response_model=TranscriptResponse)
+async def transcribe_audio(
+    note_id: uuid.UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Transcribe already saved .mp3 file for a note via Groq Whisper on-demand.
+
+    - Check Redis cache first.
+    - If cache miss, read .mp3 file from disk.
+    - Transcribe using Groq Whisper.
+    - Save transcript to DB and cache.
+    """
+    # Validate note ownership
+    note = await get_note(note_id, uuid.UUID(user_id), db)
+
+    # Check cache first
+    redis = await get_redis()
+    cache_key = f"transcript:{note_id}"
+    cached_text = await redis.get(cache_key)
+    if cached_text:
+        return TranscriptResponse(transcript=cached_text)
+
+    # Check DB transcript if already present
+    if note.transcript:
+        await redis.setex(cache_key, settings.media_cache_ttl, note.transcript)
+        return TranscriptResponse(transcript=note.transcript)
+
+    # Read .mp3 file from disk
+    file_path = os.path.join(MEDIA_DIR, f"{note_id}.mp3")
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio recording not found. Please record audio first."
+        )
+
+    try:
+        async with aiofiles.open(file_path, "rb") as f:
+            audio_bytes = await f.read()
+    except Exception as e:
+        logger.error("Failed to read audio file %s: %s", file_path, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to read audio file from disk"
+        )
 
     # Send to Groq Whisper for transcription
     try:
         transcription = await client.audio.transcriptions.create(
-            file=(f"{note_id}.{ext}", audio_bytes),
+            file=("recording.mp3", audio_bytes),
             model=settings.groq_whisper_model,
             language="en",
         )
@@ -121,16 +175,13 @@ async def upload_audio(
             detail="Transcription service unavailable — please try again"
         )
 
-    # Save transcript to DB by primary key — O(log n)
+    # Save transcript to DB
     await db.execute(
         update(Note).where(Note.id == note_id).values(transcript=transcript_text)
     )
     await db.commit()
 
-    # Invalidate stale cache, then set new value — O(1) Redis operations
-    redis = await get_redis()
-    cache_key = f"transcript:{note_id}"
-    await redis.delete(cache_key)
+    # Populate cache
     await redis.setex(cache_key, settings.media_cache_ttl, transcript_text)
 
     return TranscriptResponse(transcript=transcript_text)
