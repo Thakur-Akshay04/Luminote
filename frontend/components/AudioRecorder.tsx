@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { notesApi } from "@/lib/api";
-import { Mic, Square, Loader2, Play, Volume2, Copy, Check, Sparkles } from "lucide-react";
+import { Mic, Square, Loader2, Play, Volume2, Copy, Check, Sparkles, RefreshCw } from "lucide-react";
 
 interface AudioRecorderProps {
   noteId: string;
@@ -27,6 +27,7 @@ export default function AudioRecorder({
   const [copied, setCopied] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -34,6 +35,10 @@ export default function AudioRecorder({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
     };
   }, []);
 
@@ -44,6 +49,7 @@ export default function AudioRecorder({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const options = { mimeType: "audio/webm" };
       
       const mediaRecorder = new MediaRecorder(stream, options);
@@ -57,7 +63,10 @@ export default function AudioRecorder({
 
       mediaRecorder.onstop = async () => {
         // Stop all audio stream tracks to release microphone
-        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
 
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         await handleUpload(audioBlob);
@@ -72,6 +81,10 @@ export default function AudioRecorder({
     } catch (err: any) {
       console.error("Microphone access error:", err);
       setError("Microphone access denied or not supported.");
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
     }
   };
 
@@ -84,6 +97,11 @@ export default function AudioRecorder({
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
   };
 
@@ -103,11 +121,11 @@ export default function AudioRecorder({
     }
   };
 
-  const handleTranscribe = async () => {
+  const handleTranscribe = async (force: boolean = false) => {
     setTranscribing(true);
     setError(null);
     try {
-      const res = await notesApi.transcribeAudio(noteId);
+      const res = await notesApi.transcribeAudio(noteId, force);
       onTranscriptUpdate(res.data.transcript);
     } catch (err: any) {
       console.error("Audio transcription error:", err);
@@ -230,7 +248,7 @@ export default function AudioRecorder({
 
           {!transcript && (
             <button
-              onClick={handleTranscribe}
+              onClick={() => handleTranscribe(false)}
               disabled={transcribing}
               className="btn-primary w-full py-2 flex items-center justify-center gap-2"
               id="transcribe-audio-btn"
@@ -256,24 +274,36 @@ export default function AudioRecorder({
                 Voice Transcript
               </span>
             </div>
-            <button
-              onClick={copyToClipboard}
-              className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1 text-xs"
-              title="Copy to clipboard"
-              id="copy-transcript-btn"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleTranscribe(true)}
+                disabled={transcribing}
+                className="text-neutral-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 text-xs"
+                title="Regenerate transcript"
+                id="regenerate-transcript-btn"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${transcribing ? "animate-spin text-brand-400" : ""}`} />
+                <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
+              </button>
+              <button
+                onClick={copyToClipboard}
+                className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1 text-xs"
+                title="Copy to clipboard"
+                id="copy-transcript-btn"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           <p className="text-sm text-gray-300 leading-relaxed font-sans whitespace-pre-wrap">
             {transcript}

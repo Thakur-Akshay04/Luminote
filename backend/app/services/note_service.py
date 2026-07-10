@@ -56,6 +56,29 @@ async def sync_ai_alerts(
 async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
+        # Check note_type first to avoid using model for voice (audio) and drawing features
+        async with session_factory() as db:
+            note = await db.get(Note, note_id)
+            if not note:
+                logger.warning("Note %s not found during AI pipeline execution", note_id)
+                return
+            note_type = note.note_type
+            user_id = note.user_id
+
+        if note_type in ("audio", "drawing"):
+            logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
+            embedding = await get_embedding(content)
+            if embedding:
+                async with session_factory() as db:
+                    await db.execute(
+                        update(Note).where(Note.id == note_id).values(
+                            embedding=embedding,
+                            updated_at=datetime.now(timezone.utc)
+                        )
+                    )
+                    await db.commit()
+            return
+
         current_time_str = datetime.now(timezone.utc).isoformat()
         enrichment, embedding = await asyncio.gather(
             summarize_note_with_ai(content, format="paragraph", extract_alerts=True, current_time_str=current_time_str),
@@ -79,7 +102,7 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
             await db.execute(update(Note).where(Note.id == note_id).values(**values))
 
             # Sync AI Alerts
-            await sync_ai_alerts(db, note.user_id, note_id, enrichment.get("alerts", []))
+            await sync_ai_alerts(db, user_id, note_id, enrichment.get("alerts", []))
 
             await db.commit()
 

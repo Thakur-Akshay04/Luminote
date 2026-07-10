@@ -79,8 +79,8 @@ export const notesApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-  transcribeAudio: (id: string) =>
-    api.post<TranscriptResponse>(`/notes/${id}/transcribe`),
+  transcribeAudio: (id: string, force: boolean = false) =>
+    api.post<TranscriptResponse>(`/notes/${id}/transcribe${force ? "?force=true" : ""}`),
 
   // ── Feature 3: To-do Checklist ───────────────────────────────────────────
   toggleChecklistItem: (id: string, index: number, checked: boolean) =>

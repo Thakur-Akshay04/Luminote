@@ -84,7 +84,7 @@ export default function NoteEditorPage() {
 
   // Poll for AI enrichment if not ready yet
   useEffect(() => {
-    if (!note) return;
+    if (!note || noteType !== "text") return;
     if (note.summary && note.tags?.length) return; // already enriched
 
     const interval = setInterval(async () => {
@@ -100,7 +100,7 @@ export default function NoteEditorPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [note, noteId]);
+  }, [note, noteId, noteType]);
 
   const saveNote = useCallback(async () => {
     if (!isDirty.current) return;
@@ -310,19 +310,21 @@ export default function NoteEditorPage() {
           </button>
 
           {/* AI Panel toggle */}
-          <button
-            onClick={() => setShowAI(!showAI)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all
-              ${showAI
-                ? "bg-brand-500/15 border border-brand-500/30 text-brand-300"
-                : "btn-secondary"
-              }`}
-            id="ai-panel-toggle"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">AI</span>
-            {showAI ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-          </button>
+          {noteType === "text" && (
+            <button
+              onClick={() => setShowAI(!showAI)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all
+                ${showAI
+                  ? "bg-brand-500/15 border border-brand-500/30 text-brand-300"
+                  : "btn-secondary"
+                }`}
+              id="ai-panel-toggle"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI</span>
+              {showAI ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -490,7 +492,7 @@ export default function NoteEditorPage() {
                       <p className="text-gray-300 text-sm leading-relaxed">{note.transcript}</p>
                       <hr className="border-white/[0.06]" />
                       <div className="text-xs text-gray-500 italic">
-                        Note: The audio transcript is saved inside your note database record and will automatically enrich search and summary insights.
+                        Note: The audio transcript is saved inside your note database record and will automatically enrich search insights.
                       </div>
                     </div>
                   ) : (
@@ -536,7 +538,7 @@ export default function NoteEditorPage() {
         </div>
 
         {/* AI Panel */}
-        {showAI && note && (
+        {noteType === "text" && showAI && note && (
           <div className="hidden lg:flex flex-col w-80 xl:w-96 border-l border-white/[0.06] overflow-y-auto p-4">
             <AIPanel note={note} onUpdateNote={setNote} />
           </div>
@@ -544,7 +546,7 @@ export default function NoteEditorPage() {
       </div>
 
       {/* Mobile AI panel (bottom sheet) */}
-      {showAI && note && (
+      {noteType === "text" && showAI && note && (
         <div className="lg:hidden border-t border-white/[0.06] max-h-64 overflow-y-auto p-4">
           <AIPanel note={note} onUpdateNote={setNote} />
         </div>

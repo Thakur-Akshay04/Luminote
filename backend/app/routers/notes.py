@@ -17,7 +17,6 @@ from app.services.note_service import (
     update_note,
     sync_ai_alerts,
 )
-from app.models.alert import Alert
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +105,11 @@ async def summarize(
     from datetime import datetime, timezone
     
     note = await get_note(note_id, uuid.UUID(user_id), db)
+    if note.note_type in ("audio", "drawing"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI summarization is disabled for voice and drawing notes."
+        )
     current_time_str = datetime.now(timezone.utc).isoformat()
     
     enrichment = await summarize_note_with_ai(

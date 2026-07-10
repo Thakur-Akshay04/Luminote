@@ -1,7 +1,6 @@
 import hashlib
 import json
 import re
-import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import text

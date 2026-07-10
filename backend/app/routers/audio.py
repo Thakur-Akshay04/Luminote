@@ -117,6 +117,7 @@ async def upload_audio(
 @router.post("/{note_id}/transcribe", response_model=TranscriptResponse)
 async def transcribe_audio(
     note_id: uuid.UUID,
+    force: bool = False,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -133,14 +134,15 @@ async def transcribe_audio(
     # Check cache first
     redis = await get_redis()
     cache_key = f"transcript:{note_id}"
-    cached_text = await redis.get(cache_key)
-    if cached_text:
-        return TranscriptResponse(transcript=cached_text)
+    if not force:
+        cached_text = await redis.get(cache_key)
+        if cached_text:
+            return TranscriptResponse(transcript=cached_text)
 
-    # Check DB transcript if already present
-    if note.transcript:
-        await redis.setex(cache_key, settings.media_cache_ttl, note.transcript)
-        return TranscriptResponse(transcript=note.transcript)
+        # Check DB transcript if already present
+        if note.transcript:
+            await redis.setex(cache_key, settings.media_cache_ttl, note.transcript)
+            return TranscriptResponse(transcript=note.transcript)
 
     # Read .mp3 file from disk
     file_path = os.path.join(MEDIA_DIR, f"{note_id}.mp3")

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Note } from "@/types";
 import { notesApi } from "@/lib/api";
-import { Sparkles, Tag, MessageSquare, SendHorizonal, Loader2, X, ListTodo } from "lucide-react";
+import { Sparkles, Tag, MessageSquare, SendHorizonal, Loader2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

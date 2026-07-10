@@ -3,7 +3,6 @@ Feature 3 — To-do Checklist: targeted JSONB update for toggling single checkli
 
 PATCH /notes/{note_id}/checklist/{item_index} — toggle checked via jsonb_set — O(log n)
 """
-import json
 import logging
 import uuid
 

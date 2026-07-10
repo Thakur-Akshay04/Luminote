@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, delete
