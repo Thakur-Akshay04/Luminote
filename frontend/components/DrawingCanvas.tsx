@@ -19,33 +19,51 @@ import {
   Check,
   Brush,
   Highlighter,
-  Wind,
-  Slash,
+  Sparkles,
+  Minus,
   Square,
   Circle,
   Type,
   PaintBucket,
 } from "lucide-react";
-import { Canvas, PencilBrush, SprayBrush, Line, Rect, Ellipse, IText, FabricImage } from "fabric";
-
-// O(1) hex to rgba conversion
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
 
 const PRESET_COLORS = [
-  "#f4f4f5", // white
+  "#ffffff", // white
   "#ef4444", // red
   "#f59e0b", // amber
   "#22c55e", // green
   "#3b82f6", // blue
   "#8b5cf6", // violet
   "#ec4899", // pink
-  "#09090b", // black
+  "#000000", // black
 ];
+
+const HIGHLIGHTER_COLORS = ["#FFFF00", "#00FFFF", "#00FF00", "#FF69B4"];
+
+// O(1) hex to rgba conversion
+function hexToRgba(hex: string, alpha: number) {
+  const cleanHex = hex.startsWith("#") ? hex : "#" + hex;
+  const r = parseInt(cleanHex.slice(1, 3), 16);
+  const g = parseInt(cleanHex.slice(3, 5), 16);
+  const b = parseInt(cleanHex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// O(1) hex to rgb bytes helper for flood fill
+function hexToRgbaBytes(hex: string) {
+  const cleanHex = hex.startsWith("#") ? hex : "#" + hex;
+  let r = 0, g = 0, b = 0, a = 255;
+  if (cleanHex.length === 7) {
+    r = parseInt(cleanHex.slice(1, 3), 16);
+    g = parseInt(cleanHex.slice(3, 5), 16);
+    b = parseInt(cleanHex.slice(5, 7), 16);
+  } else if (cleanHex.length === 4) {
+    r = parseInt(cleanHex[1] + cleanHex[1], 16);
+    g = parseInt(cleanHex[2] + cleanHex[2], 16);
+    b = parseInt(cleanHex[3] + cleanHex[3], 16);
+  }
+  return [r, g, b, a];
+}
 
 export interface DrawingCanvasRef {
   save: () => Promise<void>;
@@ -65,31 +83,27 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const [isDrawing, setIsDrawing] = useState(false);
 
     const [tool, setTool] = useState<
-      "pen" | "eraser" | "marker" | "highlighter" | "spray" | "line" | "rect" | "circle" | "text" | "fill"
+      "pen" | "marker" | "highlighter" | "spray" | "eraser" | "line" | "rect" | "circle" | "text" | "fill"
     >("pen");
-    const [color, setColor] = useState("#f4f4f5");
-    const [hexInput, setHexInput] = useState("#f4f4f5");
+    const [color, setColor] = useState("#000000");
+    const [hexInput, setHexInput] = useState("#000000");
     const [strokeSize, setStrokeSize] = useState(3);
-    const [sprayDensity, setSprayDensity] = useState(20);
-    const [textSize, setTextSize] = useState(18);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [showColorPicker, setShowColorPicker] = useState(false);
 
-    const fabricCanvasRef = useRef<Canvas | null>(null);
+    // New states and refs for extra drawing tools
+    const [sprayDensity, setSprayDensity] = useState(20);
+    const [fontSize, setFontSize] = useState(18);
+    const [textInputStyle, setTextInputStyle] = useState<{ x: number; y: number } | null>(null);
+    const [textValue, setTextValue] = useState("");
 
-    // Keep refs in sync for single-registration mouse handlers
-    const toolRef = useRef(tool);
-    const colorRef = useRef(color);
-    const strokeSizeRef = useRef(strokeSize);
-    const textSizeRef = useRef(textSize);
-    const sprayDensityRef = useRef(sprayDensity);
-
-    useEffect(() => { toolRef.current = tool; }, [tool]);
-    useEffect(() => { colorRef.current = color; }, [color]);
-    useEffect(() => { strokeSizeRef.current = strokeSize; }, [strokeSize]);
-    useEffect(() => { textSizeRef.current = textSize; }, [textSize]);
-    useEffect(() => { sprayDensityRef.current = sprayDensity; }, [sprayDensity]);
+    const dragStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
+    const savedCanvasStateRef = useRef<ImageData | null>(null);
+    const strokePointsRef = useRef<{ x: number; y: number }[]>([]);
+    const textInputStyleRef = useRef<{ x: number; y: number } | null>(null);
+    const textValueRef = useRef("");
+    const textInputRef = useRef<HTMLTextAreaElement>(null);
 
     // Drawing Versioning State
     const [versions, setVersions] = useState<string[]>([]);
@@ -128,42 +142,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }, []);
 
-    // Sync state with Fabric.js background
-    const updateFabricBackground = useCallback(async (dataUrl: string) => {
-      const fCanvas = fabricCanvasRef.current;
-      if (!fCanvas) return;
-      try {
-        const img = await FabricImage.fromURL(dataUrl);
-        img.set({
-          left: 0,
-          top: 0,
-          scaleX: fCanvas.width / img.width,
-          scaleY: fCanvas.height / img.height,
-          originX: "left",
-          originY: "top",
-          selectable: false,
-          evented: false,
-        });
-        fCanvas.backgroundImage = img;
-        fCanvas.requestRenderAll();
-      } catch (err) {
-        console.error("Failed to update fabric background:", err);
-      }
-    }, []);
-
-    // Commit fabric drawing objects to the background image
-    const commitFabricCanvas = useCallback(async () => {
-      const fCanvas = fabricCanvasRef.current;
-      const canvas = canvasRef.current;
-      if (!fCanvas || !canvas) return;
-
-      if (fCanvas.getObjects().length > 0) {
-        const dataUrl = fCanvas.toDataURL();
-        fCanvas.clear();
-        await updateFabricBackground(dataUrl);
-      }
-    }, [updateFabricBackground]);
-
     // Load existing drawing version on canvas
     const loadDrawingFromUrl = useCallback(
       async (url: string) => {
@@ -180,19 +158,15 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           // Draw image keeping correct scaling
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           // Push initial loaded state to undo stack
-          const dataUrl = canvas.toDataURL();
-          undoStack.current = [dataUrl];
-          updateFabricBackground(dataUrl);
+          undoStack.current = [canvas.toDataURL()];
         };
         img.onerror = () => {
           console.error("Failed to load background image:", imgUrl);
           clearCanvas();
-          const dataUrl = canvas.toDataURL();
-          undoStack.current = [dataUrl];
-          updateFabricBackground(dataUrl);
+          undoStack.current = [canvas.toDataURL()];
         };
       },
-      [baseUrl, clearCanvas, updateFabricBackground]
+      [baseUrl, clearCanvas]
     );
 
     // Resize handler to match container client dimensions exactly
@@ -235,23 +209,130 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           ctx.drawImage(tempCanvas, 0, 0, width, height);
         }
       }
+    }, []);
 
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.setDimensions({ width, height });
-        updateFabricBackground(canvas.toDataURL());
+    const finalizeText = useCallback(() => {
+      const coords = textInputStyleRef.current;
+      const value = textValueRef.current;
+      const canvas = canvasRef.current;
+      const ctx = contextRef.current;
+      if (coords && canvas && ctx && value.trim() !== "") {
+        if (undoStack.current.length >= 50) {
+          undoStack.current.shift();
+        }
+        undoStack.current.push(canvas.toDataURL());
+
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        ctx.fillStyle = color;
+        ctx.textBaseline = "top";
+        const lines = value.split("\n");
+        lines.forEach((line, i) => {
+          ctx.fillText(line, coords.x, coords.y + i * fontSize * 1.2);
+        });
       }
-    }, [updateFabricBackground]);
+      setTextInputStyle(null);
+      setTextValue("");
+    }, [fontSize, color]);
 
-    // Initialize Fabric Canvas once on mount
+    // Keep refs in sync
+    useEffect(() => {
+      textValueRef.current = textValue;
+    }, [textValue]);
+
+    useEffect(() => {
+      textInputStyleRef.current = textInputStyle;
+    }, [textInputStyle]);
+
+    // Flood fill algorithm
+    const floodFill = useCallback((
+      ctx: CanvasRenderingContext2D,
+      startX: number,
+      startY: number,
+      fillColor: string
+    ) => {
+      const canvas = ctx.canvas;
+      const width = canvas.width;
+      const height = canvas.height;
+      const sx = Math.floor(startX);
+      const sy = Math.floor(startY);
+
+      if (sx < 0 || sx >= width || sy < 0 || sy >= height) return;
+
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+
+      const fillPixel = hexToRgbaBytes(fillColor);
+      const fr = fillPixel[0];
+      const fg = fillPixel[1];
+      const fb = fillPixel[2];
+      const fa = fillPixel[3];
+
+      const startPos = (sy * width + sx) * 4;
+      const sr = data[startPos];
+      const sg = data[startPos + 1];
+      const sb = data[startPos + 2];
+      const sa = data[startPos + 3];
+
+      if (sr === fr && sg === fg && sb === fb && sa === fa) {
+        return;
+      }
+
+      const queue: [number, number][] = [[sx, sy]];
+      const visited = new Uint8Array(width * height);
+      visited[sy * width + sx] = 1;
+
+      while (queue.length > 0) {
+        const current = queue.pop();
+        if (!current) continue;
+        const [x, y] = current;
+
+        const idx = y * width + x;
+        const pos = idx * 4;
+
+        // Fill pixel
+        data[pos] = fr;
+        data[pos + 1] = fg;
+        data[pos + 2] = fb;
+        data[pos + 3] = fa;
+
+        const neighbors = [
+          [x + 1, y],
+          [x - 1, y],
+          [x, y + 1],
+          [x, y - 1]
+        ];
+
+        for (const [nx, ny] of neighbors) {
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const nidx = ny * width + nx;
+            if (!visited[nidx]) {
+              const npos = nidx * 4;
+              if (
+                data[npos] === sr &&
+                data[npos + 1] === sg &&
+                data[npos + 2] === sb &&
+                data[npos + 3] === sa
+              ) {
+                visited[nidx] = 1;
+                queue.push([nx, ny]);
+              }
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }, []);
+
+    // Initialize Canvas on mount and set listeners
     useEffect(() => {
       const canvas = canvasRef.current;
       const container = canvas?.parentElement;
       if (!canvas || !container) return;
 
-      const width = container.clientWidth || 800;
-      const height = container.clientHeight || 500;
-      canvas.width = width;
-      canvas.height = height;
+      // Initial size matching container exactly
+      canvas.width = container.clientWidth || 800;
+      canvas.height = container.clientHeight || 500;
 
       const ctx = canvas.getContext("2d");
       if (ctx) {
@@ -260,251 +341,18 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         contextRef.current = ctx;
       }
 
-      const fCanvas = new Canvas(canvas, {
-        isDrawingMode: false,
-        selection: false,
-        stopContextMenu: true,
-        width,
-        height,
-      });
-      fabricCanvasRef.current = fCanvas;
-
-      const handleStateChange = () => {
-        const canvasEl = canvasRef.current;
-        if (canvasEl) {
-          if (undoStack.current.length >= 50) {
-            undoStack.current.shift();
-          }
-          undoStack.current.push(canvasEl.toDataURL());
-        }
-      };
-
-      fCanvas.on("object:added", handleStateChange);
-      fCanvas.on("object:modified", handleStateChange);
-      fCanvas.on("path:created", handleStateChange);
-
-      // Single registration mouse event handlers for Shape/Line/Text/Fill tools
-      let isMouseDown = false;
-      let startPoint: { x: number; y: number } | null = null;
-      let activeObject: any = null;
-
-      const handleMouseDown = (opt: any) => {
-        const activeTool = toolRef.current;
-        if (["pen", "eraser", "marker", "highlighter", "spray"].includes(activeTool)) return;
-
-        const pointer = fCanvas.getScenePoint(opt.e);
-        isMouseDown = true;
-        startPoint = { x: pointer.x, y: pointer.y };
-
-        const activeColor = colorRef.current;
-        const activeStroke = strokeSizeRef.current;
-
-        if (activeTool === "line") {
-          activeObject = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
-            stroke: activeColor,
-            strokeWidth: activeStroke,
-            selectable: false,
-            evented: false,
-            originX: "left",
-            originY: "top",
-          });
-          fCanvas.add(activeObject);
-        } else if (activeTool === "rect") {
-          activeObject = new Rect({
-            left: pointer.x,
-            top: pointer.y,
-            width: 0,
-            height: 0,
-            fill: "transparent",
-            stroke: activeColor,
-            strokeWidth: activeStroke,
-            selectable: false,
-            evented: false,
-            originX: "left",
-            originY: "top",
-          });
-          fCanvas.add(activeObject);
-        } else if (activeTool === "circle") {
-          activeObject = new Ellipse({
-            left: pointer.x,
-            top: pointer.y,
-            rx: 0,
-            ry: 0,
-            fill: "transparent",
-            stroke: activeColor,
-            strokeWidth: activeStroke,
-            selectable: false,
-            evented: false,
-            originX: "center",
-            originY: "center",
-          });
-          fCanvas.add(activeObject);
-        } else if (activeTool === "text") {
-          const targetInfo = fCanvas.findTarget(opt.e);
-          const target = targetInfo?.target;
-          if (target && target.type === "i-text") {
-            fCanvas.setActiveObject(target);
-            (target as IText).enterEditing();
-            isMouseDown = false;
-            return;
-          }
-          const text = new IText("", {
-            left: pointer.x,
-            top: pointer.y,
-            fontSize: textSizeRef.current,
-            fill: activeColor,
-            fontFamily: "Inter, sans-serif",
-            selectable: true,
-          });
-          fCanvas.add(text);
-          fCanvas.setActiveObject(text);
-          text.enterEditing();
-          isMouseDown = false;
-        } else if (activeTool === "fill") {
-          const targetInfo = fCanvas.findTarget(opt.e);
-          const target = targetInfo?.target;
-          if (target) {
-            target.set("fill", activeColor);
-            fCanvas.requestRenderAll();
-            fCanvas.fire("object:modified", { target });
-          }
-          isMouseDown = false;
-        }
-      };
-
-      const handleMouseMove = (opt: any) => {
-        if (!isMouseDown || !startPoint || !activeObject) return;
-        const pointer = fCanvas.getScenePoint(opt.e);
-        const activeTool = toolRef.current;
-
-        if (activeTool === "line") {
-          activeObject.set({
-            x2: pointer.x,
-            y2: pointer.y,
-          });
-        } else if (activeTool === "rect") {
-          const left = Math.min(startPoint.x, pointer.x);
-          const top = Math.min(startPoint.y, pointer.y);
-          const width = Math.abs(startPoint.x - pointer.x);
-          const height = Math.abs(startPoint.y - pointer.y);
-          activeObject.set({ left, top, width, height });
-        } else if (activeTool === "circle") {
-          const left = Math.min(startPoint.x, pointer.x);
-          const top = Math.min(startPoint.y, pointer.y);
-          const rx = Math.abs(startPoint.x - pointer.x) / 2;
-          const ry = Math.abs(startPoint.y - pointer.y) / 2;
-          activeObject.set({
-            left: left + rx,
-            top: top + ry,
-            rx,
-            ry,
-          });
-        }
-        activeObject.setCoords();
-        fCanvas.requestRenderAll();
-      };
-
-      const handleMouseUp = () => {
-        if (!isMouseDown) return;
-        isMouseDown = false;
-        startPoint = null;
-        if (activeObject) {
-          activeObject.setCoords();
-          fCanvas.fire("object:added", { target: activeObject });
-          activeObject = null;
-        }
-      };
-
-      fCanvas.on("mouse:down", handleMouseDown);
-      fCanvas.on("mouse:move", handleMouseMove);
-      fCanvas.on("mouse:up", handleMouseUp);
-
-      window.addEventListener("resize", handleResize);
-
-      return () => {
-        window.removeEventListener("resize", handleResize);
-        fCanvas.off("object:added", handleStateChange);
-        fCanvas.off("object:modified", handleStateChange);
-        fCanvas.off("path:created", handleStateChange);
-        fCanvas.off("mouse:down", handleMouseDown);
-        fCanvas.off("mouse:move", handleMouseMove);
-        fCanvas.off("mouse:up", handleMouseUp);
-        fCanvas.dispose();
-        fabricCanvasRef.current = null;
-      };
-    }, [handleResize]);
-
-    // Handle initial and version changes loading
-    useEffect(() => {
       if (currentVersionUrl) {
         loadDrawingFromUrl(currentVersionUrl);
       } else {
         clearCanvas();
-        const canvas = canvasRef.current;
-        if (canvas) {
-          undoStack.current = [canvas.toDataURL()];
-          updateFabricBackground(canvas.toDataURL());
-        }
+        undoStack.current = [canvas.toDataURL()];
       }
-    }, [currentVersionUrl, loadDrawingFromUrl, clearCanvas, updateFabricBackground]);
 
-    // Commit fabric drawing objects when switching to 2D pen/eraser tools
-    useEffect(() => {
-      const is2D = ["pen", "eraser"].includes(tool);
-      if (is2D) {
-        commitFabricCanvas();
-      }
-    }, [tool, commitFabricCanvas]);
-
-    // Toggle Fabric drawing mode and configure drawing brushes reactively
-    useEffect(() => {
-      const fCanvas = fabricCanvasRef.current;
-      if (!fCanvas) return;
-
-      const isDrawingTool = ["marker", "highlighter", "spray"].includes(tool);
-      const is2DTool = ["pen", "eraser"].includes(tool);
-
-      if (is2DTool) {
-        if (fCanvas.upperCanvasEl) {
-          fCanvas.upperCanvasEl.style.pointerEvents = "none";
-        }
-        fCanvas.isDrawingMode = false;
-      } else {
-        if (fCanvas.upperCanvasEl) {
-          fCanvas.upperCanvasEl.style.pointerEvents = "auto";
-        }
-
-        if (isDrawingTool) {
-          fCanvas.isDrawingMode = true;
-          if (tool === "marker") {
-            const brush = new PencilBrush(fCanvas);
-            brush.width = 18;
-            brush.color = hexToRgba(color, 0.4);
-            fCanvas.freeDrawingBrush = brush;
-          } else if (tool === "highlighter") {
-            const brush = new PencilBrush(fCanvas);
-            brush.width = 28;
-            brush.color = hexToRgba(color, 0.25);
-            fCanvas.freeDrawingBrush = brush;
-          } else if (tool === "spray") {
-            const brush = new SprayBrush(fCanvas);
-            brush.width = 30;
-            brush.density = sprayDensity;
-            brush.color = color;
-            fCanvas.freeDrawingBrush = brush;
-          }
-        } else {
-          fCanvas.isDrawingMode = false;
-        }
-      }
-    }, [tool, color, sprayDensity]);
-
-    // Enforce restricted highlighter colors on select
-    useEffect(() => {
-      if (tool === "highlighter" && !["#FFFF00", "#00FFFF", "#00FF00", "#FF69B4"].includes(color)) {
-        setColor("#FFFF00");
-      }
-    }, [tool, color]);
+      window.addEventListener("resize", handleResize);
+      return () => {
+        window.removeEventListener("resize", handleResize);
+      };
+    }, [currentVersionUrl, loadDrawingFromUrl, clearCanvas, handleResize]);
 
     useEffect(() => {
       fetchVersions();
@@ -599,6 +447,24 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       };
     };
 
+    const spray = useCallback((
+      ctx: CanvasRenderingContext2D,
+      cx: number,
+      cy: number,
+      sprayColor: string,
+      density: number
+    ) => {
+      const radius = 15; // 30px width / 2
+      ctx.fillStyle = sprayColor;
+      for (let i = 0; i < density; i++) {
+        const r = Math.random() * radius;
+        const theta = Math.random() * 2 * Math.PI;
+        const x = cx + r * Math.cos(theta);
+        const y = cy + r * Math.sin(theta);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }, []);
+
     // Start drawing
     const startDrawing = (
       e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
@@ -608,29 +474,82 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const canvas = canvasRef.current;
       if (!coords || !ctx || !canvas) return;
 
-      // Push current state to undo stack before starting the new line
+      // Handle Text tool click placement
+      if (tool === "text") {
+        const hadActiveText = textInputStyleRef.current !== null;
+        if (hadActiveText) {
+          finalizeText();
+        }
+        
+        // Push state before placing new text
+        if (undoStack.current.length >= 50) {
+          undoStack.current.shift();
+        }
+        undoStack.current.push(canvas.toDataURL());
+
+        setTextInputStyle({ x: coords.x, y: coords.y });
+        textInputStyleRef.current = { x: coords.x, y: coords.y };
+        setTextValue("");
+        textValueRef.current = "";
+
+        setTimeout(() => {
+          textInputRef.current?.focus();
+        }, 50);
+        return;
+      }
+
+      // Handle Paint Bucket Fill tool
+      if (tool === "fill") {
+        if (undoStack.current.length >= 50) {
+          undoStack.current.shift();
+        }
+        undoStack.current.push(canvas.toDataURL());
+
+        floodFill(ctx, coords.x, coords.y, color);
+        return;
+      }
+
+      // Push current state to undo stack before starting the new drawing
       if (undoStack.current.length >= 50) {
         undoStack.current.shift(); // Limit stack size to 50
       }
       undoStack.current.push(canvas.toDataURL());
 
-      ctx.beginPath();
-      ctx.moveTo(coords.x, coords.y);
-
-      // Configure brush/eraser styling
-      if (tool === "eraser") {
-        ctx.strokeStyle = "#ffffff"; // matches background color
-        ctx.lineWidth = strokeSize * 3;
-      } else {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = strokeSize;
+      // Save canvas state for live previews
+      if (
+        tool === "line" ||
+        tool === "rect" ||
+        tool === "circle" ||
+        tool === "marker" ||
+        tool === "highlighter"
+      ) {
+        savedCanvasStateRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
       }
 
+      dragStartCoordsRef.current = coords;
       setIsDrawing(true);
+
+      if (tool === "pen" || tool === "eraser") {
+        ctx.beginPath();
+        ctx.moveTo(coords.x, coords.y);
+
+        if (tool === "eraser") {
+          ctx.strokeStyle = "#ffffff"; // matches background color (white)
+          ctx.lineWidth = strokeSize * 3;
+        } else {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = strokeSize;
+        }
+      } else if (tool === "marker" || tool === "highlighter") {
+        strokePointsRef.current = [coords];
+      } else if (tool === "spray") {
+        spray(ctx, coords.x, coords.y, color, sprayDensity);
+      }
+
       e.preventDefault();
     };
 
-    // Draw lines
+    // Draw lines/shapes
     const draw = (
       e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
     ) => {
@@ -639,8 +558,65 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const ctx = contextRef.current;
       if (!coords || !ctx) return;
 
-      ctx.lineTo(coords.x, coords.y);
-      ctx.stroke();
+      const start = dragStartCoordsRef.current;
+
+      // Restore saved canvas state for tools with live preview to clear previous preview frame
+      if (
+        tool === "line" ||
+        tool === "rect" ||
+        tool === "circle" ||
+        tool === "marker" ||
+        tool === "highlighter"
+      ) {
+        if (savedCanvasStateRef.current) {
+          ctx.putImageData(savedCanvasStateRef.current, 0, 0);
+        }
+      }
+
+      if (tool === "pen" || tool === "eraser") {
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+      } else if (tool === "marker" || tool === "highlighter") {
+        strokePointsRef.current.push(coords);
+        ctx.beginPath();
+        ctx.moveTo(strokePointsRef.current[0].x, strokePointsRef.current[0].y);
+        for (let i = 1; i < strokePointsRef.current.length; i++) {
+          ctx.lineTo(strokePointsRef.current[i].x, strokePointsRef.current[i].y);
+        }
+        ctx.strokeStyle = tool === "marker" ? hexToRgba(color, 0.4) : hexToRgba(color, 0.25);
+        ctx.lineWidth = tool === "marker" ? 18 : 28;
+        ctx.stroke();
+      } else if (tool === "spray") {
+        spray(ctx, coords.x, coords.y, color, sprayDensity);
+      } else if (tool === "line" && start) {
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeSize;
+        ctx.stroke();
+      } else if (tool === "rect" && start) {
+        const x = Math.min(start.x, coords.x);
+        const y = Math.min(start.y, coords.y);
+        const w = Math.abs(coords.x - start.x);
+        const h = Math.abs(coords.y - start.y);
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeSize;
+        ctx.stroke();
+      } else if (tool === "circle" && start) {
+        const centerX = (start.x + coords.x) / 2;
+        const centerY = (start.y + coords.y) / 2;
+        const rx = Math.abs(coords.x - start.x) / 2;
+        const ry = Math.abs(coords.y - start.y) / 2;
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, rx, ry, 0, 0, 2 * Math.PI);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeSize;
+        ctx.stroke();
+      }
+
       e.preventDefault();
     };
 
@@ -648,14 +624,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const stopDrawing = () => {
       if (!isDrawing) return;
       setIsDrawing(false);
-      contextRef.current?.closePath();
 
-      // Capture state immediately on stroke end for Pencil/Eraser tools
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const dataUrl = canvas.toDataURL();
-        updateFabricBackground(dataUrl);
+      if (tool === "pen" || tool === "eraser") {
+        contextRef.current?.closePath();
       }
+
+      dragStartCoordsRef.current = null;
+      savedCanvasStateRef.current = null;
+      strokePointsRef.current = [];
     };
 
     // Undo action
@@ -672,11 +648,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-
-        if (fabricCanvasRef.current) {
-          fabricCanvasRef.current.clear();
-          updateFabricBackground(previousState);
-        }
       };
     };
 
@@ -686,22 +657,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (!canvas) return;
       undoStack.current.push(canvas.toDataURL());
       clearCanvas();
-
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.clear();
-        fabricCanvasRef.current.backgroundImage = undefined;
-        fabricCanvasRef.current.requestRenderAll();
-      }
     };
 
     // Save drawing to DB
     const handleSave = async () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-
-      // Commit fabric objects to background image first
-      await commitFabricCanvas();
-
       setSaving(true);
       setMessage(null);
 
@@ -726,27 +687,50 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
     };
 
+    const handleToolChange = (newTool: typeof tool) => {
+      // Finalize text if active
+      if (textInputStyleRef.current) {
+        finalizeText();
+      }
+      setTool(newTool);
+
+      // Default color handling for Highlighter
+      if (newTool === "highlighter") {
+        if (!HIGHLIGHTER_COLORS.includes(color.toUpperCase())) {
+          setColor("#FFFF00");
+          setHexInput("#FFFF00");
+        }
+      }
+    };
+
     const handleColorSelect = (c: string) => {
       setColor(c);
       setHexInput(c);
+      if (tool === "eraser") {
+        setTool("pen");
+      }
     };
 
     const handleHexSubmit = () => {
       if (/^#[0-9a-fA-F]{6}$/.test(hexInput)) {
         setColor(hexInput);
+        if (tool === "eraser") {
+          setTool("pen");
+        }
       }
     };
 
     return (
-      <div className="flex flex-col h-full overflow-hidden gap-3">
+      <div className="flex flex-col h-full overflow-hidden gap-3 text-text-primary">
         {/* Toolbar aligned to match D layout.png */}
-        <div className="flex flex-wrap items-center gap-4 px-3 py-2 bg-surface-raised border border-border-muted rounded-xs select-none">
-          {/* Tools Grid Container */}
-          <div className="flex flex-col gap-1.5">
-            {/* Row 1: Pencil, Marker, Highlighter, Spray, Eraser */}
-            <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-surface-raised border border-border-muted rounded-xs select-none">
+          {/* Tool Selector Section (Grid format) */}
+          <div className="flex flex-col gap-1.5 pr-3 border-r border-border-muted">
+            {/* Row 1 */}
+            <div className="flex items-center gap-1.5">
+              {/* Pencil */}
               <button
-                onClick={() => setTool("pen")}
+                onClick={() => handleToolChange("pen")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "pen"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -754,12 +738,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 }`}
                 title="Pencil tool"
                 aria-label="Pencil tool"
-                id="drawing-pencil-btn"
+                id="drawing-pen-btn"
               >
                 <Pen className="w-4 h-4" />
               </button>
+
+              {/* Marker */}
               <button
-                onClick={() => setTool("marker")}
+                onClick={() => handleToolChange("marker")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "marker"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -771,8 +757,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               >
                 <Brush className="w-4 h-4" />
               </button>
+
+              {/* Highlighter */}
               <button
-                onClick={() => setTool("highlighter")}
+                onClick={() => handleToolChange("highlighter")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "highlighter"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -784,8 +772,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               >
                 <Highlighter className="w-4 h-4" />
               </button>
+
+              {/* Spray */}
               <button
-                onClick={() => setTool("spray")}
+                onClick={() => handleToolChange("spray")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "spray"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -795,10 +785,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 aria-label="Spray tool"
                 id="drawing-spray-btn"
               >
-                <Wind className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
               </button>
+
+              {/* Eraser */}
               <button
-                onClick={() => setTool("eraser")}
+                onClick={() => handleToolChange("eraser")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "eraser"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -811,10 +803,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 <Eraser className="w-4 h-4" />
               </button>
             </div>
-            {/* Row 2: Line, Rectangle, Circle, Text, Fill */}
-            <div className="flex items-center gap-1">
+
+            {/* Row 2 */}
+            <div className="flex items-center gap-1.5">
+              {/* Line */}
               <button
-                onClick={() => setTool("line")}
+                onClick={() => handleToolChange("line")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "line"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -824,10 +818,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 aria-label="Line tool"
                 id="drawing-line-btn"
               >
-                <Slash className="w-4 h-4" />
+                <Minus className="w-4 h-4" />
               </button>
+
+              {/* Rectangle */}
               <button
-                onClick={() => setTool("rect")}
+                onClick={() => handleToolChange("rect")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "rect"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -839,8 +835,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               >
                 <Square className="w-4 h-4" />
               </button>
+
+              {/* Circle */}
               <button
-                onClick={() => setTool("circle")}
+                onClick={() => handleToolChange("circle")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "circle"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -852,8 +850,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               >
                 <Circle className="w-4 h-4" />
               </button>
+
+              {/* Text */}
               <button
-                onClick={() => setTool("text")}
+                onClick={() => handleToolChange("text")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "text"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -865,8 +865,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               >
                 <Type className="w-4 h-4" />
               </button>
+
+              {/* Fill */}
               <button
-                onClick={() => setTool("fill")}
+                onClick={() => handleToolChange("fill")}
                 className={`p-2 rounded-xs transition-colors ${
                   tool === "fill"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
@@ -881,28 +883,27 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             </div>
           </div>
 
-          <div className="h-10 w-px bg-border-muted" />
-
-          {/* Color Selection Block */}
+          {/* Color Picker with Circle Dot Preview OR Highlighter preset colors */}
           {tool === "highlighter" ? (
-            <div className="flex items-center gap-1.5 border border-border-muted px-2.5 py-1.5 rounded-xs bg-surface-raised">
-              <span className="text-[10px] text-text-tertiary mr-1 font-semibold uppercase tracking-wider">Color:</span>
-              {["#FFFF00", "#00FFFF", "#00FF00", "#FF69B4"].map((c) => (
+            <div className="flex items-center gap-1.5 bg-surface-strong px-2 py-1.5 rounded-xs">
+              {HIGHLIGHTER_COLORS.map((c) => (
                 <button
                   key={c}
-                  onClick={() => handleColorSelect(c)}
+                  onClick={() => {
+                    setColor(c);
+                    setHexInput(c);
+                  }}
                   className="w-6 h-6 rounded-full border border-white/10 hover:scale-110 transition-transform relative"
                   style={{ backgroundColor: c }}
                   aria-label={`Highlighter color ${c}`}
                 >
-                  {color === c && (
-                    <Check className="w-3 h-3 absolute inset-0 m-auto text-black drop-shadow-md font-bold" />
+                  {c === color && (
+                    <Check className="w-3 h-3 absolute inset-0 m-auto text-black drop-shadow-md" />
                   )}
                 </button>
               ))}
             </div>
           ) : (
-            /* General Color Picker with Circle Dot Preview */
             <div className="relative">
               <button
                 onClick={() => setShowColorPicker(!showColorPicker)}
@@ -950,7 +951,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                         }
                       }}
                       placeholder="#ffffff"
-                      className="input text-xs py-1.5 px-2 flex-1"
+                      className="input text-xs py-1.5 px-2 flex-1 bg-surface-strong border border-border-muted text-text-primary rounded-xs focus:outline-none"
                       maxLength={7}
                       aria-label="Hex color input"
                       id="drawing-hex-input"
@@ -970,16 +971,32 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             </div>
           )}
 
-          <div className="h-10 w-px bg-border-muted" />
+          <div className="h-5 w-px bg-border-muted" />
 
-          {/* Tool specific & Shared Controls */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Spray Density Slider */}
-            {tool === "spray" && (
+          {/* Stroke Size Slider */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-tertiary w-8 text-right select-none font-mono">
+              {strokeSize}px
+            </span>
+            <input
+              id="stroke-size"
+              type="range"
+              min={1}
+              max={20}
+              value={strokeSize}
+              onChange={(e) => setStrokeSize(Number(e.target.value))}
+              className="w-20 h-1 rounded-lg appearance-none cursor-pointer accent-[#e31c5f] bg-surface-strong"
+              aria-label="Stroke size"
+            />
+          </div>
+
+          {/* Spray Density Slider (Conditional) */}
+          {tool === "spray" && (
+            <>
+              <div className="h-5 w-px bg-border-muted" />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-text-tertiary select-none font-semibold">Density:</span>
-                <span className="text-xs text-text-tertiary w-6 text-right select-none font-mono">
-                  {sprayDensity}
+                <span className="text-xs text-text-tertiary select-none font-mono">
+                  Density: {sprayDensity}
                 </span>
                 <input
                   id="spray-density"
@@ -992,69 +1009,54 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                   aria-label="Spray density"
                 />
               </div>
-            )}
+            </>
+          )}
 
-            {/* Font Size Input */}
-            {tool === "text" && (
+          {/* Text Font Size Input/Slider (Conditional) */}
+          {tool === "text" && (
+            <>
+              <div className="h-5 w-px bg-border-muted" />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-text-tertiary select-none font-semibold">Size:</span>
-                <span className="text-xs text-text-tertiary w-8 text-right select-none font-mono">
-                  {textSize}px
+                <span className="text-xs text-text-tertiary select-none font-mono">
+                  Font: {fontSize}px
                 </span>
                 <input
-                  id="font-size"
+                  id="text-font-size"
                   type="range"
                   min={12}
                   max={72}
-                  value={textSize}
-                  onChange={(e) => setTextSize(Number(e.target.value))}
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
                   className="w-20 h-1 rounded-lg appearance-none cursor-pointer accent-[#e31c5f] bg-surface-strong"
                   aria-label="Font size"
                 />
               </div>
-            )}
+            </>
+          )}
 
-            {/* Stroke Size Slider */}
-            {!["marker", "highlighter", "spray", "text", "fill"].includes(tool) && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-text-tertiary w-8 text-right select-none font-mono">
-                  {strokeSize}px
-                </span>
-                <input
-                  id="stroke-size"
-                  type="range"
-                  min={1}
-                  max={20}
-                  value={strokeSize}
-                  onChange={(e) => setStrokeSize(Number(e.target.value))}
-                  className="w-20 h-1 rounded-lg appearance-none cursor-pointer accent-[#e31c5f] bg-surface-strong"
-                  aria-label="Stroke size"
-                />
-              </div>
-            )}
+          <div className="h-5 w-px bg-border-muted" />
 
-            {/* Undo Button */}
-            <button
-              onClick={handleUndo}
-              className="p-2 rounded-xs text-text-secondary hover:bg-surface-strong transition-colors"
-              title="Undo last stroke"
-              aria-label="Undo last stroke"
-              id="drawing-undo-btn"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
+          {/* Undo Button */}
+          <button
+            onClick={handleUndo}
+            className="p-2 rounded-xs text-text-secondary hover:bg-surface-strong transition-colors"
+            title="Undo last stroke"
+            aria-label="Undo last stroke"
+            id="drawing-undo-btn"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
 
-            {/* Clear Button */}
-            <button
-              onClick={handleClear}
-              className="p-2 rounded-xs text-red-400 hover:bg-red-950/20 transition-colors"
-              title="Clear all"
-              aria-label="Clear all"
-              id="drawing-clear-btn"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Clear Button */}
+          <button
+            onClick={handleClear}
+            className="p-2 rounded-xs text-red-400 hover:bg-red-950/20 transition-colors"
+            title="Clear all"
+            aria-label="Clear all"
+            id="drawing-clear-btn"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Status Message */}
@@ -1072,7 +1074,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
         {/* Canvas container */}
         <div
-          className="flex-1 w-full rounded-xs overflow-hidden border border-border-muted min-h-[400px] relative bg-[#ffffff]"
+          className="flex-1 w-full rounded-xs overflow-hidden border border-border-muted min-h-[400px] relative bg-white"
         >
           <canvas
             ref={canvasRef}
@@ -1084,8 +1086,44 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             onTouchStart={startDrawing}
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
-            className="w-full h-full block bg-[#ffffff] cursor-crosshair touch-none"
+            className="w-full h-full block bg-white cursor-crosshair touch-none"
           />
+
+          {/* Text Input Overlay */}
+          {textInputStyle && (
+            <textarea
+              ref={textInputRef}
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              onBlur={finalizeText}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  finalizeText();
+                }
+              }}
+              className="font-sans"
+              style={{
+                position: "absolute",
+                left: `${textInputStyle.x}px`,
+                top: `${textInputStyle.y}px`,
+                fontSize: `${fontSize}px`,
+                color: color,
+                fontFamily: "Inter, sans-serif",
+                background: "transparent",
+                border: "1px dashed #e31c5f",
+                outline: "none",
+                resize: "both",
+                overflow: "hidden",
+                whiteSpace: "pre",
+                minWidth: "150px",
+                minHeight: `${fontSize * 1.5}px`,
+                lineHeight: "1.2",
+                padding: "0",
+                margin: "0",
+                zIndex: 50,
+              }}
+            />
+          )}
         </div>
 
         {/* Saved Versions Timeline */}
@@ -1115,20 +1153,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                         setSwitchVersionTarget(versionNum);
                       }
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        if (!isActive) {
-                          setSwitchVersionTarget(versionNum);
-                        }
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
                   >
                     <img
                       src={`${baseUrl}${versionUrl}?t=${Date.now()}`}
                       alt={`Version ${versionNum}`}
-                      className="w-full h-full object-cover bg-[#ffffff]"
+                      className="w-full h-full object-cover bg-[#18181b]"
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1 flex justify-between items-center text-[10px] text-gray-300">
                       <span className="font-semibold">V{versionNum}</span>
