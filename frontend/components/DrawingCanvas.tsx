@@ -19,7 +19,7 @@ import {
   Check,
   Brush,
   Highlighter,
-  Sparkles,
+  SprayCan,
   Minus,
   Square,
   Circle,
@@ -789,7 +789,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 aria-label="Spray tool"
                 id="drawing-spray-btn"
               >
-                <Sparkles className="w-4 h-4" />
+                <SprayCan className="w-4 h-4" />
               </button>
 
               {/* Eraser */}
