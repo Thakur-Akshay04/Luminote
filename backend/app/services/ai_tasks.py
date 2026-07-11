@@ -38,7 +38,7 @@ async def extract_tasks(content: str) -> list[dict]:
             temperature=0.2,
             max_tokens=2048,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = (response.choices[0].message.content or "").strip()
 
         # Handle reasoning-model <think>...</think> wrapping
         if "<think>" in raw:

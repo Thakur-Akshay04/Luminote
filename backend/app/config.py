@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     media_cache_ttl: int = 7 * 24 * 60 * 60  # 7 days (drawings, transcripts)
     checklist_cache_ttl: int = 1 * 24 * 60 * 60  # 1 day
 
+    hf_api_key: str = ""
+
 
 settings = Settings()
 

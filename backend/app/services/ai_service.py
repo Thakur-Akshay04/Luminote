@@ -3,22 +3,13 @@ import json
 import logging
 from typing import Optional
 
-from fastembed import TextEmbedding
+import httpx
 
 from app.config import settings
 from app.redis_client import get_redis
 from app.groq_client import client, MODEL
 
 logger = logging.getLogger(__name__)
-
-_embedding_model: Optional[TextEmbedding] = None
-
-
-def _get_embedding_model() -> TextEmbedding:
-    global _embedding_model
-    if _embedding_model is None:
-        _embedding_model = TextEmbedding()
-    return _embedding_model
 
 
 def _md5(text: str) -> str:
@@ -78,7 +69,7 @@ Note content:
             temperature=0.3,
             max_tokens=512,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)
         result = json.loads(json_str)
         if "summary" not in result:
@@ -97,16 +88,32 @@ Note content:
 
 async def get_embedding(text: str) -> list[float]:
     """
-    Generate a 384-dimensional embedding locally using BAAI/bge-small-en-v1.5 via fastembed.
+    Generate a 384-dimensional embedding using BAAI/bge-small-en-v1.5 via Hugging Face Serverless API.
     """
     try:
-        model = _get_embedding_model()
-        embeddings = list(model.embed([text[:8000]]))
-        if embeddings:
-            return embeddings[0].tolist()
-        return []
+        api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5"
+        headers = {}
+        if getattr(settings, "hf_api_key", None):
+            headers["Authorization"] = f"Bearer {settings.hf_api_key}"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                api_url,
+                headers=headers,
+                json={"inputs": text[:8000]},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    # Hugging Face feature extraction can return flat list [...] or nested list [[...]]
+                    if isinstance(result[0], list):
+                        return [float(x) for x in result[0]]
+                    return [float(x) for x in result]
+            logger.error("Hugging Face API returned status code %s: %s", response.status_code, response.text)
+            return []
     except Exception as e:
-        logger.error("Local fastembed embedding error: %s", e)
+        logger.error("Hugging Face embedding error: %s", e)
         return []
 
 
@@ -142,7 +149,7 @@ Be concise and accurate. If the answer cannot be found in the note, say so."""
             temperature=0.4,
             max_tokens=1024,
         )
-        return response.choices[0].message.content.strip()
+        return (response.choices[0].message.content or "").strip()
     except Exception as e:
         logger.error("Groq Q&A error: %s", e)
         return "Sorry, I could not generate an answer at this time."
@@ -202,7 +209,7 @@ Note content:
             temperature=0.3,
             max_tokens=1024,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)
         result = json.loads(json_str)
         if "summary" not in result:

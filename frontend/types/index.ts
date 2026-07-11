@@ -84,7 +84,8 @@ export interface SummarizeResponse {
 }
 
 export interface DrawingResponse {
-  media_url: string;
+  media_url: string | null;
+  versions: string[];
 }
 
 export interface TranscriptResponse {

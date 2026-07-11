@@ -280,13 +280,15 @@ export default function NoteEditorPage() {
 
         <div className="flex items-center gap-1 ml-auto shrink-0">
           {/* Preview toggle (mobile) */}
-          <button
-            onClick={() => setPreviewMode(!previewMode)}
-            className="sm:hidden btn-secondary px-2.5 py-1.5 text-xs"
-            id="preview-toggle"
-          >
-            {previewMode ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          </button>
+          {noteType !== "drawing" && (
+            <button
+              onClick={() => setPreviewMode(!previewMode)}
+              className="sm:hidden btn-secondary px-2.5 py-1.5 text-xs"
+              id="preview-toggle"
+            >
+              {previewMode ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+          )}
 
           {/* Save */}
           <button
@@ -334,7 +336,7 @@ export default function NoteEditorPage() {
         <div className="flex flex-1 overflow-hidden">
           
           {/* EDITOR PANEL (LEFT) */}
-          <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`}>
+          <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${noteType === "drawing" ? "w-full overflow-hidden h-full" : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"}`}>
             
             {noteType === "text" && (
               <>
@@ -360,24 +362,18 @@ export default function NoteEditorPage() {
             )}
 
             {noteType === "drawing" && (
-              <>
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                  <Palette className="w-3.5 h-3.5 text-gray-600" />
-                  <span className="text-xs text-gray-600 font-medium">Freehand Sketch Canvas</span>
-                </div>
-                <div className="p-4 sm:p-6 flex-1">
-                  <DrawingCanvas 
-                    ref={drawingCanvasRef}
-                    noteId={noteId} 
-                    mediaUrl={note?.media_url || null} 
-                    onDrawingSave={(newUrl) => {
-                      if (note) {
-                        setNote({ ...note, media_url: newUrl });
-                      }
-                    }}
-                  />
-                </div>
-              </>
+              <div className="p-3 pb-1 sm:p-4 sm:pb-1 flex-1 flex flex-col min-h-0">
+                <DrawingCanvas 
+                  ref={drawingCanvasRef}
+                  noteId={noteId} 
+                  mediaUrl={note?.media_url || null} 
+                  onDrawingSave={(newUrl) => {
+                    if (note) {
+                      setNote({ ...note, media_url: newUrl });
+                    }
+                  }}
+                />
+              </div>
             )}
 
             {noteType === "audio" && (
@@ -432,109 +428,83 @@ export default function NoteEditorPage() {
           </div>
 
           {/* PREVIEW PANEL (RIGHT) */}
-          <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-1/2 overflow-y-auto`}>
-            
-            {noteType === "text" && (
-              <>
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                  <Eye className="w-3.5 h-3.5 text-gray-600" />
-                  <span className="text-xs text-gray-600 font-medium">Markdown Preview</span>
-                </div>
-                <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
-                  {content ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {content}
-                    </ReactMarkdown>
-                  ) : (
-                    <p className="text-gray-700 text-sm italic">Preview will appear here…</p>
-                  )}
-                </div>
-              </>
-            )}
+          {noteType !== "drawing" && (
+            <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-1/2 overflow-y-auto`}>
+              
+              {noteType === "text" && (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+                    <Eye className="w-3.5 h-3.5 text-gray-600" />
+                    <span className="text-xs text-gray-600 font-medium">Markdown Preview</span>
+                  </div>
+                  <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
+                    {content ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {content}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="text-gray-700 text-sm italic">Preview will appear here…</p>
+                    )}
+                  </div>
+                </>
+              )}
 
-            {noteType === "drawing" && (
-              <>
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                  <Eye className="w-3.5 h-3.5 text-gray-600" />
-                  <span className="text-xs text-gray-600 font-medium">Saved Drawing Preview</span>
-                </div>
-                <div className="flex-1 p-4 sm:p-6 flex flex-col items-center justify-center">
-                  {note?.media_url ? (
-                    <div className="glass p-2 max-w-full overflow-hidden flex flex-col items-center gap-2 animate-fade-in shadow-lg">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`${baseUrl}${note.media_url}?t=${Date.now()}`}
-                        alt="Note drawing"
-                        className="max-h-[350px] object-contain rounded-xs border border-white/[0.06] bg-[#18181b]"
-                      />
-                      <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">
-                        Saved Drawing PNG
+              {noteType === "audio" && (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+                    <Eye className="w-3.5 h-3.5 text-gray-600" />
+                    <span className="text-xs text-gray-600 font-medium">Voice Note Transcript</span>
+                  </div>
+                  <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
+                    {note?.transcript ? (
+                      <div className="space-y-4">
+                        <p className="text-gray-300 text-sm leading-relaxed">{note.transcript}</p>
+                        <hr className="border-white/[0.06]" />
+                        <div className="text-xs text-gray-500 italic">
+                          Note: The audio transcript is saved inside your note database record and will automatically enrich search insights.
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700 text-sm italic">
+                        Transcribed text will be generated here when you stop recording.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {noteType === "checklist" && (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+                    <Edit3 className="w-3.5 h-3.5 text-gray-600" />
+                    <span className="text-xs text-gray-600 font-medium">Context / Description Editor</span>
+                  </div>
+                  <div className="flex-1 flex flex-col min-h-[300px]">
+                    <textarea
+                      id="note-checklist-content"
+                      className="flex-1 bg-transparent resize-none p-4 sm:p-6 text-sm text-gray-200
+                                 font-mono leading-relaxed placeholder-gray-700
+                                 focus:outline-none"
+                      placeholder="Write details, descriptions, or general notes regarding this checklist here…"
+                      value={content}
+                      onChange={(e) => {
+                        setContent(e.target.value);
+                        contentRef.current = e.target.value;
+                        scheduleAutosave();
+                      }}
+                      spellCheck
+                    />
+                    <div className="px-4 py-2 border-t border-white/[0.04] flex items-center justify-between text-xs text-gray-700 font-mono">
+                      <span>
+                        {content.split(/\s+/).filter(Boolean).length} words
                       </span>
                     </div>
-                  ) : (
-                    <div className="text-center text-gray-600 text-sm italic">
-                      No saved drawing yet. Create one and click &quot;Save Drawing&quot; on the left canvas.
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {noteType === "audio" && (
-              <>
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                  <Eye className="w-3.5 h-3.5 text-gray-600" />
-                  <span className="text-xs text-gray-600 font-medium">Voice Note Transcript</span>
-                </div>
-                <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
-                  {note?.transcript ? (
-                    <div className="space-y-4">
-                      <p className="text-gray-300 text-sm leading-relaxed">{note.transcript}</p>
-                      <hr className="border-white/[0.06]" />
-                      <div className="text-xs text-gray-500 italic">
-                        Note: The audio transcript is saved inside your note database record and will automatically enrich search insights.
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-700 text-sm italic">
-                      Transcribed text will be generated here when you stop recording.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {noteType === "checklist" && (
-              <>
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                  <Edit3 className="w-3.5 h-3.5 text-gray-600" />
-                  <span className="text-xs text-gray-600 font-medium">Context / Description Editor</span>
-                </div>
-                <div className="flex-1 flex flex-col min-h-[300px]">
-                  <textarea
-                    id="note-checklist-content"
-                    className="flex-1 bg-transparent resize-none p-4 sm:p-6 text-sm text-gray-200
-                               font-mono leading-relaxed placeholder-gray-700
-                               focus:outline-none"
-                    placeholder="Write details, descriptions, or general notes regarding this checklist here…"
-                    value={content}
-                    onChange={(e) => {
-                      setContent(e.target.value);
-                      contentRef.current = e.target.value;
-                      scheduleAutosave();
-                    }}
-                    spellCheck
-                  />
-                  <div className="px-4 py-2 border-t border-white/[0.04] flex items-center justify-between text-xs text-gray-700 font-mono">
-                    <span>
-                      {content.split(/\s+/).filter(Boolean).length} words
-                    </span>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-          </div>
+            </div>
+          )}
         </div>
 
         {/* AI Panel */}

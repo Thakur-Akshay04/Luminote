@@ -70,6 +70,10 @@ export const notesApi = {
     api.post<DrawingResponse>(`/notes/${id}/drawing`, { image: base64Image }),
   getDrawing: (id: string) =>
     api.get<DrawingResponse>(`/notes/${id}/drawing`),
+  switchDrawingVersion: (id: string, version: number) =>
+    api.post<DrawingResponse>(`/notes/${id}/drawing/switch`, { version }),
+  deleteDrawingVersion: (id: string, version: number) =>
+    api.delete<DrawingResponse>(`/notes/${id}/drawing/version/${version}`),
 
   // ── Feature 2: Audio Recording & Transcription ───────────────────────────
   uploadAudio: (id: string, audioBlob: Blob) => {
