@@ -456,9 +456,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     ) => {
       const radius = 15; // 30px width / 2
       ctx.fillStyle = sprayColor;
+      // Use CSPRNG: generate all random values in one batch
+      const rng = new Uint32Array(density * 2);
+      crypto.getRandomValues(rng);
+      const MAX_U32 = 0xFFFFFFFF;
       for (let i = 0; i < density; i++) {
-        const r = Math.random() * radius;
-        const theta = Math.random() * 2 * Math.PI;
+        const r = (rng[i * 2] / MAX_U32) * radius;
+        const theta = (rng[i * 2 + 1] / MAX_U32) * 2 * Math.PI;
         const x = cx + r * Math.cos(theta);
         const y = cy + r * Math.sin(theta);
         ctx.fillRect(x, y, 1, 1);
@@ -1143,6 +1147,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 return (
                   <div
                     key={versionUrl}
+                    role="button"
+                    tabIndex={0}
                     className={`relative flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border cursor-pointer group transition-all ${
                       isActive
                         ? "border-[#e31c5f] shadow-md shadow-brand-500/10 ring-1 ring-[#e31c5f]"
@@ -1150,6 +1156,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                     }`}
                     onClick={() => {
                       if (!isActive) {
+                        setSwitchVersionTarget(versionNum);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.key === "Enter" || e.key === " ") && !isActive) {
+                        e.preventDefault();
                         setSwitchVersionTarget(versionNum);
                       }
                     }}
