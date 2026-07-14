@@ -52,6 +52,7 @@ class NoteResponse(BaseModel):
     media_url: Optional[str] = None
     transcript: Optional[str] = None
     checklist_items: Optional[list[dict]] = None
+    chat_history: Optional[list[dict]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -65,6 +66,7 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     note_id: uuid.UUID
+    chat_history: Optional[list[dict]] = None
 
 
 class SummarizeRequest(BaseModel):

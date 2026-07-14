@@ -50,6 +50,7 @@ async def init_db() -> None:
         ALTER TABLE notes ADD COLUMN IF NOT EXISTS media_url TEXT;
         ALTER TABLE notes ADD COLUMN IF NOT EXISTS transcript TEXT;
         ALTER TABLE notes ADD COLUMN IF NOT EXISTS checklist_items JSONB;
+        ALTER TABLE notes ADD COLUMN IF NOT EXISTS chat_history JSONB;
         CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes (note_type);
         CREATE INDEX IF NOT EXISTS idx_notes_checklist ON notes USING GIN (checklist_items);
         """

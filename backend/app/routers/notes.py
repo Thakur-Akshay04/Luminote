@@ -98,9 +98,30 @@ async def ask(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from datetime import datetime, timezone
+
     note = await get_note(note_id, uuid.UUID(user_id), db)
-    answer = await ask_question(note.content, body.question)
-    return AskResponse(answer=answer, note_id=note_id)
+    
+    # Safely clone or initialize local list
+    history = list(note.chat_history) if note.chat_history else []
+    
+    # Append new user message
+    user_msg = {"role": "user", "content": body.question}
+    history.append(user_msg)
+    
+    # Call Groq Q&A with previous history (excluding user_msg because ask_question appends it)
+    answer = await ask_question(note.content, body.question, history[:-1])
+    
+    # Append assistant response
+    assistant_msg = {"role": "assistant", "content": answer}
+    history.append(assistant_msg)
+    
+    # Save updates via direct attribute reassignment (triggers dirty state automatically)
+    note.chat_history = history
+    note.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    
+    return AskResponse(answer=answer, note_id=note_id, chat_history=note.chat_history)
 
 
 @router.post("/{note_id}/summarize", response_model=SummarizeResponse)

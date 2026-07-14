@@ -21,6 +21,7 @@ export interface Note {
   media_url: string | null;
   transcript: string | null;
   checklist_items: ChecklistItem[] | null;
+  chat_history?: { role: "user" | "assistant"; content: string }[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,7 @@ export interface SearchResponse {
 export interface AskResponse {
   answer: string;
   note_id: string;
+  chat_history?: { role: "user" | "assistant"; content: string }[];
 }
 
 export interface AuthResponse {

@@ -32,6 +32,7 @@ class Note(Base):
     media_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     checklist_items: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    chat_history: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

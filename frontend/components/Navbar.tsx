@@ -110,14 +110,23 @@ function NavbarContent() {
                 <div key={href} className="flex flex-col gap-1">
                   <div
                     className={clsx(
-                      "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer select-none",
+                      "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer select-none focus:outline-none focus:bg-surface-700 focus:text-white",
                       isActive && !activeType
                         ? "bg-surface-700 text-white font-semibold shadow-sm"
                         : "text-neutral-400 hover:text-white hover:bg-surface-700"
                     )}
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       router.push(href);
                       setNotesDropdownOpen(!notesDropdownOpen);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(href);
+                        setNotesDropdownOpen(!notesDropdownOpen);
+                      }
                     }}
                   >
                     <div className="flex items-center gap-3">

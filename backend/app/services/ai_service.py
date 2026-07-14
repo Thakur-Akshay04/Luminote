@@ -127,25 +127,33 @@ async def get_search_embedding_cached(query: str) -> tuple[list[float], bool]:
     return embedding, False
 
 
-async def ask_question(content: str, question: str) -> str:
+async def ask_question(content: str, question: str, chat_history: Optional[list[dict]] = None) -> str:
     """
     Send note content + question to Groq and return the answer.
     """
-    prompt = f"""You are a helpful assistant. The user has a note with the following content:
+    system_prompt = f"""You are a helpful assistant. The user has a note with the following content:
 
 ---
 {content[:6000]}
 ---
 
-Answer the following question based on the note content:
-{question}
+Answer the user's questions based on the note content. Be concise and accurate. If the answer cannot be found in the note, say so."""
 
-Be concise and accurate. If the answer cannot be found in the note, say so."""
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if chat_history:
+        for msg in chat_history:
+            role = msg.get("role")
+            msg_content = msg.get("content")
+            if role in ("user", "assistant") and msg_content:
+                messages.append({"role": role, "content": msg_content})
+
+    messages.append({"role": "user", "content": question})
 
     try:
         response = await client.chat.completions.create(
             model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             temperature=0.4,
             max_tokens=1024,
         )

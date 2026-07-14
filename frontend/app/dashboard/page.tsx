@@ -109,6 +109,7 @@ const typeConfig: {
     icon: any;
     colorClass: string;
     label: string;
+    subtitle: string;
     hoverTextClass: string;
     glowColorClass: string;
     accentBorderClass: string;
@@ -118,6 +119,7 @@ const typeConfig: {
     icon: FileText,
     colorClass: "bg-blue-500/10 border-blue-500/25 text-blue-400",
     label: "Text",
+    subtitle: "Document with key text details",
     hoverTextClass: "group-hover:text-blue-400",
     glowColorClass: "bg-blue-500",
     accentBorderClass: "hover:border-blue-500/30",
@@ -126,6 +128,7 @@ const typeConfig: {
     icon: Mic,
     colorClass: "bg-rose-500/10 border-rose-500/25 text-rose-400",
     label: "Voice",
+    subtitle: "Audio recording & transcript",
     hoverTextClass: "group-hover:text-rose-400",
     glowColorClass: "bg-rose-500",
     accentBorderClass: "hover:border-rose-500/30",
@@ -134,6 +137,7 @@ const typeConfig: {
     icon: Palette,
     colorClass: "bg-violet-500/10 border-violet-500/25 text-violet-400",
     label: "Drawing",
+    subtitle: "Freehand sketch canvas",
     hoverTextClass: "group-hover:text-violet-400",
     glowColorClass: "bg-violet-500",
     accentBorderClass: "hover:border-violet-500/30",
@@ -142,6 +146,7 @@ const typeConfig: {
     icon: ListTodo,
     colorClass: "bg-emerald-500/10 border-emerald-500/25 text-emerald-400",
     label: "Checklist",
+    subtitle: "Structured AI task planner",
     hoverTextClass: "group-hover:text-emerald-400",
     glowColorClass: "bg-emerald-500",
     accentBorderClass: "hover:border-emerald-500/30",
@@ -282,23 +287,55 @@ export default function DashboardPage() {
       <div className="flex-1 px-8 py-8 flex flex-col justify-between min-h-[calc(100vh-1px)]">
         <div className="space-y-6">
           {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-600 pb-5">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Home</h1>
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4 border-b border-white/[0.04] pb-5">
+            {/* Column 1: Title */}
+            <div className="flex items-center justify-start">
+              <h1 className="text-2xl font-bold text-white tracking-tight">Home</h1>
+            </div>
+
+            {/* Column 2: Centered Search Bar */}
+            <div className="flex justify-center w-full">
+              <form onSubmit={handleSearchSubmit} className="relative max-w-sm w-full hidden md:block">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="How can I help?"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-surface-900 border border-white/[0.06] rounded-full pl-9 pr-4 py-1.5 text-white text-xs focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 shadow-sm transition-all placeholder:text-neutral-500 text-center"
+                />
+              </form>
+            </div>
             
-            <button 
-              onClick={handleCreateNote} 
-              disabled={creating}
-              className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5"
-            >
-              {creating ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  New Note
-                </>
-              )}
-            </button>
+            {/* Column 3: Actions & Mobile Search */}
+            <div className="flex items-center justify-between sm:justify-end gap-3 w-full">
+              {/* Search Bar - visible on mobile, hidden on desktop */}
+              <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-xs md:hidden">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-surface-900 border border-white/[0.06] rounded-full pl-9 pr-4 py-1.5 text-white text-xs focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 shadow-sm transition-all placeholder:text-neutral-500 text-center"
+                />
+              </form>
+
+              <button 
+                onClick={handleCreateNote} 
+                disabled={creating}
+                className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              >
+                {creating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" />
+                    New Note
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Notes grouped by day */}
@@ -386,9 +423,17 @@ export default function DashboardPage() {
                                 )}>
                                   {note.title || "Untitled note"}
                                 </h3>
-                                <span className="text-[9px] uppercase font-bold tracking-wider opacity-60">
-                                  {config.label}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                  <span className={clsx(
+                                    "text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded border border-white/[0.04] shrink-0",
+                                    config.colorClass
+                                  )}>
+                                    {config.label}
+                                  </span>
+                                  <span className="text-[10px] text-neutral-500 truncate">
+                                    {config.subtitle}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             <button
@@ -435,19 +480,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Bottom Centered search bar */}
-        <div className="mt-12 w-full pt-4">
-          <form onSubmit={handleSearchSubmit} className="relative max-w-lg w-full mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="How can I help?"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-900 border border-surface-600 rounded-full pl-11 pr-4 py-3 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 shadow-sm transition-all placeholder:text-neutral-500"
-            />
-          </form>
-        </div>
       </div>
 
       {/* ── Right Sidebar Column (Calendar/Upcoming) ── */}
