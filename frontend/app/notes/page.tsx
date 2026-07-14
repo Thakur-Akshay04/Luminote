@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
@@ -9,8 +9,11 @@ import NoteCard from "@/components/NoteCard";
 import TagFilter from "@/components/TagFilter";
 import { Plus, Loader2, StickyNote, Sparkles } from "lucide-react";
 
-export default function NotesPage() {
+function NotesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const noteTypeParam = searchParams.get("type") || undefined;
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -26,14 +29,14 @@ export default function NotesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await notesApi.list(selectedTag ?? undefined);
+      const res = await notesApi.list(selectedTag ?? undefined, noteTypeParam);
       setNotes(res.data);
     } catch {
       setError("Failed to load notes.");
     } finally {
       setLoading(false);
     }
-  }, [selectedTag]);
+  }, [selectedTag, noteTypeParam]);
 
   useEffect(() => {
     fetchNotes();
@@ -43,18 +46,20 @@ export default function NotesPage() {
     new Set(notes.flatMap((n) => n.tags ?? []))
   ).sort();
 
-  const handleCreate = async () => {
-    setCreating(true);
-    try {
-      const res = await notesApi.create({
-        title: "New note",
-        content: "Start writing here…",
-      });
-      router.push(`/notes/${res.data.id}`);
-    } catch {
-      setError("Failed to create note.");
-      setCreating(false);
-    }
+  const handleCreate = () => {
+    const url = noteTypeParam ? `/notes/new?type=${noteTypeParam}` : "/notes/new";
+    router.push(url);
+  };
+
+  const getTitle = () => {
+    if (!noteTypeParam) return "My Notes";
+    const typeMap: { [key: string]: string } = {
+      text: "Text Notes",
+      audio: "Voice Notes",
+      drawing: "Drawing Notes",
+      checklist: "Checklists",
+    };
+    return typeMap[noteTypeParam] || "My Notes";
   };
 
   return (
@@ -62,7 +67,7 @@ export default function NotesPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gradient">My Notes</h1>
+          <h1 className="text-3xl font-bold text-gradient">{getTitle()}</h1>
           <p className="text-gray-500 text-sm mt-1">
             {loading ? "Loading…" : `${notes.length} note${notes.length !== 1 ? "s" : ""}`}
           </p>
@@ -159,5 +164,17 @@ export default function NotesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function NotesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-surface-800">
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+      </div>
+    }>
+      <NotesContent />
+    </Suspense>
   );
 }

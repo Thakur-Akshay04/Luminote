@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { clearAuth, getUser } from "@/lib/auth";
 import type { StoredUser } from "@/lib/auth";
 import {
@@ -14,17 +14,33 @@ import {
   LayoutDashboard,
   Settings,
   HelpCircle,
+  ChevronDown,
+  FileText,
+  Mic,
+  Palette,
+  ListTodo,
 } from "lucide-react";
 import clsx from "clsx";
 
-export default function Navbar() {
+function NavbarContent() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeType = searchParams.get("type");
+  
   const [user, setUser] = useState<StoredUser | null>(null);
+  const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
 
   useEffect(() => {
     setUser(getUser());
   }, []);
+
+  // Keep notes dropdown open if current path is a notes list filter
+  useEffect(() => {
+    if (pathname.startsWith("/notes")) {
+      setNotesDropdownOpen(true);
+    }
+  }, [pathname]);
 
   const handleLogout = () => {
     clearAuth();
@@ -34,14 +50,20 @@ export default function Navbar() {
   const navLinks = user
     ? [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-        { href: "/notes",  label: "Notes",  icon: BookOpen },
+        { href: "/notes",  label: "Notes",  icon: BookOpen, hasDropdown: true },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/search", label: "Search", icon: Search },
       ]
     : [];
 
+  const dropdownOptions = [
+    { type: "text", label: "Text", icon: FileText },
+    { type: "audio", label: "Voice", icon: Mic },
+    { type: "drawing", label: "Drawing", icon: Palette },
+    { type: "checklist", label: "Checklist", icon: ListTodo },
+  ];
+
   if (!user) {
-    // Render top horizontal navbar for landing / guest pages
     return (
       <header className="w-full border-b border-surface-600 bg-surface-900/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -59,7 +81,6 @@ export default function Navbar() {
     );
   }
 
-  // Render left vertical sidebar for authenticated pages
   return (
     <aside className="w-64 h-screen border-r border-surface-600 bg-surface-800 flex flex-col justify-between py-6 px-4 shrink-0 sticky top-0 animate-fade-in">
       <div className="flex flex-col gap-8">
@@ -81,8 +102,66 @@ export default function Navbar() {
 
         {/* Nav Links */}
         <div className="flex flex-col gap-1.5">
-          {navLinks.map(({ href, label, icon: Icon }) => {
+          {navLinks.map(({ href, label, icon: Icon, hasDropdown }) => {
             const isActive = pathname.startsWith(href);
+            
+            if (hasDropdown) {
+              return (
+                <div key={href} className="flex flex-col gap-1">
+                  <div
+                    className={clsx(
+                      "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer select-none",
+                      isActive && !activeType
+                        ? "bg-surface-700 text-white font-semibold shadow-sm"
+                        : "text-neutral-400 hover:text-white hover:bg-surface-700"
+                    )}
+                    onClick={(e) => {
+                      router.push(href);
+                      setNotesDropdownOpen(!notesDropdownOpen);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={clsx("w-4 h-4", isActive ? "text-brand-500" : "text-neutral-500")} />
+                      <span>{label}</span>
+                    </div>
+                    <ChevronDown
+                      className={clsx(
+                        "w-4 h-4 text-neutral-500 transition-transform duration-200",
+                        notesDropdownOpen && "rotate-180"
+                      )}
+                    />
+                  </div>
+                  
+                  {/* Dropdown Options */}
+                  {notesDropdownOpen && (
+                    <div className="flex flex-col gap-1 pl-4 mt-1 border-l border-surface-600 ml-5">
+                      {dropdownOptions.map((opt) => {
+                        const optHref = `/notes?type=${opt.type}`;
+                        const isOptActive = pathname.startsWith("/notes") && activeType === opt.type;
+                        const OptIcon = opt.icon;
+                        
+                        return (
+                          <Link
+                            key={opt.type}
+                            href={optHref}
+                            className={clsx(
+                              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150",
+                              isOptActive
+                                ? "bg-surface-700 text-white font-semibold shadow-sm"
+                                : "text-neutral-400 hover:text-white hover:bg-surface-700/50"
+                            )}
+                          >
+                            <OptIcon className={clsx("w-3.5 h-3.5", isOptActive ? "text-brand-500" : "text-neutral-500")} />
+                            <span>{opt.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={href}
@@ -128,5 +207,13 @@ export default function Navbar() {
         </button>
       </div>
     </aside>
+  );
+}
+
+export default function Navbar() {
+  return (
+    <Suspense fallback={<aside className="w-64 h-screen border-r border-surface-600 bg-surface-800 shrink-0 sticky top-0" />}>
+      <NavbarContent />
+    </Suspense>
   );
 }

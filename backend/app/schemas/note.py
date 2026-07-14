@@ -15,6 +15,7 @@ class ChecklistItem(BaseModel):
 class NoteCreate(BaseModel):
     title: Optional[str] = None
     content: str
+    note_type: Optional[str] = "text"
 
 
 class NoteUpdate(BaseModel):

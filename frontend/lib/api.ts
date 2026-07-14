@@ -54,8 +54,13 @@ export const authApi = {
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 export const notesApi = {
-  list: (tag?: string) =>
-    api.get<Note[]>("/notes", { params: tag ? { tag } : {} }),
+  list: (tag?: string, noteType?: string) =>
+    api.get<Note[]>("/notes", {
+      params: {
+        ...(tag ? { tag } : {}),
+        ...(noteType ? { note_type: noteType } : {}),
+      },
+    }),
   get: (id: string) => api.get<Note>(`/notes/${id}`),
   create: (data: NoteCreate) => api.post<Note>("/notes", data),
   update: (id: string, data: NoteUpdate) => api.put<Note>(`/notes/${id}`, data),

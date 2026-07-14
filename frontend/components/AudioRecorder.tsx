@@ -10,6 +10,7 @@ interface AudioRecorderProps {
   transcript: string | null;
   onTranscriptUpdate: (newTranscript: string) => void;
   onMediaUrlUpdate: (newUrl: string) => void;
+  onSaveBeforeAction?: () => Promise<string>;
 }
 
 export default function AudioRecorder({
@@ -18,6 +19,7 @@ export default function AudioRecorder({
   transcript,
   onTranscriptUpdate,
   onMediaUrlUpdate,
+  onSaveBeforeAction,
 }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -109,7 +111,11 @@ export default function AudioRecorder({
     setLoading(true);
     setError(null);
     try {
-      const res = await notesApi.uploadAudio(noteId, audioBlob);
+      let activeId = noteId;
+      if (noteId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      }
+      const res = await notesApi.uploadAudio(activeId, audioBlob);
       onMediaUrlUpdate(res.data.media_url);
     } catch (err: any) {
       console.error("Audio upload error:", err);
@@ -125,7 +131,11 @@ export default function AudioRecorder({
     setTranscribing(true);
     setError(null);
     try {
-      const res = await notesApi.transcribeAudio(noteId, force);
+      let activeId = noteId;
+      if (noteId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      }
+      const res = await notesApi.transcribeAudio(activeId, force);
       onTranscriptUpdate(res.data.transcript);
     } catch (err: any) {
       console.error("Audio transcription error:", err);

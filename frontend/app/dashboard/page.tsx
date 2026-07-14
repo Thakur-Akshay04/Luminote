@@ -19,9 +19,12 @@ import {
   Trash2,
   MoreVertical,
   Loader2,
-  Video,
-  FileDown,
+  FileText,
+  Mic,
+  Palette,
+  ListTodo,
 } from "lucide-react";
+import clsx from "clsx";
 import {
   format,
   isSameDay,
@@ -101,6 +104,50 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
   );
 }
 
+const typeConfig: {
+  [key: string]: {
+    icon: any;
+    colorClass: string;
+    label: string;
+    hoverTextClass: string;
+    glowColorClass: string;
+    accentBorderClass: string;
+  };
+} = {
+  text: {
+    icon: FileText,
+    colorClass: "bg-blue-500/10 border-blue-500/25 text-blue-400",
+    label: "Text",
+    hoverTextClass: "group-hover:text-blue-400",
+    glowColorClass: "bg-blue-500",
+    accentBorderClass: "hover:border-blue-500/30",
+  },
+  audio: {
+    icon: Mic,
+    colorClass: "bg-rose-500/10 border-rose-500/25 text-rose-400",
+    label: "Voice",
+    hoverTextClass: "group-hover:text-rose-400",
+    glowColorClass: "bg-rose-500",
+    accentBorderClass: "hover:border-rose-500/30",
+  },
+  drawing: {
+    icon: Palette,
+    colorClass: "bg-violet-500/10 border-violet-500/25 text-violet-400",
+    label: "Drawing",
+    hoverTextClass: "group-hover:text-violet-400",
+    glowColorClass: "bg-violet-500",
+    accentBorderClass: "hover:border-violet-500/30",
+  },
+  checklist: {
+    icon: ListTodo,
+    colorClass: "bg-emerald-500/10 border-emerald-500/25 text-emerald-400",
+    label: "Checklist",
+    hoverTextClass: "group-hover:text-emerald-400",
+    glowColorClass: "bg-emerald-500",
+    accentBorderClass: "hover:border-emerald-500/30",
+  },
+};
+
 // ── Main Dashboard Component ─────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -114,7 +161,6 @@ export default function DashboardPage() {
   const [firstName, setFirstName] = useState("there");
 
   // Input states
-  const [quickNoteInput, setQuickNoteInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -149,22 +195,8 @@ export default function DashboardPage() {
     }
   }, [mounted, fetchData]);
 
-  const handleCreateNote = async () => {
-    setCreating(true);
-    try {
-      const content = quickNoteInput.trim()
-        ? `Meeting URL: ${quickNoteInput.trim()}\n\nStart writing notes here…`
-        : "Start writing here…";
-      const title = quickNoteInput.trim()
-        ? "Recorded Meeting Session"
-        : "New note";
-
-      const res = await notesApi.create({ title, content });
-      setQuickNoteInput("");
-      router.push(`/notes/${res.data.id}`);
-    } catch {
-      setCreating(false);
-    }
+  const handleCreateNote = () => {
+    router.push("/notes/new");
   };
 
   const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
@@ -253,40 +285,20 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-600 pb-5">
             <h1 className="text-2xl font-bold text-white tracking-tight">Home</h1>
             
-            {/* Quick Actions Header */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-72">
-                <Video className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pink-400" />
-                <input
-                  type="text"
-                  placeholder="Paste meeting URL to record"
-                  className="w-full bg-surface-900 border border-surface-600 rounded-lg pl-10 pr-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500 shadow-sm transition-all placeholder:text-neutral-500"
-                  value={quickNoteInput}
-                  onChange={(e) => setQuickNoteInput(e.target.value)}
-                />
-              </div>
-              <button 
-                onClick={handleCreateNote} 
-                className="btn-secondary py-2 px-4 text-xs font-semibold flex items-center gap-1 bg-surface-900 hover:bg-surface-700"
-              >
-                <FileDown className="w-3.5 h-3.5 text-neutral-400" />
-                Import
-              </button>
-              <button 
-                onClick={handleCreateNote} 
-                disabled={creating}
-                className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5"
-              >
-                {creating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping mr-0.5" />
-                    Record
-                  </>
-                )}
-              </button>
-            </div>
+            <button 
+              onClick={handleCreateNote} 
+              disabled={creating}
+              className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5"
+            >
+              {creating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  New Note
+                </>
+              )}
+            </button>
           </div>
 
           {/* Notes grouped by day */}
@@ -308,8 +320,8 @@ export default function DashboardPage() {
               <StickyNote className="w-8 h-8 text-neutral-500" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-neutral-300">No notes recorded yet</h3>
-                <p className="text-xs text-neutral-500 mt-1">Start by recording a meeting URL or click "New Note".</p>
+              <h3 className="text-sm font-bold text-neutral-300">No notes yet</h3>
+                <p className="text-xs text-neutral-500 mt-1">Click "New Note" to get started.</p>
               </div>
               <button onClick={handleCreateNote} className="btn-primary text-xs py-1.5 px-3">
                 <Plus className="w-3.5 h-3.5" /> Create a Note
@@ -328,20 +340,60 @@ export default function DashboardPage() {
                   {/* Notes Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {groupNotes.map((note) => {
-                      const wordCount = note.content.split(/\s+/).filter(Boolean).length;
+                      const getSnippetAndCount = () => {
+                        if (note.note_type === "checklist" && note.content) {
+                          try {
+                            const data = JSON.parse(note.content);
+                            const text = data.description || "";
+                            const count = text.split(/\s+/).filter(Boolean).length;
+                            return { snippet: note.summary || text, wordCount: count };
+                          } catch {
+                            // Fallback if content is not JSON
+                          }
+                        }
+                        const count = note.content.split(/\s+/).filter(Boolean).length;
+                        return { snippet: note.summary || note.content, wordCount: count };
+                      };
+                      const { snippet, wordCount } = getSnippetAndCount();
+                      const config = typeConfig[note.note_type] || typeConfig.text;
+                      const TypeIcon = config.icon;
                       return (
                         <Link
                           key={note.id}
                           href={`/notes/${note.id}`}
-                          className="bg-surface-900 border border-surface-600 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm hover:shadow transition-all group relative"
+                          className={clsx(
+                            "bg-surface-900/60 backdrop-blur-md border border-white/[0.04] rounded-xl p-5 flex flex-col justify-between gap-4",
+                            "shadow-sm transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden group relative",
+                            "hover:-translate-y-1 hover:scale-[1.01] hover:bg-surface-900/90 hover:shadow-lg hover:shadow-black/55",
+                            config.accentBorderClass
+                          )}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <h3 className="text-sm font-bold text-white leading-snug group-hover:text-pink-400 transition-colors truncate pr-6">
-                              {note.title || "Untitled note"}
-                            </h3>
+                          {/* Ambient Glow */}
+                          <div className={`absolute -top-12 -right-12 w-28 h-28 rounded-full blur-2xl opacity-10 group-hover:opacity-25 transition-opacity duration-300 pointer-events-none ${config.glowColorClass}`} />
+
+                          <div className="flex items-start justify-between gap-3 relative z-10">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className={clsx(
+                                "shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-colors duration-150",
+                                config.colorClass
+                              )}>
+                                <TypeIcon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className={clsx(
+                                  "text-sm font-bold text-white leading-snug transition-colors truncate pr-6",
+                                  config.hoverTextClass
+                                )}>
+                                  {note.title || "Untitled note"}
+                                </h3>
+                                <span className="text-[9px] uppercase font-bold tracking-wider opacity-60">
+                                  {config.label}
+                                </span>
+                              </div>
+                            </div>
                             <button
                               onClick={(e) => handleDeleteNote(note.id, e)}
-                              className="text-neutral-500 hover:text-red-400 absolute top-3 right-3 p-1 rounded-lg hover:bg-surface-700 transition-all"
+                              className="text-neutral-500 hover:text-red-400 absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-700 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 z-10"
                               title="Delete Note"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -349,18 +401,14 @@ export default function DashboardPage() {
                           </div>
 
                           {/* Snippet */}
-                          <p className="text-xs text-neutral-400 line-clamp-2">
-                            {note.summary || note.content}
+                          <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2 relative z-10">
+                            {snippet}
                           </p>
 
                           {/* Footer Details row */}
-                          <div className="flex items-center justify-between border-t border-surface-700 pt-2.5 mt-1">
-                            <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
-                              <div className="w-4 h-4 rounded bg-pink-950/30 flex items-center justify-center text-pink-400 shrink-0">
-                                <Sparkles className="w-2.5 h-2.5 fill-pink-400" />
-                              </div>
-                              <span className="font-semibold text-neutral-400">Luminote</span>
-                              <span>•</span>
+                          <div className="flex items-center justify-between border-t border-white/[0.04] group-hover:border-white/[0.08] pt-3 mt-1 transition-colors duration-300 relative z-10">
+                            <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-medium">
+                              <Clock className="w-3 h-3 text-neutral-500" />
                               <span>{format(new Date(note.updated_at), "h:mm a")}</span>
                               <span>•</span>
                               <span>{wordCount} words</span>
@@ -370,7 +418,7 @@ export default function DashboardPage() {
                             {note.tags && note.tags.length > 0 && (
                               <div className="flex gap-1 shrink-0">
                                 {note.tags.slice(0, 2).map((tag) => (
-                                  <span key={tag} className="tag text-[9px] py-0 px-1 bg-surface-700 border-surface-600 text-neutral-300">
+                                  <span key={tag} className="tag text-[9px] py-0.5 px-2 bg-surface-700/50 border-white/[0.04] text-neutral-300 rounded-md">
                                     {tag}
                                   </span>
                                 ))}

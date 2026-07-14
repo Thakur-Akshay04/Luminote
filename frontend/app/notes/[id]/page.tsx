@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { notesApi } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
@@ -28,11 +28,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-const AUTOSAVE_DELAY = 1500; // ms
+// Auto-saving is disabled. Saving is done manually.
 
-export default function NoteEditorPage() {
+function NoteEditorContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const noteId = params.id as string;
 
   const [note, setNote] = useState<Note | null>(null);
@@ -40,6 +41,8 @@ export default function NoteEditorPage() {
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState<string>("text");
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [checklistDescription, setChecklistDescription] = useState("");
+  const [aiContext, setAiContext] = useState("");
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,11 +51,15 @@ export default function NoteEditorPage() {
   const [saved, setSaved] = useState(false);
   const [showAI, setShowAI] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [extractingTasks, setExtractingTasks] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirty = useRef(false);
   const titleRef = useRef("");
   const contentRef = useRef("");
+  const descriptionRef = useRef("");
+  const aiContextRef = useRef("");
   const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
 
   useEffect(() => {
@@ -60,6 +67,38 @@ export default function NoteEditorPage() {
   }, [router]);
 
   const fetchNote = useCallback(async () => {
+    if (noteId === "new") {
+      const defaultType = searchParams.get("type") || "text";
+      setNote({
+        id: "new",
+        user_id: "",
+        title: "",
+        content: "",
+        summary: null,
+        tags: null,
+        note_type: defaultType,
+        media_url: null,
+        transcript: null,
+        checklist_items: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setTitle("");
+      setContent("");
+      setChecklistDescription("");
+      setAiContext("");
+      setNoteType(defaultType);
+      setChecklistItems([]);
+      titleRef.current = "";
+      contentRef.current = "";
+      descriptionRef.current = "";
+      aiContextRef.current = "";
+      setLoading(false);
+      isDirty.current = true;
+      setHasUnsavedChanges(true);
+      return;
+    }
+
     try {
       const res = await notesApi.get(noteId);
       setNote(res.data);
@@ -69,12 +108,32 @@ export default function NoteEditorPage() {
       setChecklistItems(res.data.checklist_items || []);
       titleRef.current = res.data.title ?? "";
       contentRef.current = res.data.content;
+      
+      if (res.data.note_type === "checklist" && res.data.content) {
+        try {
+          const data = JSON.parse(res.data.content);
+          setChecklistDescription(data.description || "");
+          setAiContext(data.ai_context || "");
+          descriptionRef.current = data.description || "";
+          aiContextRef.current = data.ai_context || "";
+        } catch {
+          setChecklistDescription(res.data.content);
+          setAiContext("");
+          descriptionRef.current = res.data.content;
+          aiContextRef.current = "";
+        }
+      } else {
+        setChecklistDescription("");
+        setAiContext("");
+        descriptionRef.current = "";
+        aiContextRef.current = "";
+      }
     } catch {
       setError("Note not found.");
     } finally {
       setLoading(false);
     }
-  }, [noteId]);
+  }, [noteId, searchParams]);
 
   useEffect(() => {
     if (noteId) {
@@ -105,35 +164,104 @@ export default function NoteEditorPage() {
   const saveNote = useCallback(async () => {
     if (!isDirty.current) return;
     setSaving(true);
+    setError(null);
     try {
-      const res = await notesApi.update(noteId, {
-        title: titleRef.current || undefined,
-        content: contentRef.current,
-        note_type: noteType,
-      });
-      setNote(res.data);
-      isDirty.current = false;
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      if (noteId === "new") {
+        const res = await notesApi.create({
+          title: titleRef.current || undefined,
+          content: contentRef.current || "",
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        window.history.replaceState(null, "", `/notes/${res.data.id}`);
+        router.replace(`/notes/${res.data.id}`);
+      } else {
+        const res = await notesApi.update(noteId, {
+          title: titleRef.current || undefined,
+          content: contentRef.current,
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
     } catch {
       setError("Failed to save.");
     } finally {
       setSaving(false);
     }
-  }, [noteId, noteType]);
+  }, [noteId, noteType, router]);
 
-  const scheduleAutosave = useCallback(() => {
+  const markDirty = useCallback(() => {
     isDirty.current = true;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(saveNote, AUTOSAVE_DELAY);
-  }, [saveNote]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
+    setHasUnsavedChanges(true);
   }, []);
+
+  const handleExtractTasks = async () => {
+    setExtractingTasks(true);
+    setExtractError(null);
+    try {
+      let activeId = noteId;
+      if (noteId === "new") {
+        const res = await notesApi.create({
+          title: titleRef.current || undefined,
+          content: contentRef.current || "",
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        activeId = res.data.id;
+        window.history.replaceState(null, "", `/notes/${activeId}`);
+        router.replace(`/notes/${activeId}`);
+      } else if (isDirty.current) {
+        const res = await notesApi.update(noteId, {
+          title: titleRef.current || undefined,
+          content: contentRef.current,
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+      }
+
+      const res = await notesApi.extractTasks(activeId);
+      const extracted = res.data.tasks || [];
+
+      if (extracted.length === 0) {
+        setExtractError("No action items found in this note's content.");
+        return;
+      }
+
+      const existingTexts = new Set(checklistItems.map((item) => item.text.toLowerCase()));
+      const newItems = extracted.filter(
+        (item) => !existingTexts.has(item.text.toLowerCase())
+      );
+
+      const merged = [...checklistItems, ...newItems];
+      setChecklistItems(merged);
+      if (note) {
+        setNote({ ...note, checklist_items: merged });
+      }
+
+      await notesApi.update(activeId, { checklist_items: merged });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      console.error("AI task extraction error:", err);
+      setExtractError(
+        err.response?.data?.detail || "AI task extraction failed. Make sure to enter context details first."
+      );
+    } finally {
+      setExtractingTasks(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Delete this note? This cannot be undone.")) return;
@@ -148,16 +276,44 @@ export default function NoteEditorPage() {
   };
 
   const handleManualSave = async () => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    if (noteType === "drawing" && drawingCanvasRef.current) {
-      await drawingCanvasRef.current.save();
+    let activeId = noteId;
+    if (noteId === "new") {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await notesApi.create({
+          title: titleRef.current || undefined,
+          content: contentRef.current || "",
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        activeId = res.data.id;
+        window.history.replaceState(null, "", `/notes/${activeId}`);
+        router.replace(`/notes/${activeId}`);
+      } catch {
+        setError("Failed to create note.");
+        setSaving(false);
+        return;
+      }
     }
-    isDirty.current = true;
-    saveNote();
+
+    if (noteType === "drawing" && drawingCanvasRef.current) {
+      await drawingCanvasRef.current.save(activeId);
+    } else {
+      isDirty.current = true;
+      saveNote();
+    }
   };
 
   const handleNoteTypeChange = async (type: string) => {
     setNoteType(type);
+    if (noteId === "new") {
+      return;
+    }
     try {
       setSaving(true);
       const res = await notesApi.update(noteId, { note_type: type });
@@ -235,7 +391,7 @@ export default function NoteEditorPage() {
           onChange={(e) => {
             setTitle(e.target.value);
             titleRef.current = e.target.value;
-            scheduleAutosave();
+            markDirty();
           }}
         />
 
@@ -271,11 +427,14 @@ export default function NoteEditorPage() {
 
         {/* Save indicator */}
         <div className="shrink-0 flex items-center gap-1">
+          {hasUnsavedChanges && !saving && (
+            <span className="text-xs text-amber-500 animate-fade-in font-medium">Unsaved changes</span>
+          )}
           {saving && <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" />}
           {saved && !saving && (
-            <span className="text-xs text-emerald-500 animate-fade-in">Saved ✓</span>
+            <span className="text-xs text-emerald-500 animate-fade-in font-medium">Saved ✓</span>
           )}
-          {error && <span className="text-xs text-red-400">{error}</span>}
+          {error && <span className="text-xs text-red-400 font-medium">{error}</span>}
         </div>
 
         <div className="flex items-center gap-1 ml-auto shrink-0">
@@ -336,7 +495,13 @@ export default function NoteEditorPage() {
         <div className="flex flex-1 overflow-hidden">
           
           {/* EDITOR PANEL (LEFT) */}
-          <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${noteType === "drawing" ? "w-full overflow-hidden h-full" : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"}`}>
+          <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${
+            noteType === "drawing" 
+              ? "w-full overflow-hidden h-full" 
+              : noteType === "checklist"
+                ? "w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto"
+                : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"
+          }`}>
             
             {noteType === "text" && (
               <>
@@ -354,7 +519,7 @@ export default function NoteEditorPage() {
                   onChange={(e) => {
                     setContent(e.target.value);
                     contentRef.current = e.target.value;
-                    scheduleAutosave();
+                    markDirty();
                   }}
                   spellCheck
                 />
@@ -393,6 +558,31 @@ export default function NoteEditorPage() {
                         setNote({ ...note, media_url: newUrl });
                       }
                     }}
+                    onSaveBeforeAction={async () => {
+                      // Save note and return new note's ID
+                      setSaving(true);
+                      setError(null);
+                      try {
+                        const res = await notesApi.create({
+                          title: titleRef.current || undefined,
+                          content: contentRef.current || "",
+                          note_type: noteType,
+                        });
+                        setNote(res.data);
+                        isDirty.current = false;
+                        setHasUnsavedChanges(false);
+                        setSaved(true);
+                        setTimeout(() => setSaved(false), 2000);
+                        window.history.replaceState(null, "", `/notes/${res.data.id}`);
+                        router.replace(`/notes/${res.data.id}`);
+                        return res.data.id;
+                      } catch {
+                        setError("Failed to create note before recording audio.");
+                        throw new Error("Init note failed");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
                   />
                 </div>
               </>
@@ -404,7 +594,57 @@ export default function NoteEditorPage() {
                   <ListTodo className="w-3.5 h-3.5 text-gray-600" />
                   <span className="text-xs text-gray-600 font-medium">Checklist Planner</span>
                 </div>
-                <div className="p-4 sm:p-6 flex-1">
+                <div className="p-4 sm:p-6 flex-1 flex flex-col gap-5 overflow-y-auto">
+                  {/* Description Box */}
+                  {(() => {
+                    const descWordCount = checklistDescription.trim() === "" ? 0 : checklistDescription.trim().split(/\s+/).filter(Boolean).length;
+                    return (
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <label htmlFor="checklist-desc" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                          Checklist Sub-title / Short Description
+                        </label>
+                        <div className="relative w-full">
+                          <input
+                            type="text"
+                            id="checklist-desc"
+                            className="w-full bg-surface-900/50 border border-white/[0.04] focus:border-brand-500/50 rounded-xl pl-3 pr-20 py-2 text-xs text-gray-200
+                                       placeholder-gray-700 focus:outline-none transition-all"
+                            placeholder="Add a short subtitle or description for this checklist..."
+                            value={checklistDescription}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const words = val.trim().split(/\s+/).filter(Boolean);
+                              if (words.length <= 25) {
+                                setChecklistDescription(val);
+                                descriptionRef.current = val;
+                                contentRef.current = JSON.stringify({
+                                  description: val,
+                                  ai_context: aiContextRef.current,
+                                });
+                                markDirty();
+                              } else {
+                                const truncated = val.split(/\s+/).slice(0, 25).join(" ");
+                                setChecklistDescription(truncated);
+                                descriptionRef.current = truncated;
+                                contentRef.current = JSON.stringify({
+                                  description: truncated,
+                                  ai_context: aiContextRef.current,
+                                });
+                                markDirty();
+                              }
+                            }}
+                            spellCheck
+                          />
+                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider pointer-events-none select-none ${descWordCount >= 25 ? "text-red-400" : "text-gray-500"}`}>
+                            {descWordCount}/25 words
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="h-px bg-white/[0.04] shrink-0" />
+
                   <ChecklistEditor
                     noteId={noteId}
                     items={checklistItems}
@@ -429,7 +669,9 @@ export default function NoteEditorPage() {
 
           {/* PREVIEW PANEL (RIGHT) */}
           {noteType !== "drawing" && (
-            <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-1/2 overflow-y-auto`}>
+            <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} ${
+              noteType === "checklist" ? "w-full sm:w-[35%]" : "w-full sm:w-1/2"
+            } overflow-y-auto`}>
               
               {noteType === "text" && (
                 <>
@@ -475,30 +717,52 @@ export default function NoteEditorPage() {
 
               {noteType === "checklist" && (
                 <>
-                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                    <Edit3 className="w-3.5 h-3.5 text-gray-600" />
-                    <span className="text-xs text-gray-600 font-medium">Context / Description Editor</span>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04] bg-surface-900/40">
+                    <Sparkles className="w-3.5 h-3.5 text-brand-400 fill-brand-400/20" />
+                    <span className="text-xs text-gray-200 font-semibold uppercase tracking-wider">AI Task Generator</span>
                   </div>
-                  <div className="flex-1 flex flex-col min-h-[300px]">
+                  <div className="p-5 flex-1 flex flex-col gap-4">
+                    <div className="text-xs text-neutral-400 leading-relaxed">
+                      Type or paste context, meeting notes, project briefs, or general thoughts below. The AI will extract actionable checklist items and add them to your checklist items.
+                    </div>
+                    
                     <textarea
                       id="note-checklist-content"
-                      className="flex-1 bg-transparent resize-none p-4 sm:p-6 text-sm text-gray-200
+                      className="flex-1 min-h-[180px] bg-surface-900/40 border border-white/[0.04] focus:border-brand-500/50 rounded-xl p-4 text-sm text-gray-200
                                  font-mono leading-relaxed placeholder-gray-700
-                                 focus:outline-none"
-                      placeholder="Write details, descriptions, or general notes regarding this checklist here…"
-                      value={content}
+                                 focus:outline-none transition-all resize-none"
+                      placeholder="e.g. 'Must call the plumber to fix the kitchen sink by Tuesday. Also send final slides to the team and schedule a sync with the marketing lead.'..."
+                      value={aiContext}
                       onChange={(e) => {
-                        setContent(e.target.value);
-                        contentRef.current = e.target.value;
-                        scheduleAutosave();
+                        setAiContext(e.target.value);
+                        aiContextRef.current = e.target.value;
+                        contentRef.current = JSON.stringify({
+                          description: descriptionRef.current,
+                          ai_context: e.target.value,
+                        });
+                        markDirty();
                       }}
                       spellCheck
                     />
-                    <div className="px-4 py-2 border-t border-white/[0.04] flex items-center justify-between text-xs text-gray-700 font-mono">
-                      <span>
-                        {content.split(/\s+/).filter(Boolean).length} words
-                      </span>
-                    </div>
+
+                    {extractError && (
+                      <div className="px-3.5 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium">
+                        {extractError}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleExtractTasks}
+                      disabled={extractingTasks || !aiContext.trim()}
+                      className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 transition-all font-semibold"
+                    >
+                      {extractingTasks ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 text-white fill-white" />
+                      )}
+                      <span>{extractingTasks ? "Extracting Tasks..." : "Generate AI Checklist Items"}</span>
+                    </button>
                   </div>
                 </>
               )}
@@ -522,5 +786,17 @@ export default function NoteEditorPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function NoteEditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-surface-800">
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+      </div>
+    }>
+      <NoteEditorContent />
+    </Suspense>
   );
 }

@@ -66,7 +66,7 @@ function hexToRgbaBytes(hex: string) {
 }
 
 export interface DrawingCanvasRef {
-  save: () => Promise<void>;
+  save: (overrideNoteId?: string) => Promise<void>;
 }
 
 interface DrawingCanvasProps {
@@ -120,6 +120,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     }));
 
     const fetchVersions = useCallback(async () => {
+      if (noteId === "new") return;
       try {
         const res = await notesApi.getDrawing(noteId);
         if (res.data.versions) {
@@ -664,7 +665,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     };
 
     // Save drawing to DB
-    const handleSave = async () => {
+    const handleSave = async (overrideNoteId?: string) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       setSaving(true);
@@ -672,7 +673,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
       try {
         const dataUrl = canvas.toDataURL("image/png");
-        const res = await notesApi.saveDrawing(noteId, dataUrl);
+        const res = await notesApi.saveDrawing(overrideNoteId || noteId, dataUrl);
         setMessage({ type: "success", text: "Drawing saved successfully" });
         setTimeout(() => setMessage(null), 3000);
         if (res.data.media_url) {

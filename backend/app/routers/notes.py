@@ -33,10 +33,11 @@ async def get_current_user(authorization: str = Header(...)) -> str:
 @router.get("", response_model=list[NoteResponse])
 async def list_notes(
     tag: Optional[str] = None,
+    note_type: Optional[str] = None,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    notes = await get_notes(uuid.UUID(user_id), tag, db)
+    notes = await get_notes(uuid.UUID(user_id), tag, note_type, db)
     return notes
 
 
@@ -47,7 +48,14 @@ async def create(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_note(uuid.UUID(user_id), body.title, body.content, db, background_tasks)
+    return await create_note(
+        uuid.UUID(user_id),
+        body.title,
+        body.content,
+        db,
+        background_tasks,
+        note_type=body.note_type,
+    )
 
 
 @router.get("/{note_id}", response_model=NoteResponse)

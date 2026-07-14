@@ -17,7 +17,6 @@ export default function ChecklistEditor({
   onItemsUpdate,
 }: ChecklistEditorProps) {
   const [newItemText, setNewItemText] = useState("");
-  const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const checklistItems = items || [];
@@ -75,36 +74,7 @@ export default function ChecklistEditor({
     }
   };
 
-  const handleAIExtract = async () => {
-    setExtracting(true);
-    setError(null);
-    try {
-      const res = await notesApi.extractTasks(noteId);
-      const extracted = res.data.tasks || [];
-      
-      if (extracted.length === 0) {
-        setError("No action items found in this note's content.");
-        return;
-      }
-
-      // Merge extracted tasks, avoiding duplicates by text
-      const existingTexts = new Set(checklistItems.map((item) => item.text.toLowerCase()));
-      const newItems = extracted.filter(
-        (item) => !existingTexts.has(item.text.toLowerCase())
-      );
-
-      const merged = [...checklistItems, ...newItems];
-      onItemsUpdate(merged);
-
-      // Save to backend
-      await notesApi.update(noteId, { checklist_items: merged });
-    } catch (err) {
-      console.error("Failed to extract tasks:", err);
-      setError("AI task extraction failed. Make sure the note has content.");
-    } finally {
-      setExtracting(false);
-    }
-  };
+  // AI Task extraction is handled by parent page's AI Task Generator panel.
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,20 +86,6 @@ export default function ChecklistEditor({
             Checklist Items
           </span>
         </div>
-
-        <button
-          onClick={handleAIExtract}
-          disabled={extracting}
-          className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 hover:border-brand-500/40 hover:bg-brand-500/10"
-          id="ai-extract-tasks-btn"
-        >
-          {extracting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5 text-brand-400 fill-brand-400" />
-          )}
-          <span>Extract Tasks with AI</span>
-        </button>
       </div>
 
       {/* Error message */}

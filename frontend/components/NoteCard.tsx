@@ -1,7 +1,7 @@
 import type { Note } from "@/types";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { FileText, ChevronRight } from "lucide-react";
+import { FileText, Mic, Palette, ListTodo, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 
 interface NoteCardProps {
@@ -9,9 +9,54 @@ interface NoteCardProps {
   className?: string;
 }
 
+const typeConfig: {
+  [key: string]: {
+    icon: any;
+    colorClass: string;
+    label: string;
+  };
+} = {
+  text: {
+    icon: FileText,
+    colorClass: "bg-blue-500/10 border-blue-500/25 text-blue-400",
+    label: "Text",
+  },
+  audio: {
+    icon: Mic,
+    colorClass: "bg-rose-500/10 border-rose-500/25 text-rose-400",
+    label: "Voice",
+  },
+  drawing: {
+    icon: Palette,
+    colorClass: "bg-violet-500/10 border-violet-500/25 text-violet-400",
+    label: "Drawing",
+  },
+  checklist: {
+    icon: ListTodo,
+    colorClass: "bg-emerald-500/10 border-emerald-500/25 text-emerald-400",
+    label: "Checklist",
+  },
+};
+
 export default function NoteCard({ note, className }: NoteCardProps) {
-  const preview = note.summary || note.content.slice(0, 140);
+  const getPreview = () => {
+    if (note.summary) return note.summary;
+    if (note.note_type === "checklist" && note.content) {
+      try {
+        const data = JSON.parse(note.content);
+        if (data && typeof data === "object" && "description" in data) {
+          return data.description.slice(0, 140);
+        }
+      } catch {
+        // Fallback if content is not JSON
+      }
+    }
+    return note.content.slice(0, 140);
+  };
+  const preview = getPreview();
   const timeAgo = formatDistanceToNow(new Date(note.updated_at), { addSuffix: true });
+  const config = typeConfig[note.note_type] || typeConfig.text;
+  const TypeIcon = config.icon;
 
   return (
     <Link href={`/notes/${note.id}`}>
@@ -24,15 +69,23 @@ export default function NoteCard({ note, className }: NoteCardProps) {
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="shrink-0 w-8 h-8 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-neutral-400" />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={clsx(
+              "shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-colors duration-150",
+              config.colorClass
+            )}>
+              <TypeIcon className="w-4.5 h-4.5" />
             </div>
-            <h3 className="font-semibold text-gray-100 truncate text-sm">
-              {note.title || "Untitled note"}
-            </h3>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-gray-100 truncate text-sm group-hover:text-white transition-colors">
+                {note.title || "Untitled note"}
+              </h3>
+              <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">
+                {config.label}
+              </span>
+            </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-white shrink-0 transition-colors" />
+          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-white shrink-0 transition-colors self-center" />
         </div>
 
         {/* Preview */}

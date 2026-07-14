@@ -28,6 +28,7 @@ export interface Note {
 export interface NoteCreate {
   title?: string;
   content: string;
+  note_type?: string;
 }
 
 export interface NoteUpdate {

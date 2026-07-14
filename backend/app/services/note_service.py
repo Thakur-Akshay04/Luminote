@@ -117,12 +117,14 @@ async def create_note(
     content: str,
     db: AsyncSession,
     background_tasks,
+    note_type: Optional[str] = None,
 ) -> Note:
     note = Note(
         id=uuid.uuid4(),
         user_id=user_id,
         title=title,
         content=content,
+        note_type=note_type or "text",
     )
     db.add(note)
     await db.commit()
@@ -138,11 +140,14 @@ async def create_note(
 async def get_notes(
     user_id: uuid.UUID,
     tag: Optional[str],
+    note_type: Optional[str],
     db: AsyncSession,
 ) -> list[Note]:
     stmt = select(Note).where(Note.user_id == user_id).order_by(Note.updated_at.desc())
     if tag:
         stmt = stmt.where(Note.tags.contains([tag]))
+    if note_type:
+        stmt = stmt.where(Note.note_type == note_type)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 

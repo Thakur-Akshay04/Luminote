@@ -40,11 +40,21 @@ async def extract_note_tasks(
     # Validate note ownership
     note = await get_note(note_id, uuid.UUID(user_id), db)
 
-    if not note.content or not note.content.strip():
+    content_to_extract = note.content
+    if note.note_type == "checklist" and note.content:
+        import json
+        try:
+            data = json.loads(note.content)
+            if isinstance(data, dict) and "ai_context" in data:
+                content_to_extract = data["ai_context"]
+        except json.JSONDecodeError:
+            pass
+
+    if not content_to_extract or not content_to_extract.strip():
         return {"tasks": []}
 
     try:
-        tasks = await extract_tasks(note.content)
+        tasks = await extract_tasks(content_to_extract)
         return {"tasks": tasks}
     except Exception as e:
         logger.error("Task extraction failed for note %s: %s", note_id, e)
