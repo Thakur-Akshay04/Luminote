@@ -104,6 +104,9 @@ function NoteEditorContent() {
   const aiContextRef = useRef("");
   const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
 
+  // Tabbed Rich Text Toolbar
+  const [activeToolbarTab, setActiveToolbarTab] = useState<string>("Formatting");
+
   // Popover States
   const [showFontDropdown, setShowFontDropdown] = useState(false);
   const [showSizeDropdown, setShowSizeDropdown] = useState(false);
@@ -764,252 +767,338 @@ function NoteEditorContent() {
           {noteType === "text" && (
             <div className="no-print sticky top-0 z-20 bg-neutral-900 border-b border-white/[0.06] p-2 flex flex-col gap-1.5 select-none shrink-0">
               
-              {/* Desktop Toolbar (7 Rows) */}
-              <div className="hidden md:flex flex-col gap-1.5">
-                {/* Row 1: History & Clipboard */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">History & Clipboard</span>
-                  <button type="button" onClick={() => editor?.chain().focus().undo().run()} className={getBtnClass(false)} title="Undo (Ctrl+Z)"><Undo className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().redo().run()} className={getBtnClass(false)} title="Redo (Ctrl+Shift+Z)"><Redo className="w-3.5 h-3.5" /></button>
-                  <div className="h-4 w-px bg-white/10 mx-1" />
-                  <button type="button" onClick={handleCut} className={getBtnClass(false)} title="Cut"><Scissors className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={handleCopy} className={getBtnClass(false)} title="Copy"><Copy className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={handlePaste} className={getBtnClass(false)} title="Paste"><Clipboard className="w-3.5 h-3.5" /></button>
-                </div>
+              {/* Category tabs aligned horizontally */}
+              <div 
+                className="flex items-center gap-2 overflow-x-auto pb-1.5 mb-1 border-b border-white/[0.04] scrollbar-none"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {[
+                  "History & Clipboard",
+                  "Font & Size",
+                  "Formatting",
+                  "Paragraph & Align",
+                  "Lists & Indent",
+                  "Insert & Clear",
+                  "Utilities"
+                ].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveToolbarTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
+                      activeToolbarTab === tab
+                        ? "bg-brand-500/15 text-brand-300 border border-brand-500/30"
+                        : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02] border border-transparent"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
 
-                {/* Row 2: Font & Size */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Font & Size</span>
-                  {/* Font Family Dropdown */}
-                  <div className="relative" ref={fontDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowFontDropdown(!showFontDropdown)}
-                      className="px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-xs text-gray-300 flex items-center gap-1.5 hover:bg-neutral-800 transition-all font-medium min-w-[110px]"
-                    >
-                      <span className="truncate max-w-[80px]">{getActiveFontFamily()}</span>
-                      <span className="text-[8px] text-gray-500">▼</span>
-                    </button>
-                    {showFontDropdown && (
-                      <div className="absolute left-0 mt-1 w-40 rounded-md bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
-                        {["Inter", "Georgia", "Courier New", "Arial", "Times New Roman"].map((font) => (
-                          <button
-                            key={font}
-                            type="button"
-                            onClick={() => {
-                              editor?.chain().focus().setFontFamily(font).run();
-                              setShowFontDropdown(false);
-                            }}
-                            className={`w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/[0.05] ${
-                              getActiveFontFamily() === font ? "text-brand-400 font-bold" : "text-gray-300"
-                            }`}
-                            style={{ fontFamily: font }}
-                          >
-                            {font}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              {/* Selected heading tools row */}
+              <div className="min-h-[40px] flex items-center px-1">
+                {activeToolbarTab === "History & Clipboard" && (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <button type="button" onClick={() => editor?.chain().focus().undo().run()} className={getBtnClass(false)} title="Undo (Ctrl+Z)"><Undo className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().redo().run()} className={getBtnClass(false)} title="Redo (Ctrl+Shift+Z)"><Redo className="w-4 h-4" /></button>
+                    <div className="h-5 w-px bg-white/10 mx-1.5" />
+                    <button type="button" onClick={handleCut} className={getBtnClass(false)} title="Cut"><Scissors className="w-4 h-4" /></button>
+                    <button type="button" onClick={handleCopy} className={getBtnClass(false)} title="Copy"><Copy className="w-4 h-4" /></button>
+                    <button type="button" onClick={handlePaste} className={getBtnClass(false)} title="Paste"><Clipboard className="w-4 h-4" /></button>
                   </div>
-                  {/* Font Size Dropdown */}
-                  <div className="relative" ref={sizeDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                      className="px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-xs text-gray-300 flex items-center gap-1.5 hover:bg-neutral-800 transition-all font-medium min-w-[65px]"
-                    >
-                      <span>{getActiveFontSize()} px</span>
-                      <span className="text-[8px] text-gray-500">▼</span>
-                    </button>
-                    {showSizeDropdown && (
-                      <div className="absolute left-0 mt-1 w-20 max-h-48 overflow-y-auto rounded-md bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1">
-                        {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => {
-                              editor?.chain().focus().setMark("textStyle", { fontSize: size + "px" }).run();
-                              setShowSizeDropdown(false);
-                            }}
-                            className={`w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/[0.05] ${
-                              getActiveFontSize() === String(size) ? "text-brand-400 font-bold" : "text-gray-300"
-                            }`}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
 
-                {/* Row 3: Text Formatting */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Formatting</span>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={getBtnClass(editor?.isActive("bold") || false)} title="Bold (Ctrl+B)"><Bold className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={getBtnClass(editor?.isActive("italic") || false)} title="Italic (Ctrl+I)"><Italic className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className={getBtnClass(editor?.isActive("underline") || false)} title="Underline (Ctrl+U)"><UnderlineIcon className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className={getBtnClass(editor?.isActive("strike") || false)} title="Strikethrough"><Strikethrough className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className={getBtnClass(editor?.isActive("subscript") || false)} title="Subscript"><SubscriptIcon className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className={getBtnClass(editor?.isActive("superscript") || false)} title="Superscript"><SuperscriptIcon className="w-3.5 h-3.5" /></button>
-                  <div className="h-4 w-px bg-white/10 mx-1" />
-                  
-                  {/* Text Color Picker */}
-                  <div className="relative" ref={colorPickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowColorPicker(!showColorPicker)}
-                      className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1 ${
-                        showColorPicker ? "bg-white/[0.05] border-white/10" : ""
-                      }`}
-                      title="Text Color"
-                    >
-                      <div className="flex flex-col items-center justify-center">
-                        <span className="text-[11px] font-bold font-serif leading-none mt-[-2px]">A</span>
-                        <div 
-                          className="w-3.5 h-0.5 mt-0.5 rounded-full" 
-                          style={{ backgroundColor: editor?.getAttributes("textStyle").color || "#e5e7eb" }} 
-                        />
-                      </div>
-                    </button>
-                    {showColorPicker && (
-                      <div className="absolute left-0 mt-1 p-2 rounded-md bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
-                        <div className="grid grid-cols-5 gap-1.5">
-                          {COLORS.map((c) => (
+                {activeToolbarTab === "Font & Size" && (
+                  <div className="flex items-center gap-2.5 animate-fade-in">
+                    {/* Font Family Dropdown */}
+                    <div className="relative" ref={fontDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowFontDropdown(!showFontDropdown)}
+                        className="px-2.5 py-1.5 rounded-lg bg-neutral-950 border border-white/[0.08] text-xs text-gray-300 flex items-center gap-2 hover:bg-neutral-900 transition-all font-medium min-w-[130px]"
+                      >
+                        <span className="truncate max-w-[90px]">{getActiveFontFamily()}</span>
+                        <span className="text-[8px] text-gray-500 ml-auto">▼</span>
+                      </button>
+                      {showFontDropdown && (
+                        <div className="absolute left-0 mt-1 w-44 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
+                          {["Inter", "Georgia", "Courier New", "Arial", "Times New Roman"].map((font) => (
                             <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => setTextColor(c.value)}
-                              className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
-                              style={{ backgroundColor: c.value }}
-                              title={c.name}
-                            >
-                              {editor?.getAttributes("textStyle").color === c.value && (
-                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">✓</span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Highlight Color Picker */}
-                  <div className="relative" ref={highlightPickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-                      className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1 ${
-                        showHighlightPicker ? "bg-white/[0.05] border-white/10" : ""
-                      }`}
-                      title="Highlight Color"
-                    >
-                      <Palette className="w-3.5 h-3.5" />
-                    </button>
-                    {showHighlightPicker && (
-                      <div className="absolute left-0 mt-1 p-2 rounded-md bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {HIGHLIGHTS.map((c) => (
-                            <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => setHighlightColor(c.value)}
-                              className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
-                              style={{ backgroundColor: c.value }}
-                              title={c.name}
-                            >
-                              {editor?.isActive("highlight", { color: c.value }) && (
-                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-black">✓</span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 4: Paragraph & Alignment */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Paragraph & Align</span>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 1 }) || false)} title="Heading 1">H1</button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 2 }) || false)} title="Heading 2">H2</button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 3 }) || false)} title="Heading 3">H3</button>
-                  <button type="button" onClick={() => editor?.chain().focus().setParagraph().run()} className={getBtnClass(editor?.isActive("paragraph") || false)} title="Normal text">P</button>
-                  <div className="h-4 w-px bg-white/10 mx-1" />
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className={getBtnClass(editor?.isActive({ textAlign: "left" }) || false)} title="Align Left"><AlignLeft className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className={getBtnClass(editor?.isActive({ textAlign: "center" }) || false)} title="Align Center"><AlignCenter className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className={getBtnClass(editor?.isActive({ textAlign: "right" }) || false)} title="Align Right"><AlignRight className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("justify").run()} className={getBtnClass(editor?.isActive({ textAlign: "justify" }) || false)} title="Justify"><AlignJustify className="w-3.5 h-3.5" /></button>
-                </div>
-
-                {/* Row 5: Lists & Indentation */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Lists & Indent</span>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className={getBtnClass(editor?.isActive("bulletList") || false)} title="Bullet List"><List className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={getBtnClass(editor?.isActive("orderedList") || false)} title="Numbered List"><ListOrdered className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={getBtnClass(editor?.isActive("blockquote") || false)} title="Blockquote"><Quote className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={getBtnClass(editor?.isActive("codeBlock") || false)} title="Code Block"><Code className="w-3.5 h-3.5" /></button>
-                  <div className="h-4 w-px bg-white/10 mx-1" />
-                  <button type="button" onClick={() => editor?.chain().focus().liftListItem("listItem").run()} className={getBtnClass(false)} title="Decrease Indent (Shift+Tab)"><Outdent className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().sinkListItem("listItem").run()} className={getBtnClass(false)} title="Increase Indent (Tab)"><Indent className="w-3.5 h-3.5" /></button>
-                </div>
-
-                {/* Row 6: Insert */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Insert & Clear</span>
-                  {/* Link Insertion */}
-                  <div className="relative" ref={linkPopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const activeUrl = editor?.getAttributes("link").href || "";
-                        setLinkUrl(activeUrl);
-                        setShowLinkPopover(!showLinkPopover);
-                      }}
-                      className={getBtnClass(editor?.isActive("link") || false)}
-                      title="Link (Ctrl+K)"
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showLinkPopover && (
-                      <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
-                        <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert/Edit Link</span>
-                        <input
-                          type="text"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
-                          placeholder="https://example.com"
-                          value={linkUrl}
-                          onChange={(e) => setLinkUrl(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              if (linkUrl) {
-                                editor?.chain().focus().setLink({ href: linkUrl }).run();
-                              } else {
-                                editor?.chain().focus().unsetLink().run();
-                              }
-                              setShowLinkPopover(false);
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <div className="flex justify-between items-center gap-1.5 mt-1">
-                          {editor?.isActive("link") && (
-                            <button
+                              key={font}
                               type="button"
                               onClick={() => {
-                                editor?.chain().focus().unsetLink().run();
-                                setShowLinkPopover(false);
+                                editor?.chain().focus().setFontFamily(font).run();
+                                setShowFontDropdown(false);
                               }}
-                              className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors"
+                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${
+                                getActiveFontFamily() === font ? "text-brand-400 font-bold" : "text-gray-300"
+                              }`}
+                              style={{ fontFamily: font }}
                             >
-                              Remove Link
+                              {font}
                             </button>
-                          )}
-                          <div className="flex gap-1 ml-auto">
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Font Size Dropdown */}
+                    <div className="relative" ref={sizeDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowSizeDropdown(!showSizeDropdown)}
+                        className="px-2.5 py-1.5 rounded-lg bg-neutral-950 border border-white/[0.08] text-xs text-gray-300 flex items-center gap-2 hover:bg-neutral-900 transition-all font-medium min-w-[80px]"
+                      >
+                        <span>{getActiveFontSize()} px</span>
+                        <span className="text-[8px] text-gray-500 ml-auto">▼</span>
+                      </button>
+                      {showSizeDropdown && (
+                        <div className="absolute left-0 mt-1 w-24 max-h-48 overflow-y-auto rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1">
+                          {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => {
+                                editor?.chain().focus().setMark("textStyle", { fontSize: size + "px" }).run();
+                                setShowSizeDropdown(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${
+                                getActiveFontSize() === String(size) ? "text-brand-400 font-bold" : "text-gray-300"
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeToolbarTab === "Formatting" && (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={getBtnClass(editor?.isActive("bold") || false)} title="Bold (Ctrl+B)"><Bold className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={getBtnClass(editor?.isActive("italic") || false)} title="Italic (Ctrl+I)"><Italic className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className={getBtnClass(editor?.isActive("underline") || false)} title="Underline (Ctrl+U)"><UnderlineIcon className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className={getBtnClass(editor?.isActive("strike") || false)} title="Strikethrough"><Strikethrough className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className={getBtnClass(editor?.isActive("subscript") || false)} title="Subscript"><SubscriptIcon className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className={getBtnClass(editor?.isActive("superscript") || false)} title="Superscript"><SuperscriptIcon className="w-4 h-4" /></button>
+                    <div className="h-5 w-px bg-white/10 mx-1.5" />
+                    
+                    {/* Text Color Picker */}
+                    <div className="relative" ref={colorPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${
+                          showColorPicker ? "bg-white/[0.05] border-white/10" : ""
+                        }`}
+                        title="Text Color"
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="text-xs font-bold font-serif leading-none mt-[-2px]">A</span>
+                          <div 
+                            className="w-4 h-0.5 mt-0.5 rounded-full" 
+                            style={{ backgroundColor: editor?.getAttributes("textStyle").color || "#e5e7eb" }} 
+                          />
+                        </div>
+                      </button>
+                      {showColorPicker && (
+                        <div className="absolute left-0 mt-1 p-2 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {COLORS.map((c) => (
+                              <button
+                                key={c.value}
+                                type="button"
+                                onClick={() => setTextColor(c.value)}
+                                className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
+                                style={{ backgroundColor: c.value }}
+                                title={c.name}
+                              >
+                                {editor?.getAttributes("textStyle").color === c.value && (
+                                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">✓</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Highlight Color Picker */}
+                    <div className="relative" ref={highlightPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowHighlightPicker(!showHighlightPicker)}
+                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${
+                          showHighlightPicker ? "bg-white/[0.05] border-white/10" : ""
+                        }`}
+                        title="Highlight Color"
+                      >
+                        <Palette className="w-4 h-4" />
+                      </button>
+                      {showHighlightPicker && (
+                        <div className="absolute left-0 mt-1 p-2 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {HIGHLIGHTS.map((c) => (
+                              <button
+                                key={c.value}
+                                type="button"
+                                onClick={() => setHighlightColor(c.value)}
+                                className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
+                                style={{ backgroundColor: c.value }}
+                                title={c.name}
+                              >
+                                {editor?.isActive("highlight", { color: c.value }) && (
+                                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-black">✓</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeToolbarTab === "Paragraph & Align" && (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 1 }) || false)} title="Heading 1">H1</button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 2 }) || false)} title="Heading 2">H2</button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 3 }) || false)} title="Heading 3">H3</button>
+                    <button type="button" onClick={() => editor?.chain().focus().setParagraph().run()} className={getBtnClass(editor?.isActive("paragraph") || false)} title="Normal text">P</button>
+                    <div className="h-5 w-px bg-white/10 mx-1.5" />
+                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className={getBtnClass(editor?.isActive({ textAlign: "left" }) || false)} title="Align Left"><AlignLeft className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className={getBtnClass(editor?.isActive({ textAlign: "center" }) || false)} title="Align Center"><AlignCenter className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className={getBtnClass(editor?.isActive({ textAlign: "right" }) || false)} title="Align Right"><AlignRight className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("justify").run()} className={getBtnClass(editor?.isActive({ textAlign: "justify" }) || false)} title="Justify"><AlignJustify className="w-4 h-4" /></button>
+                  </div>
+                )}
+
+                {activeToolbarTab === "Lists & Indent" && (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className={getBtnClass(editor?.isActive("bulletList") || false)} title="Bullet List"><List className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={getBtnClass(editor?.isActive("orderedList") || false)} title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={getBtnClass(editor?.isActive("blockquote") || false)} title="Blockquote"><Quote className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={getBtnClass(editor?.isActive("codeBlock") || false)} title="Code Block"><Code className="w-4 h-4" /></button>
+                    <div className="h-5 w-px bg-white/10 mx-1.5" />
+                    <button type="button" onClick={() => editor?.chain().focus().liftListItem("listItem").run()} className={getBtnClass(false)} title="Decrease Indent (Shift+Tab)"><Outdent className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().sinkListItem("listItem").run()} className={getBtnClass(false)} title="Increase Indent (Tab)"><Indent className="w-4 h-4" /></button>
+                  </div>
+                )}
+
+                {activeToolbarTab === "Insert & Clear" && (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    {/* Link Insertion */}
+                    <div className="relative" ref={linkPopoverRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const activeUrl = editor?.getAttributes("link").href || "";
+                          setLinkUrl(activeUrl);
+                          setShowLinkPopover(!showLinkPopover);
+                        }}
+                        className={getBtnClass(editor?.isActive("link") || false)}
+                        title="Link (Ctrl+K)"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                      </button>
+                      {showLinkPopover && (
+                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert/Edit Link</span>
+                          <input
+                            type="text"
+                            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
+                            placeholder="https://example.com"
+                            value={linkUrl}
+                            onChange={(e) => setLinkUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (linkUrl) {
+                                  editor?.chain().focus().setLink({ href: linkUrl }).run();
+                                } else {
+                                  editor?.chain().focus().unsetLink().run();
+                                }
+                                setShowLinkPopover(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <div className="flex justify-between items-center gap-1.5 mt-1">
+                            {editor?.isActive("link") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  editor?.chain().focus().unsetLink().run();
+                                  setShowLinkPopover(false);
+                                }}
+                                className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors"
+                              >
+                                Remove Link
+                              </button>
+                            )}
+                            <div className="flex gap-1 ml-auto">
+                              <button
+                                type="button"
+                                onClick={() => setShowLinkPopover(false)}
+                                className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (linkUrl) {
+                                    editor?.chain().focus().setLink({ href: linkUrl }).run();
+                                  } else {
+                                    editor?.chain().focus().unsetLink().run();
+                                  }
+                                  setShowLinkPopover(false);
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Image Insertion */}
+                    <div className="relative" ref={imagePopoverRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowImagePopover(!showImagePopover)}
+                        className={getBtnClass(false)}
+                        title="Insert Image"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                      </button>
+                      {showImagePopover && (
+                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
+                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert Image URL</span>
+                          <input
+                            type="text"
+                            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
+                            placeholder="https://example.com/image.jpg"
+                            value={imageUrl}
+                            onChange={(e) => setImageUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (imageUrl) {
+                                  editor?.chain().focus().setImage({ src: imageUrl }).run();
+                                }
+                                setShowImagePopover(false);
+                                setImageUrl("");
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <div className="flex gap-1 ml-auto mt-1">
                             <button
                               type="button"
-                              onClick={() => setShowLinkPopover(false)}
+                              onClick={() => setShowImagePopover(false)}
                               className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
                             >
                               Cancel
@@ -1017,397 +1106,80 @@ function NoteEditorContent() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (linkUrl) {
-                                  editor?.chain().focus().setLink({ href: linkUrl }).run();
-                                } else {
-                                  editor?.chain().focus().unsetLink().run();
+                                if (imageUrl) {
+                                  editor?.chain().focus().setImage({ src: imageUrl }).run();
                                 }
-                                setShowLinkPopover(false);
+                                setShowImagePopover(false);
+                                setImageUrl("");
                               }}
                               className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors"
                             >
-                              Save
+                              Insert
                             </button>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  {/* Image Insertion */}
-                  <div className="relative" ref={imagePopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowImagePopover(!showImagePopover)}
-                      className={getBtnClass(false)}
-                      title="Insert Image"
-                    >
-                      <ImageIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showImagePopover && (
-                      <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
-                        <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert Image URL</span>
-                        <input
-                          type="text"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
-                          placeholder="https://example.com/image.jpg"
-                          value={imageUrl}
-                          onChange={(e) => setImageUrl(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              if (imageUrl) {
-                                editor?.chain().focus().setImage({ src: imageUrl }).run();
-                              }
-                              setShowImagePopover(false);
-                              setImageUrl("");
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <div className="flex gap-1 ml-auto mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowImagePopover(false)}
-                            className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
+                    {/* Table Grid Picker */}
+                    <div className="relative" ref={tablePopoverRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowTablePopover(!showTablePopover)}
+                        className={getBtnClass(editor?.isActive("table") || false)}
+                        title="Insert Table"
+                      >
+                        <TableIcon className="w-4 h-4" />
+                      </button>
+                      {showTablePopover && (
+                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 flex flex-col gap-2.5 select-none w-[166px]">
+                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider font-sans text-gray-400">Insert Table Grid</span>
+                          <div 
+                            className="grid grid-cols-6 gap-1"
+                            onMouseLeave={() => setHoveredGrid(null)}
                           >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (imageUrl) {
-                                editor?.chain().focus().setImage({ src: imageUrl }).run();
-                              }
-                              setShowImagePopover(false);
-                              setImageUrl("");
-                            }}
-                            className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors"
-                          >
-                            Insert
-                          </button>
+                            {Array.from({ length: 36 }).map((_, index) => {
+                              const row = Math.floor(index / 6) + 1;
+                              const col = (index % 6) + 1;
+                              const isSelected = hoveredGrid && row <= hoveredGrid.r && col <= hoveredGrid.c;
+                              return (
+                                <button
+                                  key={index}
+                                  type="button"
+                                  onMouseEnter={() => setHoveredGrid({ r: row, c: col })}
+                                  onClick={() => {
+                                    editor?.chain().focus().insertTable({ rows: row, cols: col, withHeaderRow: true }).run();
+                                    setShowTablePopover(false);
+                                    setHoveredGrid(null);
+                                  }}
+                                  className={`w-5 h-5 rounded transition-colors border ${
+                                    isSelected 
+                                      ? "bg-brand-500/80 border-brand-500" 
+                                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
+                                  }`}
+                                />
+                              );
+                            })}
+                          </div>
+                          <span className="text-[10px] font-bold text-center text-gray-400 font-sans">
+                            {hoveredGrid ? `${hoveredGrid.r} x ${hoveredGrid.c} Table` : "Hover to choose size"}
+                          </span>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
+                    <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className={getBtnClass(false)} title="Horizontal Rule"><Minus className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} className={getBtnClass(false)} title="Clear Formatting"><Eraser className="w-4 h-4" /></button>
                   </div>
+                )}
 
-                  {/* Table Grid Picker */}
-                  <div className="relative" ref={tablePopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowTablePopover(!showTablePopover)}
-                      className={getBtnClass(editor?.isActive("table") || false)}
-                      title="Insert Table"
-                    >
-                      <TableIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showTablePopover && (
-                      <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 flex flex-col gap-2.5 select-none">
-                        <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider font-sans text-gray-400">Insert Table Grid</span>
-                        <div 
-                          className="grid grid-cols-6 gap-1"
-                          onMouseLeave={() => setHoveredGrid(null)}
-                        >
-                          {Array.from({ length: 6 }).map((_, rIdx) => (
-                            <div key={rIdx} className="flex gap-1">
-                              {Array.from({ length: 6 }).map((_, cIdx) => {
-                                const row = rIdx + 1;
-                                const col = cIdx + 1;
-                                const isSelected = hoveredGrid && row <= hoveredGrid.r && col <= hoveredGrid.c;
-                                return (
-                                  <button
-                                    key={cIdx}
-                                    type="button"
-                                    onMouseEnter={() => setHoveredGrid({ r: row, c: col })}
-                                    onClick={() => {
-                                      editor?.chain().focus().insertTable({ rows: row, cols: col, withHeaderRow: true }).run();
-                                      setShowTablePopover(false);
-                                      setHoveredGrid(null);
-                                    }}
-                                    className={`w-5 h-5 rounded transition-colors border ${
-                                      isSelected 
-                                        ? "bg-brand-500/80 border-brand-500" 
-                                        : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
-                                    }`}
-                                  />
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                        <span className="text-[10px] font-bold text-center text-gray-400 font-sans">
-                          {hoveredGrid ? `${hoveredGrid.r} x ${hoveredGrid.c} Table` : "Hover to choose size"}
-                        </span>
-                      </div>
-                    )}
+                {activeToolbarTab === "Utilities" && (
+                  <div className="flex flex-wrap items-center gap-2.5 animate-fade-in w-full">
+                    <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Words: {wordCount}</span>
+                    <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Characters: {charCount}</span>
+                    <button type="button" onClick={() => window.print()} className="ml-auto btn-secondary py-1.5 px-3.5 text-xs flex items-center gap-1.5 border-neutral-800 hover:border-neutral-700 font-medium" title="Print Document"><Printer className="w-4 h-4" /> Print</button>
                   </div>
-
-                  <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className={getBtnClass(false)} title="Horizontal Rule"><Minus className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} className={getBtnClass(false)} title="Clear Formatting"><Eraser className="w-3.5 h-3.5" /></button>
-                </div>
-
-                {/* Row 7: Utilities */}
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider min-w-[130px] select-none">Utilities</span>
-                  <span className="text-xs text-gray-400 bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded font-mono select-none">Words: {wordCount}</span>
-                  <span className="text-xs text-gray-400 bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded font-mono select-none">Characters: {charCount}</span>
-                  <button type="button" onClick={() => window.print()} className="ml-auto btn-secondary py-1 px-3 text-xs flex items-center gap-1 border-neutral-800 hover:border-neutral-700 font-medium" title="Print Document"><Printer className="w-3.5 h-3.5" /> Print</button>
-                </div>
-              </div>
-
-              {/* Mobile Toolbar (2 Rows) */}
-              <div className="flex md:hidden flex-col gap-1.5">
-                {/* Row 1 (Mobile) */}
-                <div className="flex flex-wrap items-center gap-1">
-                  <button type="button" onClick={() => editor?.chain().focus().undo().run()} className={getBtnClass(false)} title="Undo"><Undo className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().redo().run()} className={getBtnClass(false)} title="Redo"><Redo className="w-3.5 h-3.5" /></button>
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button type="button" onClick={handleCut} className={getBtnClass(false)} title="Cut"><Scissors className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={handleCopy} className={getBtnClass(false)} title="Copy"><Copy className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={handlePaste} className={getBtnClass(false)} title="Paste"><Clipboard className="w-3.5 h-3.5" /></button>
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  
-                  {/* Font Family Dropdown */}
-                  <div className="relative" ref={fontDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowFontDropdown(!showFontDropdown)}
-                      className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-gray-300 flex items-center gap-1 hover:bg-neutral-800"
-                    >
-                      <span className="truncate max-w-[50px]">{getActiveFontFamily()}</span>
-                    </button>
-                    {showFontDropdown && (
-                      <div className="absolute left-0 mt-1 w-32 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1">
-                        {["Inter", "Georgia", "Courier New", "Arial", "Times New Roman"].map((font) => (
-                          <button
-                            key={font}
-                            type="button"
-                            onClick={() => {
-                              editor?.chain().focus().setFontFamily(font).run();
-                              setShowFontDropdown(false);
-                            }}
-                            className="w-full px-2 py-1 text-left text-[11px] text-gray-300 hover:bg-white/[0.05]"
-                            style={{ fontFamily: font }}
-                          >
-                            {font}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Font Size Dropdown */}
-                  <div className="relative" ref={sizeDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                      className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-gray-300 flex items-center gap-1 hover:bg-neutral-800"
-                    >
-                      <span>{getActiveFontSize()}px</span>
-                    </button>
-                    {showSizeDropdown && (
-                      <div className="absolute left-0 mt-1 w-16 max-h-32 overflow-y-auto rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1">
-                        {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => {
-                              editor?.chain().focus().setMark("textStyle", { fontSize: size + "px" }).run();
-                              setShowSizeDropdown(false);
-                            }}
-                            className="w-full px-2 py-1 text-left text-[11px] text-gray-300 hover:bg-white/[0.05]"
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={getBtnClass(editor?.isActive("bold") || false)}><Bold className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={getBtnClass(editor?.isActive("italic") || false)}><Italic className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className={getBtnClass(editor?.isActive("underline") || false)}><UnderlineIcon className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className={getBtnClass(editor?.isActive("strike") || false)}><Strikethrough className="w-3.5 h-3.5" /></button>
-                  
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  {/* Color Pickers */}
-                  <div className="relative" ref={colorPickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowColorPicker(!showColorPicker)}
-                      className="p-1 rounded hover:bg-white/[0.04]"
-                    >
-                      <span className="text-xs font-bold font-serif underline">A</span>
-                    </button>
-                    {showColorPicker && (
-                      <div className="absolute left-0 mt-1 p-1 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-32">
-                        <div className="grid grid-cols-5 gap-1">
-                          {COLORS.map((c) => (
-                            <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => setTextColor(c.value)}
-                              className="w-4 h-4 rounded border border-white/10"
-                              style={{ backgroundColor: c.value }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="relative" ref={highlightPickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-                      className="p-1 rounded hover:bg-white/[0.04]"
-                    >
-                      <Palette className="w-3.5 h-3.5" />
-                    </button>
-                    {showHighlightPicker && (
-                      <div className="absolute left-0 mt-1 p-1 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-32">
-                        <div className="grid grid-cols-4 gap-1">
-                          {HIGHLIGHTS.map((c) => (
-                            <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => setHighlightColor(c.value)}
-                              className="w-4 h-4 rounded border border-white/10"
-                              style={{ backgroundColor: c.value }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 2 (Mobile) */}
-                <div className="flex flex-wrap items-center gap-1">
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 1 }) || false)}>H1</button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 2 }) || false)}>H2</button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 3 }) || false)}>H3</button>
-                  <button type="button" onClick={() => editor?.chain().focus().setParagraph().run()} className={getBtnClass(editor?.isActive("paragraph") || false)}>P</button>
-                  
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className={getBtnClass(editor?.isActive({ textAlign: "left" }) || false)}><AlignLeft className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className={getBtnClass(editor?.isActive({ textAlign: "center" }) || false)}><AlignCenter className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className={getBtnClass(editor?.isActive({ textAlign: "right" }) || false)}><AlignRight className="w-3.5 h-3.5" /></button>
-                  
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className={getBtnClass(editor?.isActive("bulletList") || false)}><List className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={getBtnClass(editor?.isActive("orderedList") || false)}><ListOrdered className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={getBtnClass(editor?.isActive("blockquote") || false)}><Quote className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={getBtnClass(editor?.isActive("codeBlock") || false)}><Code className="w-3.5 h-3.5" /></button>
-                  
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  <button type="button" onClick={() => editor?.chain().focus().liftListItem("listItem").run()} className={getBtnClass(false)}><Outdent className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().sinkListItem("listItem").run()} className={getBtnClass(false)}><Indent className="w-3.5 h-3.5" /></button>
-                  
-                  <div className="h-4 w-px bg-white/10 mx-0.5" />
-                  {/* Link Insert */}
-                  <div className="relative" ref={linkPopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const activeUrl = editor?.getAttributes("link").href || "";
-                        setLinkUrl(activeUrl);
-                        setShowLinkPopover(!showLinkPopover);
-                      }}
-                      className={getBtnClass(editor?.isActive("link") || false)}
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showLinkPopover && (
-                      <div className="absolute right-0 mt-1 p-2 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-48 flex flex-col gap-1.5">
-                        <input
-                          type="text"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-0.5 text-xs text-gray-200"
-                          placeholder="Link URL"
-                          value={linkUrl}
-                          onChange={(e) => setLinkUrl(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (linkUrl) {
-                              editor?.chain().focus().setLink({ href: linkUrl }).run();
-                            } else {
-                              editor?.chain().focus().unsetLink().run();
-                            }
-                            setShowLinkPopover(false);
-                          }}
-                          className="w-full bg-brand-500 py-1 rounded text-[10px] text-white font-bold"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Image Insert */}
-                  <div className="relative" ref={imagePopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowImagePopover(!showImagePopover)}
-                      className={getBtnClass(false)}
-                    >
-                      <ImageIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showImagePopover && (
-                      <div className="absolute right-0 mt-1 p-2 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-48 flex flex-col gap-1.5">
-                        <input
-                          type="text"
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-0.5 text-xs text-gray-200"
-                          placeholder="Image URL"
-                          value={imageUrl}
-                          onChange={(e) => setImageUrl(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (imageUrl) {
-                              editor?.chain().focus().setImage({ src: imageUrl }).run();
-                            }
-                            setShowImagePopover(false);
-                            setImageUrl("");
-                          }}
-                          className="w-full bg-brand-500 py-1 rounded text-[10px] text-white font-bold"
-                        >
-                          Insert
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Table Insert */}
-                  <div className="relative" ref={tablePopoverRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowTablePopover(!showTablePopover)}
-                      className={getBtnClass(editor?.isActive("table") || false)}
-                    >
-                      <TableIcon className="w-3.5 h-3.5" />
-                    </button>
-                    {showTablePopover && (
-                      <div className="absolute right-0 mt-1 p-2 rounded bg-neutral-950 border border-white/[0.08] shadow-lg z-30 flex flex-col gap-1.5">
-                        <span className="text-[9px] text-gray-400 font-bold">Quick Table (3x3)</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-                            setShowTablePopover(false);
-                          }}
-                          className="bg-brand-500 py-1 px-3 rounded text-[10px] text-white font-bold"
-                        >
-                          Insert 3x3 Table
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className={getBtnClass(false)}><Minus className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} className={getBtnClass(false)}><Eraser className="w-3.5 h-3.5" /></button>
-                </div>
+                )}
               </div>
 
               {/* Table Sub-Toolbar (Active when cursor is inside table) */}

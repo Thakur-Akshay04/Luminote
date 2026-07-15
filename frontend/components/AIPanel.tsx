@@ -110,11 +110,6 @@ export default function AIPanel({ note, onUpdateNote }: AIPanelProps) {
           <Sparkles className="w-3.5 h-3.5 text-black" />
         </div>
         <span className="font-semibold text-sm text-white">AI Insights</span>
-        {(isPending || summarizing) && (
-          <span className="ml-auto flex items-center gap-1 text-xs text-gray-500 animate-pulse">
-            <Loader2 className="w-3 h-3 animate-spin" /> Processing…
-          </span>
-        )}
       </div>
 
       {/* Summary Section */}
@@ -150,11 +145,15 @@ export default function AIPanel({ note, onUpdateNote }: AIPanelProps) {
               {note.summary!}
             </ReactMarkdown>
           </div>
-        ) : (
-          <div className="space-y-2 mb-1">
-            <div className="skeleton h-3 w-full" />
-            <div className="skeleton h-3 w-4/5" />
+        ) : summarizing ? (
+          <div className="space-y-2 mb-1 animate-pulse">
+            <div className="skeleton h-3 w-full bg-white/10 rounded" />
+            <div className="skeleton h-3 w-4/5 bg-white/10 rounded" />
           </div>
+        ) : (
+          <p className="text-xs text-neutral-500 italic mb-1 py-1">
+            No summary generated yet. Click below to get AI-powered insights.
+          </p>
         )}
 
         {summarizeError && (
