@@ -18,6 +18,21 @@ from app.services.ai_service import get_embedding, summarize_note_with_ai
 logger = logging.getLogger(__name__)
 
 
+def extract_text_from_tiptap_json(node) -> str:
+    if not node:
+        return ""
+    if isinstance(node, str):
+        return node
+    if isinstance(node, dict):
+        if "text" in node and isinstance(node["text"], str):
+            return node["text"]
+        if "content" in node:
+            return extract_text_from_tiptap_json(node["content"])
+    if isinstance(node, list):
+        return " ".join(extract_text_from_tiptap_json(child) for child in node if child)
+    return ""
+
+
 async def sync_ai_alerts(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -65,9 +80,20 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
             note_type = note.note_type
             user_id = note.user_id
 
+        text_content = content
+        if content.strip().startswith('{"') or content.strip().startswith('[{'):
+            try:
+                data = json.loads(content)
+                if isinstance(data, dict) and data.get("type") == "doc":
+                    extracted = extract_text_from_tiptap_json(data).strip()
+                    if extracted:
+                        text_content = extracted
+            except Exception as parse_err:
+                logger.error("Failed to parse content as Tiptap JSON in AI pipeline: %s", parse_err)
+
         if note_type in ("audio", "drawing"):
             logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
-            embedding = await get_embedding(content)
+            embedding = await get_embedding(text_content)
             if embedding:
                 async with session_factory() as db:
                     await db.execute(
@@ -81,8 +107,8 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
 
         current_time_str = datetime.now(timezone.utc).isoformat()
         enrichment, embedding = await asyncio.gather(
-            summarize_note_with_ai(content, format="paragraph", extract_alerts=True, current_time_str=current_time_str),
-            get_embedding(content),
+            summarize_note_with_ai(text_content, format="paragraph", extract_alerts=True, current_time_str=current_time_str),
+            get_embedding(text_content),
         )
 
         async with session_factory() as db:

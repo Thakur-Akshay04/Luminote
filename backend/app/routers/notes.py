@@ -1,4 +1,5 @@
 import uuid
+import json
 from typing import Optional
 import logging
 
@@ -19,6 +20,22 @@ from app.services.note_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def extract_text_from_tiptap_json(node) -> str:
+    if not node:
+        return ""
+    if isinstance(node, str):
+        return node
+    if isinstance(node, dict):
+        if "text" in node and isinstance(node["text"], str):
+            return node["text"]
+        if "content" in node:
+            return extract_text_from_tiptap_json(node["content"])
+    if isinstance(node, list):
+        return " ".join(extract_text_from_tiptap_json(child) for child in node if child)
+    return ""
+
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -109,8 +126,20 @@ async def ask(
     user_msg = {"role": "user", "content": body.question}
     history.append(user_msg)
     
+    # Extract text from Tiptap JSON if applicable
+    text_content = note.content
+    if note.content.strip().startswith('{"') or note.content.strip().startswith('[{'):
+        try:
+            data = json.loads(note.content)
+            if isinstance(data, dict) and data.get("type") == "doc":
+                extracted = extract_text_from_tiptap_json(data).strip()
+                if extracted:
+                    text_content = extracted
+        except Exception:
+            pass
+
     # Call Groq Q&A with previous history (excluding user_msg because ask_question appends it)
-    answer = await ask_question(note.content, body.question, history[:-1])
+    answer = await ask_question(text_content, body.question, history[:-1])
     
     # Append assistant response
     assistant_msg = {"role": "assistant", "content": answer}
@@ -141,8 +170,19 @@ async def summarize(
         )
     current_time_str = datetime.now(timezone.utc).isoformat()
     
+    text_content = note.content
+    if note.content.strip().startswith('{"') or note.content.strip().startswith('[{'):
+        try:
+            data = json.loads(note.content)
+            if isinstance(data, dict) and data.get("type") == "doc":
+                extracted = extract_text_from_tiptap_json(data).strip()
+                if extracted:
+                    text_content = extracted
+        except Exception:
+            pass
+
     enrichment = await summarize_note_with_ai(
-        content=note.content,
+        content=text_content,
         format=body.format,
         extract_alerts=body.extract_alerts,
         current_time_str=current_time_str
