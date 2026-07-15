@@ -92,6 +92,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+const generateSecureId = (): string => {
+  const cryptoObj = typeof window !== "undefined" ? (window.crypto || (window as any).msCrypto) : null;
+  if (cryptoObj && cryptoObj.getRandomValues) {
+    const array = new Uint32Array(1);
+    cryptoObj.getRandomValues(array);
+    return array[0].toString();
+  }
+  return "fallback-id-" + Date.now();
+};
+
 function NoteEditorContent() {
   const router = useRouter();
   const params = useParams();
@@ -252,7 +262,7 @@ function NoteEditorContent() {
         setClipboardHistory((prev) => {
           if (prev.some(item => item.content === text)) return prev;
           const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-          return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+          return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
         });
       }
     };
@@ -271,7 +281,7 @@ function NoteEditorContent() {
               if (base64) {
                 setClipboardHistory((prev) => {
                   if (prev.some(x => x.content === base64)) return prev;
-                  return [{ id: Math.random().toString(), type: "image" as const, content: base64 }, ...prev].slice(0, 10);
+                  return [{ id: generateSecureId(), type: "image" as const, content: base64 }, ...prev].slice(0, 10);
                 });
               }
             };
@@ -283,7 +293,7 @@ function NoteEditorContent() {
               setClipboardHistory((prev) => {
                 if (prev.some(x => x.content === text)) return prev;
                 const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-                return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+                return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
               });
             }
           });
@@ -896,7 +906,7 @@ function NoteEditorContent() {
                               setClipboardHistory((prev) => {
                                 if (prev.some(item => item.content === text)) return prev;
                                 const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-                                return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+                                return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
                               });
                             }
                           }).catch(() => { });
@@ -1374,7 +1384,7 @@ function NoteEditorContent() {
                   {/* Centered Heading visible only in print */}
                   <div className="only-print flex-col items-center justify-center border-b-2 border-neutral-300 pb-4 mb-6 w-full text-center">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Luminote</span>
-                    <h2 className="text-3xl font-bold text-black underline">{title || "Untitled Note"}</h2>
+                    <h2 className="text-2xl font-bold text-black">{title || "Untitled Note"}</h2>
                     <div className="flex gap-4 mt-2 text-xs text-neutral-500 justify-center font-medium">
                       <span>Date: {note ? new Date(note.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</span>
                       <span>Time: {note ? new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
