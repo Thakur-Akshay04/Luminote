@@ -95,7 +95,7 @@ export default function AlertListener() {
     };
 
     ws.onerror = (err) => {
-      console.error("Alerts WebSocket error:", err);
+      console.warn("Alerts WebSocket error:", err);
       ws.close();
     };
   };

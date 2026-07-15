@@ -28,6 +28,26 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 
+const TextStyleExtended = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: element => element.style.fontSize,
+        renderHTML: attributes => {
+          if (!attributes.fontSize) {
+            return {}
+          }
+          return {
+            style: `font-size: ${attributes.fontSize}`,
+          }
+        },
+      },
+    }
+  },
+});
+
 import {
   ArrowLeft,
   Save,
@@ -85,7 +105,7 @@ function NoteEditorContent() {
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [checklistDescription, setChecklistDescription] = useState("");
   const [aiContext, setAiContext] = useState("");
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -118,6 +138,8 @@ function NoteEditorContent() {
   const [imageUrl, setImageUrl] = useState("");
   const [showTablePopover, setShowTablePopover] = useState(false);
   const [hoveredGrid, setHoveredGrid] = useState<{ r: number; c: number } | null>(null);
+  const [showClipboardPopover, setShowClipboardPopover] = useState(false);
+  const [clipboardHistory, setClipboardHistory] = useState<{ id: string; type: "text" | "image"; content: string }[]>([]);
 
   // Popover Refs
   const fontDropdownRef = useRef<HTMLDivElement>(null);
@@ -127,6 +149,7 @@ function NoteEditorContent() {
   const linkPopoverRef = useRef<HTMLDivElement>(null);
   const imagePopoverRef = useRef<HTMLDivElement>(null);
   const tablePopoverRef = useRef<HTMLDivElement>(null);
+  const clipboardPopoverRef = useRef<HTMLDivElement>(null);
 
   const isEditorInitialized = useRef(false);
   const debouncedSave = useRef<NodeJS.Timeout | null>(null);
@@ -213,9 +236,69 @@ function NoteEditorContent() {
       if (tablePopoverRef.current && !tablePopoverRef.current.contains(target)) {
         setShowTablePopover(false);
       }
+      if (clipboardPopoverRef.current && !clipboardPopoverRef.current.contains(target)) {
+        setShowClipboardPopover(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Listen for copy, cut, paste events to build custom clipboard history
+  useEffect(() => {
+    const handleGlobalCopy = (e: ClipboardEvent) => {
+      const text = window.getSelection()?.toString();
+      if (text && text.trim()) {
+        setClipboardHistory((prev) => {
+          if (prev.some(item => item.content === text)) return prev;
+          const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
+          return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+        });
+      }
+    };
+
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const base64 = event.target?.result as string;
+              if (base64) {
+                setClipboardHistory((prev) => {
+                  if (prev.some(x => x.content === base64)) return prev;
+                  return [{ id: Math.random().toString(), type: "image" as const, content: base64 }, ...prev].slice(0, 10);
+                });
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        } else if (item.type === "text/plain") {
+          item.getAsString((text) => {
+            if (text && text.trim()) {
+              setClipboardHistory((prev) => {
+                if (prev.some(x => x.content === text)) return prev;
+                const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
+                return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+              });
+            }
+          });
+        }
+      }
+    };
+
+    document.addEventListener("copy", handleGlobalCopy);
+    document.addEventListener("cut", handleGlobalCopy);
+    document.addEventListener("paste", handleGlobalPaste);
+    return () => {
+      document.removeEventListener("copy", handleGlobalCopy);
+      document.removeEventListener("cut", handleGlobalCopy);
+      document.removeEventListener("paste", handleGlobalPaste);
+    };
   }, []);
 
   // Tiptap Editor Setup
@@ -225,7 +308,7 @@ function NoteEditorContent() {
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       FontFamily,
-      TextStyle,
+      TextStyleExtended,
       Color,
       Highlight.configure({ multicolor: true }),
       ImageExtension,
@@ -248,7 +331,7 @@ function NoteEditorContent() {
   // Load content into editor on mount / when note is loaded
   useEffect(() => {
     if (!editor || !note || isEditorInitialized.current) return;
-    
+
     let initialContent: any = "";
     if (note.content) {
       try {
@@ -257,10 +340,10 @@ function NoteEditorContent() {
         initialContent = note.content; // fallback
       }
     }
-    
+
     const currentJsonStr = JSON.stringify(editor.getJSON());
     const isSame = note.content === currentJsonStr || (note.content === "" && editor.isEmpty);
-    
+
     isEditorInitialized.current = true;
     if (!isSame) {
       editor.commands.setContent(initialContent);
@@ -328,7 +411,7 @@ function NoteEditorContent() {
       setChecklistItems(res.data.checklist_items || []);
       titleRef.current = res.data.title ?? "";
       contentRef.current = res.data.content;
-      
+
       if (res.data.note_type === "checklist" && res.data.content) {
         try {
           const data = JSON.parse(res.data.content);
@@ -524,11 +607,10 @@ function NoteEditorContent() {
   };
 
   const getBtnClass = (isActive: boolean) => {
-    return `p-1.5 rounded-md text-xs font-medium transition-all ${
-      isActive 
-        ? "bg-brand-500/20 text-brand-300 border border-brand-500/40" 
-        : "text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] border border-transparent"
-    }`;
+    return `p-1.5 rounded-md text-xs font-medium transition-all ${isActive
+      ? "bg-brand-500/20 text-brand-300 border border-brand-500/40"
+      : "text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] border border-transparent"
+      }`;
   };
 
   const getActiveFontFamily = () => {
@@ -762,13 +844,13 @@ function NoteEditorContent() {
       <div className="flex flex-1 overflow-hidden">
         {/* Editor + Preview (split) */}
         <div className="flex flex-1 overflow-hidden flex-col">
-          
+
           {/* TIPTAP RICH TEXT TOOLBAR (Sticky at top of text note) */}
           {noteType === "text" && (
             <div className="no-print sticky top-0 z-20 bg-neutral-900 border-b border-white/[0.06] p-2 flex flex-col gap-1.5 select-none shrink-0">
-              
+
               {/* Category tabs aligned horizontally */}
-              <div 
+              <div
                 className="flex items-center gap-2 overflow-x-auto pb-1.5 mb-1 border-b border-white/[0.04] scrollbar-none"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
@@ -779,17 +861,16 @@ function NoteEditorContent() {
                   "Paragraph & Align",
                   "Lists & Indent",
                   "Insert & Clear",
-                  "Utilities"
+                  "Print & Utilities"
                 ].map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setActiveToolbarTab(tab)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
-                      activeToolbarTab === tab
-                        ? "bg-brand-500/15 text-brand-300 border border-brand-500/30"
-                        : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02] border border-transparent"
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeToolbarTab === tab
+                      ? "bg-brand-500/15 text-brand-300 border border-brand-500/30"
+                      : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02] border border-transparent"
+                      }`}
                   >
                     {tab}
                   </button>
@@ -805,7 +886,85 @@ function NoteEditorContent() {
                     <div className="h-5 w-px bg-white/10 mx-1.5" />
                     <button type="button" onClick={handleCut} className={getBtnClass(false)} title="Cut"><Scissors className="w-4 h-4" /></button>
                     <button type="button" onClick={handleCopy} className={getBtnClass(false)} title="Copy"><Copy className="w-4 h-4" /></button>
-                    <button type="button" onClick={handlePaste} className={getBtnClass(false)} title="Paste"><Clipboard className="w-4 h-4" /></button>
+                    {/* Clipboard History Popover */}
+                    <div className="relative" ref={clipboardPopoverRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.readText().then(text => {
+                            if (text && text.trim()) {
+                              setClipboardHistory((prev) => {
+                                if (prev.some(item => item.content === text)) return prev;
+                                const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
+                                return [{ id: Math.random().toString(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+                              });
+                            }
+                          }).catch(() => { });
+                          setShowClipboardPopover(!showClipboardPopover);
+                        }}
+                        className={getBtnClass(showClipboardPopover)}
+                        title="Clipboard History (Text & Images)"
+                      >
+                        <Clipboard className="w-4 h-4" />
+                      </button>
+                      {showClipboardPopover && (
+                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2.5 max-h-72 overflow-y-auto">
+                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Clipboard History</span>
+
+                          {clipboardHistory.length === 0 ? (
+                            <span className="text-xs text-neutral-600 italic text-center py-4">History is empty. Copy some text or images first.</span>
+                          ) : (
+                            <div className="flex flex-col gap-3">
+                              {/* Text items */}
+                              {clipboardHistory.some(item => item.type === "text") && (
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[9px] font-bold uppercase text-brand-400">Copied Text</span>
+                                  <div className="flex flex-col gap-1">
+                                    {clipboardHistory.filter(item => item.type === "text").map((item) => (
+                                      <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => {
+                                          editor?.chain().focus().insertContent(item.content).run();
+                                          setShowClipboardPopover(false);
+                                        }}
+                                        className="w-full text-left p-2 rounded-lg bg-neutral-900 border border-white/[0.04] hover:bg-neutral-800 hover:border-brand-500/30 text-xs text-gray-300 truncate transition-colors"
+                                        title={item.content}
+                                      >
+                                        {item.content}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Image items */}
+                              {clipboardHistory.some(item => item.type === "image") && (
+                                <div className="flex flex-col gap-1.5 mt-1.5 border-t border-white/[0.04] pt-2">
+                                  <span className="text-[9px] font-bold uppercase text-brand-400">Copied Images</span>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {clipboardHistory.filter(item => item.type === "image").map((item) => (
+                                      <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => {
+                                          editor?.chain().focus().setImage({ src: item.content }).run();
+                                          setShowClipboardPopover(false);
+                                        }}
+                                        className="p-1 rounded-lg bg-neutral-900 border border-white/[0.04] hover:bg-neutral-800 hover:border-brand-500/30 transition-all aspect-video overflow-hidden flex items-center justify-center relative"
+                                        title="Click to paste image"
+                                      >
+                                        <img src={item.content} className="max-h-full max-w-full object-cover rounded-md" alt="Clipboard Preview" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -831,9 +990,8 @@ function NoteEditorContent() {
                                 editor?.chain().focus().setFontFamily(font).run();
                                 setShowFontDropdown(false);
                               }}
-                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${
-                                getActiveFontFamily() === font ? "text-brand-400 font-bold" : "text-gray-300"
-                              }`}
+                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${getActiveFontFamily() === font ? "text-brand-400 font-bold" : "text-gray-300"
+                                }`}
                               style={{ fontFamily: font }}
                             >
                               {font}
@@ -862,9 +1020,8 @@ function NoteEditorContent() {
                                 editor?.chain().focus().setMark("textStyle", { fontSize: size + "px" }).run();
                                 setShowSizeDropdown(false);
                               }}
-                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${
-                                getActiveFontSize() === String(size) ? "text-brand-400 font-bold" : "text-gray-300"
-                              }`}
+                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${getActiveFontSize() === String(size) ? "text-brand-400 font-bold" : "text-gray-300"
+                                }`}
                             >
                               {size}
                             </button>
@@ -884,22 +1041,21 @@ function NoteEditorContent() {
                     <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className={getBtnClass(editor?.isActive("subscript") || false)} title="Subscript"><SubscriptIcon className="w-4 h-4" /></button>
                     <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className={getBtnClass(editor?.isActive("superscript") || false)} title="Superscript"><SuperscriptIcon className="w-4 h-4" /></button>
                     <div className="h-5 w-px bg-white/10 mx-1.5" />
-                    
+
                     {/* Text Color Picker */}
                     <div className="relative" ref={colorPickerRef}>
                       <button
                         type="button"
                         onClick={() => setShowColorPicker(!showColorPicker)}
-                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${
-                          showColorPicker ? "bg-white/[0.05] border-white/10" : ""
-                        }`}
+                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${showColorPicker ? "bg-white/[0.05] border-white/10" : ""
+                          }`}
                         title="Text Color"
                       >
                         <div className="flex flex-col items-center justify-center">
                           <span className="text-xs font-bold font-serif leading-none mt-[-2px]">A</span>
-                          <div 
-                            className="w-4 h-0.5 mt-0.5 rounded-full" 
-                            style={{ backgroundColor: editor?.getAttributes("textStyle").color || "#e5e7eb" }} 
+                          <div
+                            className="w-4 h-0.5 mt-0.5 rounded-full"
+                            style={{ backgroundColor: editor?.getAttributes("textStyle").color || "#e5e7eb" }}
                           />
                         </div>
                       </button>
@@ -930,9 +1086,8 @@ function NoteEditorContent() {
                       <button
                         type="button"
                         onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${
-                          showHighlightPicker ? "bg-white/[0.05] border-white/10" : ""
-                        }`}
+                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${showHighlightPicker ? "bg-white/[0.05] border-white/10" : ""
+                          }`}
                         title="Highlight Color"
                       >
                         <Palette className="w-4 h-4" />
@@ -1134,7 +1289,7 @@ function NoteEditorContent() {
                       {showTablePopover && (
                         <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 flex flex-col gap-2.5 select-none w-[166px]">
                           <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider font-sans text-gray-400">Insert Table Grid</span>
-                          <div 
+                          <div
                             className="grid grid-cols-6 gap-1"
                             onMouseLeave={() => setHoveredGrid(null)}
                           >
@@ -1152,11 +1307,10 @@ function NoteEditorContent() {
                                     setShowTablePopover(false);
                                     setHoveredGrid(null);
                                   }}
-                                  className={`w-5 h-5 rounded transition-colors border ${
-                                    isSelected 
-                                      ? "bg-brand-500/80 border-brand-500" 
-                                      : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
-                                  }`}
+                                  className={`w-5 h-5 rounded transition-colors border ${isSelected
+                                    ? "bg-brand-500/80 border-brand-500"
+                                    : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
+                                    }`}
                                 />
                               );
                             })}
@@ -1173,7 +1327,7 @@ function NoteEditorContent() {
                   </div>
                 )}
 
-                {activeToolbarTab === "Utilities" && (
+                {activeToolbarTab === "Print & Utilities" && (
                   <div className="flex flex-wrap items-center gap-2.5 animate-fade-in w-full">
                     <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Words: {wordCount}</span>
                     <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Characters: {charCount}</span>
@@ -1201,33 +1355,42 @@ function NoteEditorContent() {
           )}
 
           <div className="flex flex-1 overflow-hidden">
-            
+
             {/* EDITOR PANEL (LEFT) */}
-            <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${
-              noteType === "drawing" 
-                ? "w-full overflow-hidden h-full" 
-                : noteType === "checklist"
-                  ? "w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto"
-                  : noteType === "text"
-                    ? "w-full overflow-y-auto"
-                    : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"
-            }`}>
-              
+            <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${noteType === "drawing"
+              ? "w-full overflow-hidden h-full"
+              : noteType === "checklist"
+                ? "w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto"
+                : noteType === "text"
+                  ? "w-full overflow-y-auto"
+                  : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"
+              }`}>
+
               {noteType === "text" && (
-                <div 
+                <div
                   className="flex-1 flex flex-col min-h-0 print-content overflow-y-auto"
                   onKeyDown={handleEditorKeyDown}
                 >
+                  {/* Centered Heading visible only in print */}
+                  <div className="only-print flex-col items-center justify-center border-b-2 border-neutral-300 pb-4 mb-6 w-full text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Luminote</span>
+                    <h2 className="text-3xl font-bold text-black underline">{title || "Untitled Note"}</h2>
+                    <div className="flex gap-4 mt-2 text-xs text-neutral-500 justify-center font-medium">
+                      <span>Date: {note ? new Date(note.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</span>
+                      <span>Time: {note ? new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+
                   <EditorContent editor={editor} className="flex-1" />
                 </div>
               )}
 
               {noteType === "drawing" && (
                 <div className="p-3 pb-1 sm:p-4 sm:pb-1 flex-1 flex flex-col min-h-0">
-                  <DrawingCanvas 
+                  <DrawingCanvas
                     ref={drawingCanvasRef}
-                    noteId={noteId} 
-                    mediaUrl={note?.media_url || null} 
+                    noteId={noteId}
+                    mediaUrl={note?.media_url || null}
                     onDrawingSave={(newUrl) => {
                       if (note) {
                         setNote({ ...note, media_url: newUrl });
@@ -1353,10 +1516,9 @@ function NoteEditorContent() {
 
             {/* PREVIEW PANEL (RIGHT) - Only active for audio & checklist types */}
             {noteType !== "drawing" && noteType !== "text" && (
-              <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} ${
-                noteType === "checklist" ? "w-full sm:w-[35%]" : "w-full sm:w-1/2"
-              } overflow-y-auto`}>
-                
+              <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} ${noteType === "checklist" ? "w-full sm:w-[35%]" : "w-full sm:w-1/2"
+                } overflow-y-auto`}>
+
                 {noteType === "audio" && (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
@@ -1391,7 +1553,7 @@ function NoteEditorContent() {
                       <div className="text-xs text-neutral-400 leading-relaxed">
                         Type or paste context, meeting notes, project briefs, or general thoughts below. The AI will extract actionable checklist items and add them to your checklist items.
                       </div>
-                      
+
                       <textarea
                         id="note-checklist-content"
                         className="flex-1 min-h-[180px] bg-surface-900/40 border border-white/[0.04] focus:border-brand-500/50 rounded-xl p-4 text-sm text-gray-200

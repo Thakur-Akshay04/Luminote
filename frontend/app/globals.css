@@ -234,10 +234,20 @@
   @apply rounded-xs px-0.5;
 }
 
+.only-print {
+  display: none !important;
+}
+
 @media print {
+  @page {
+    margin: 0;
+  }
+
   html, body, #__next, [role="main"] {
     background: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   body * {
@@ -248,13 +258,18 @@
     visibility: visible !important;
   }
 
+  .only-print, .only-print * {
+    visibility: visible !important;
+    display: flex !important;
+  }
+
   .print-content {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 20px !important;
+    padding: 2cm !important;
     background: white !important;
     color: black !important;
   }
