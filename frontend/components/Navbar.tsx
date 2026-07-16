@@ -110,17 +110,35 @@ function NavbarContent() {
 
   if (!user) {
     return (
-      <header className="w-full border-b border-surface-600 bg-surface-900/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/landing" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0">
-              <Notebook className="w-4 h-4 text-brand-500 fill-brand-500/20" />
+      <header className="w-full border-b border-white/[0.08] bg-black/40 backdrop-blur-xl sticky top-0 z-50 animate-fade-in transition-all">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <Link href="/landing" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-accent-violet flex items-center justify-center text-white shadow-lg shadow-brand-500/20 shrink-0 group-hover:scale-105 transition-transform duration-300">
+              <Notebook className="w-4.5 h-4.5 fill-white/10" />
             </div>
-            <span className="font-bold text-lg text-white tracking-tight">Luminote</span>
+            <span className="font-bold text-lg text-white tracking-tight group-hover:text-neutral-200 transition-colors">Luminote</span>
           </Link>
-          <Link href="/login" className="btn-primary text-xs px-4 py-2 shrink-0">
-            Login
-          </Link>
+
+          {/* Landing Navigation Links */}
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors duration-200">Features</a>
+            <a href="#showcase" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors duration-200">Showcase</a>
+            <a href="#security" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors duration-200">Security</a>
+            <a href="#pricing" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors duration-200">Pricing</a>
+            <a href="#faq" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors duration-200">FAQ</a>
+          </nav>
+
+          <div className="flex items-center gap-4 shrink-0">
+            <Link href="/login" className="text-[13px] font-medium text-neutral-400 hover:text-white transition-colors px-2 py-1.5">
+              Sign In
+            </Link>
+            <Link 
+              href="/register" 
+              className="px-4 py-2 rounded-lg bg-white text-black hover:bg-neutral-200 text-xs font-bold transition-all shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
       </header>
     );

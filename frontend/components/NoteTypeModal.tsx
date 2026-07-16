@@ -82,6 +82,14 @@ export default function NoteTypeModal({ isOpen, onClose }: NoteTypeModalProps) {
       <div 
         className="fixed inset-0 bg-black/70 backdrop-blur-md transition-opacity duration-300 animate-fade-in cursor-default"
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            onClose();
+          }
+        }}
+        role="button"
+        tabIndex={-1}
+        aria-hidden="true"
       />
 
       {/* Modal Content */}

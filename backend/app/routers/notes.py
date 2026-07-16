@@ -215,7 +215,7 @@ async def upload_image(
     user_id: str = Depends(get_current_user),
 ):
     import os
-    import shutil
+    import aiofiles
 
     # Validate that it is an image
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -224,20 +224,30 @@ async def upload_image(
             detail="File must be an image"
         )
     
-    # Generate unique filename
+    # Generate unique filename with whitelisted extension
     filename_str = file.filename or "image.png"
-    ext = os.path.splitext(filename_str)[1] or ".png"
+    ext = os.path.splitext(filename_str)[1].lower()
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    if ext not in allowed_extensions:
+        ext = ".png"
+        
     filename = f"{uuid.uuid4()}{ext}"
     
     media_base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    upload_dir = os.path.join(media_base, "uploads")
+    upload_dir = os.path.abspath(os.path.join(media_base, "uploads"))
     os.makedirs(upload_dir, exist_ok=True)
     
-    file_path = os.path.join(upload_dir, filename)
+    file_path = os.path.abspath(os.path.join(upload_dir, filename))
+    if not file_path.startswith(upload_dir):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path"
+        )
     
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        async with aiofiles.open(file_path, "wb") as buffer:
+            while chunk := await file.read(1024 * 1024):
+                await buffer.write(chunk)
     except Exception as e:
         logger.error("Failed to save uploaded image: %s", e)
         raise HTTPException(
