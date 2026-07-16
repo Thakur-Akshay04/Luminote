@@ -17,9 +17,16 @@ export default function AlertListener() {
   const [toasts, setToasts] = useState<ToastAlert[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeAudios = useRef<{ [id: string]: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number } }>({});
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+    const active = activeAudios.current[id];
+    if (active) {
+      if (active.intervalId) clearInterval(active.intervalId);
+      active.audioCtx.close().catch(() => {});
+      delete activeAudios.current[id];
+    }
   };
 
   const connectWebSocket = () => {
@@ -56,17 +63,55 @@ export default function AlertListener() {
           // Play a subtle notification sound (browser-safe, fallback to silent if blocked)
           try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
-            gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-            osc.start(audioCtx.currentTime);
-            osc.stop(audioCtx.currentTime + 0.5);
+            
+            const playChime = () => {
+              const startTime = audioCtx.currentTime;
+              
+              // First note: C5 (523.25 Hz) - Softer, warm triangle wave
+              const osc1 = audioCtx.createOscillator();
+              const gain1 = audioCtx.createGain();
+              osc1.connect(gain1);
+              gain1.connect(audioCtx.destination);
+              osc1.type = "triangle";
+              osc1.frequency.setValueAtTime(523.25, startTime);
+              gain1.gain.setValueAtTime(0, startTime);
+              gain1.gain.linearRampToValueAtTime(0.08, startTime + 0.04);
+              gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.4);
+              osc1.start(startTime);
+              osc1.stop(startTime + 0.45);
+
+              // Second note: E5 (659.25 Hz) - Pure sine wave, slightly delayed by 100ms
+              const osc2 = audioCtx.createOscillator();
+              const gain2 = audioCtx.createGain();
+              osc2.connect(gain2);
+              gain2.connect(audioCtx.destination);
+              osc2.type = "sine";
+              osc2.frequency.setValueAtTime(659.25, startTime + 0.1);
+              gain2.gain.setValueAtTime(0, startTime + 0.1);
+              gain2.gain.linearRampToValueAtTime(0.08, startTime + 0.14);
+              gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.65);
+              osc2.start(startTime + 0.1);
+              osc2.stop(startTime + 0.7);
+            };
+
+            // Play once immediately
+            playChime();
+
+            // Play 4 more times spaced by 1.2s intervals (total duration ~5.5s)
+            let playCount = 1;
+            const intervalId = setInterval(() => {
+              if (playCount >= 5) {
+                clearInterval(intervalId);
+                audioCtx.close().catch(() => {});
+                delete activeAudios.current[newAlert.id];
+              } else {
+                playChime();
+                playCount++;
+              }
+            }, 1200);
+
+            // Store references in a ref to keep context from garbage collection and enable manual stop
+            activeAudios.current[newAlert.id] = { audioCtx, intervalId };
           } catch (e) {
             // Audio context failed to play (e.g. no user interaction yet), ignore
           }
@@ -126,6 +171,11 @@ export default function AlertListener() {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      // Stop and clean up any playing audios on unmount
+      Object.values(activeAudios.current).forEach((active) => {
+        if (active.intervalId) clearInterval(active.intervalId);
+        active.audioCtx.close().catch(() => {});
+      });
     };
   }, []);
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
-import { notesApi } from "@/lib/api";
+import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
 import DrawingCanvas, { DrawingCanvasRef } from "@/components/DrawingCanvas";
@@ -88,7 +88,8 @@ import {
   Table as TableIcon,
   Minus,
   Eraser,
-  Printer
+  Printer,
+  Upload
 } from "lucide-react";
 import Link from "next/link";
 
@@ -146,6 +147,9 @@ function NoteEditorContent() {
   const [linkUrl, setLinkUrl] = useState("");
   const [showImagePopover, setShowImagePopover] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showTablePopover, setShowTablePopover] = useState(false);
   const [hoveredGrid, setHoveredGrid] = useState<{ r: number; c: number } | null>(null);
   const [showClipboardPopover, setShowClipboardPopover] = useState(false);
@@ -205,6 +209,27 @@ function NoteEditorContent() {
       setSaving(false);
     }
   }, [noteId, noteType, router]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+    try {
+      const res = await notesApi.uploadImage(file);
+      const relativeUrl = res.data.url;
+      const fullUrl = relativeUrl.startsWith("http") ? relativeUrl : `${BASE_URL}${relativeUrl}`;
+      editor?.chain().focus().setImage({ src: fullUrl }).run();
+      setShowImagePopover(false);
+      setImageUrl("");
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || "Failed to upload image. Make sure it is a valid image file.";
+      setImageUploadError(msg);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const onContentChange = useCallback((json: any) => {
     const jsonStr = JSON.stringify(json);
@@ -1241,45 +1266,98 @@ function NoteEditorContent() {
                         <ImageIcon className="w-4 h-4" />
                       </button>
                       {showImagePopover && (
-                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
-                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert Image URL</span>
-                          <input
-                            type="text"
-                            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
-                            placeholder="https://example.com/image.jpg"
-                            value={imageUrl}
-                            onChange={(e) => setImageUrl(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                if (imageUrl) {
-                                  editor?.chain().focus().setImage({ src: imageUrl }).run();
+                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-72 flex flex-col gap-3">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert Image URL</span>
+                            <input
+                              type="text"
+                              className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
+                              placeholder="https://example.com/image.jpg"
+                              value={imageUrl}
+                              onChange={(e) => setImageUrl(e.target.value)}
+                              disabled={isUploadingImage}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !isUploadingImage) {
+                                  if (imageUrl) {
+                                    editor?.chain().focus().setImage({ src: imageUrl }).run();
+                                  }
+                                  setShowImagePopover(false);
+                                  setImageUrl("");
                                 }
-                                setShowImagePopover(false);
-                                setImageUrl("");
-                              }
-                            }}
-                            autoFocus
-                          />
-                          <div className="flex gap-1 ml-auto mt-1">
+                              }}
+                              autoFocus
+                            />
+                            <div className="flex gap-1 ml-auto mt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (imageUrl) {
+                                    editor?.chain().focus().setImage({ src: imageUrl }).run();
+                                  }
+                                  setShowImagePopover(false);
+                                  setImageUrl("");
+                                }}
+                                disabled={isUploadingImage || !imageUrl}
+                                className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors disabled:opacity-50"
+                              >
+                                Insert URL
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="relative flex py-1 items-center">
+                            <div className="flex-grow border-t border-white/[0.06]"></div>
+                            <span className="flex-shrink mx-2 text-[9px] text-gray-600 font-bold uppercase">OR</span>
+                            <div className="flex-grow border-t border-white/[0.06]"></div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Upload from computer</span>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleImageUpload}
+                              accept="image/*"
+                              disabled={isUploadingImage}
+                              className="hidden"
+                            />
                             <button
                               type="button"
-                              onClick={() => setShowImagePopover(false)}
-                              className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingImage}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-neutral-800 hover:border-brand-500/50 hover:bg-neutral-900 rounded-lg text-xs font-semibold text-gray-300 hover:text-white transition-all duration-200"
                             >
-                              Cancel
+                              {isUploadingImage ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-500" />
+                                  <span>Uploading image...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>Choose local picture</span>
+                                </>
+                              )}
                             </button>
+                            {imageUploadError && (
+                              <p className="text-[10px] text-red-400 mt-1 leading-normal">
+                                {imageUploadError}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex border-t border-white/[0.04] pt-2 mt-1">
                             <button
                               type="button"
                               onClick={() => {
-                                if (imageUrl) {
-                                  editor?.chain().focus().setImage({ src: imageUrl }).run();
-                                }
                                 setShowImagePopover(false);
                                 setImageUrl("");
+                                setImageUploadError(null);
                               }}
-                              className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors"
+                              disabled={isUploadingImage}
+                              className="ml-auto px-2.5 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
                             >
-                              Insert
+                              Close
                             </button>
                           </div>
                         </div>

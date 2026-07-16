@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { clearAuth, getUser } from "@/lib/auth";
 import type { StoredUser } from "@/lib/auth";
+import { alertsApi } from "@/lib/api";
+import type { Alert } from "@/types";
 import {
   BookOpen,
   Search,
   LogOut,
-  Sparkles,
+  Notebook,
   Calendar,
   LayoutDashboard,
   Settings,
@@ -19,6 +21,10 @@ import {
   Mic,
   Palette,
   ListTodo,
+  Bell,
+  Trash2,
+  ExternalLink,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -30,10 +36,49 @@ function NavbarContent() {
   
   const [user, setUser] = useState<StoredUser | null>(null);
   const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   useEffect(() => {
     setUser(getUser());
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const fetchAlerts = async () => {
+        try {
+          const res = await alertsApi.list();
+          setAlerts(res.data);
+        } catch {
+          // ignore
+        }
+      };
+      fetchAlerts();
+
+      try {
+        const stored = localStorage.getItem("read_alerts");
+        if (stored) {
+          setReadAlertIds(JSON.parse(stored));
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [user]);
+
+  const handleDeleteAlert = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await alertsApi.delete(id);
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      alert("Failed to delete alert.");
+    }
+  };
+
+  const hasUnread = alerts.some((a) => !readAlertIds.includes(a.id));
 
   // Keep notes dropdown open if current path is a notes list filter
   useEffect(() => {
@@ -69,7 +114,7 @@ function NavbarContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/landing" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0">
-              <Sparkles className="w-4 h-4 fill-brand-500" />
+              <Notebook className="w-4 h-4 text-brand-500 fill-brand-500/20" />
             </div>
             <span className="font-bold text-lg text-white tracking-tight">Luminote</span>
           </Link>
@@ -90,7 +135,7 @@ function NavbarContent() {
           className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-700/50 transition-colors cursor-pointer group"
         >
           <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:border-brand-500/40 transition-colors">
-            <Sparkles className="w-4 h-4 fill-brand-500" />
+            <Notebook className="w-4 h-4 text-brand-500 fill-brand-500/20" />
           </div>
           <div className="flex-1 min-w-0 flex items-center justify-between">
             <span className="text-sm font-semibold text-neutral-200 truncate group-hover:text-white transition-colors">
@@ -192,6 +237,99 @@ function NavbarContent() {
 
       {/* Bottom Actions */}
       <div className="flex flex-col gap-1.5">
+        <div className="relative">
+          <button
+            onClick={() => {
+              setNotificationsOpen(!notificationsOpen);
+              if (!notificationsOpen) {
+                const ids = alerts.map((a) => a.id);
+                setReadAlertIds(ids);
+                localStorage.setItem("read_alerts", JSON.stringify(ids));
+              }
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white hover:bg-surface-700 w-full text-left transition-colors relative"
+          >
+            <Bell className="w-4 h-4 text-neutral-500" />
+            <span>Notifications</span>
+            {hasUnread && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-pink-500 rounded-full animate-pulse" />
+            )}
+          </button>
+
+          {/* Notifications Popover */}
+          {notificationsOpen && (
+            <div className="absolute bottom-full left-0 mb-2 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border-muted pb-2">
+                <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
+                <button
+                  onClick={() => setNotificationsOpen(false)}
+                  className="p-1 hover:bg-surface-strong rounded text-neutral-500 hover:text-white transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Notifications List */}
+              <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-0.5">
+                {alerts.length === 0 ? (
+                  <div className="text-center py-6 text-neutral-500 text-xs italic">
+                    No notifications yet
+                  </div>
+                ) : (
+                  [...alerts]
+                    .sort((a, b) => new Date(b.alert_time).getTime() - new Date(a.alert_time).getTime())
+                    .map((alert) => {
+                      const alertDate = new Date(alert.alert_time);
+                      return (
+                        <div
+                          key={alert.id}
+                          className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-base border border-border-muted hover:bg-surface-strong transition-colors group relative"
+                        >
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5
+                            ${alert.is_notified 
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                              : "bg-pink-500/10 border-pink-500/20 text-pink-400"
+                            }`}
+                          >
+                            <Bell className="w-3.5 h-3.5" />
+                          </div>
+
+                          <div className="flex-1 min-w-0 pr-6">
+                            <p className="text-xs font-semibold text-white leading-normal">
+                              {alert.title}
+                            </p>
+                            <span className="text-[10px] text-neutral-500 block mt-0.5">
+                              {alertDate.toLocaleString()}
+                            </span>
+                            {alert.note_title && (
+                              <Link
+                                href={`/notes/${alert.note_id}`}
+                                onClick={() => setNotificationsOpen(false)}
+                                className="inline-flex items-center gap-1 mt-1 text-[10px] text-brand-400 hover:underline font-semibold"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span className="truncate max-w-[150px]">Open Note: {alert.note_title}</span>
+                              </Link>
+                            )}
+                          </div>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={(e) => handleDeleteAlert(alert.id, e)}
+                            className="absolute top-2 right-2 text-neutral-500 hover:text-red-400 p-1 rounded hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Delete Alert"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <button
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white hover:bg-surface-700 w-full text-left transition-colors"
           onClick={() => router.push("/settings")}

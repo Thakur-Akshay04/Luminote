@@ -7,6 +7,7 @@ import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
 import NoteCard from "@/components/NoteCard";
 import TagFilter from "@/components/TagFilter";
+import NoteTypeModal from "@/components/NoteTypeModal";
 import { Plus, Loader2, StickyNote, Sparkles } from "lucide-react";
 
 function NotesContent() {
@@ -19,6 +20,7 @@ function NotesContent() {
   const [creating, setCreating] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isNoteTypeModalOpen, setIsNoteTypeModalOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -47,8 +49,11 @@ function NotesContent() {
   ).sort();
 
   const handleCreate = () => {
-    const url = noteTypeParam ? `/notes/new?type=${noteTypeParam}` : "/notes/new";
-    router.push(url);
+    if (noteTypeParam) {
+      router.push(`/notes/new?type=${noteTypeParam}`);
+    } else {
+      setIsNoteTypeModalOpen(true);
+    }
   };
 
   const getTitle = () => {
@@ -163,6 +168,10 @@ function NotesContent() {
           )}
         </div>
       )}
+      <NoteTypeModal
+        isOpen={isNoteTypeModalOpen}
+        onClose={() => setIsNoteTypeModalOpen(false)}
+      />
     </div>
   );
 }

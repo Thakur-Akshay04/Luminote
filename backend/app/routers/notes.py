@@ -3,7 +3,7 @@ import json
 from typing import Optional
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -118,7 +118,7 @@ async def ask(
     from datetime import datetime, timezone
 
     note = await get_note(note_id, uuid.UUID(user_id), db)
-    
+
     # Safely clone or initialize local list
     history = list(note.chat_history) if note.chat_history else []
     
@@ -207,3 +207,42 @@ async def summarize(
         "note": note,
         "alerts": new_alerts
     }
+
+
+@router.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+):
+    import os
+    import shutil
+
+    # Validate that it is an image
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image"
+        )
+    
+    # Generate unique filename
+    filename_str = file.filename or "image.png"
+    ext = os.path.splitext(filename_str)[1] or ".png"
+    filename = f"{uuid.uuid4()}{ext}"
+    
+    media_base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
+    upload_dir = os.path.join(media_base, "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error("Failed to save uploaded image: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save image"
+        )
+    
+    return {"url": f"/media/uploads/{filename}"}

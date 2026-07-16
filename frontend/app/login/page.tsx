@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { setAuth } from "@/lib/auth";
-import { Sparkles, Mail, Lock, Loader2, AlertCircle } from "lucide-react";
+import { Notebook, Mail, Lock, Loader2, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-4 shadow-sm">
-            <Sparkles className="w-6 h-6 text-black" />
+            <Notebook className="w-6 h-6 text-black fill-black/10" />
           </div>
           <h1 className="text-2xl font-bold text-gradient">Welcome back</h1>
           <p className="text-gray-500 text-sm mt-1">Sign in to your Luminote account</p>

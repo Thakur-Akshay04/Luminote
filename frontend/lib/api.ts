@@ -15,7 +15,7 @@ import type {
   AudioUploadResponse,
 } from "@/types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const api = axios.create({ baseURL: BASE_URL });
 
@@ -96,6 +96,13 @@ export const notesApi = {
     api.patch(`/notes/${id}/checklist/${index}`, { checked }),
   extractTasks: (id: string) =>
     api.post<ExtractTasksResponse>(`/notes/${id}/extract-tasks`),
+  uploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string }>("/notes/upload-image", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };
 
 // ── Alerts ────────────────────────────────────────────────────────────────────

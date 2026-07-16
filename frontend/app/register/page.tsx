@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { setAuth } from "@/lib/auth";
-import { Sparkles, Mail, Lock, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Notebook, Mail, Lock, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -55,7 +55,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-4 shadow-sm">
-            <Sparkles className="w-6 h-6 text-black" />
+            <Notebook className="w-6 h-6 text-black fill-black/10" />
           </div>
           <h1 className="text-2xl font-bold text-gradient">Create account</h1>
           <p className="text-gray-500 text-sm mt-1">Start taking smarter notes today</p>

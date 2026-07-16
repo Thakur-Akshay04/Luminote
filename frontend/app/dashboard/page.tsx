@@ -7,6 +7,7 @@ import { isAuthenticated, getUser } from "@/lib/auth";
 import { notesApi, alertsApi } from "@/lib/api";
 import type { Note, Alert } from "@/types";
 import NoteCard from "@/components/NoteCard";
+import NoteTypeModal from "@/components/NoteTypeModal";
 import {
   StickyNote,
   Bell,
@@ -20,6 +21,8 @@ import {
   Trash2,
   MoreVertical,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -43,29 +46,32 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
   const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
   return (
-    <div className="bg-surface-900 p-4 rounded-xl border border-surface-600">
+    <div className="bg-surface-900 p-5 rounded-2xl border border-white/[0.06] shadow-xl relative overflow-hidden group/calendar">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-bold text-neutral-200">
+        <span className="text-sm font-bold text-white tracking-tight uppercase">
           {format(currentMonth, "MMMM yyyy")}
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           <button
             onClick={handlePrevMonth}
-            className="p-1 hover:bg-surface-700 rounded-lg text-neutral-400 text-xs transition-colors"
+            className="p-1.5 hover:bg-surface-700 rounded-full text-neutral-400 hover:text-white transition-all active:scale-90"
+            aria-label="Previous month"
           >
-            &lt;
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleNextMonth}
-            className="p-1 hover:bg-surface-700 rounded-lg text-neutral-400 text-xs transition-colors"
+            className="p-1.5 hover:bg-surface-700 rounded-full text-neutral-400 hover:text-white transition-all active:scale-90"
+            aria-label="Next month"
           >
-            &gt;
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Weekdays */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-500 mb-2">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-500 mb-3 tracking-wider">
         {WEEKDAYS.map((day) => (
           <span key={day}>{day}</span>
         ))}
@@ -79,19 +85,53 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
           const hasAlerts = dayAlerts.length > 0;
           const isCurrent = isToday(day);
 
+          const upcoming = dayAlerts.filter((a) => !a.is_notified);
+          const completed = dayAlerts.filter((a) => a.is_notified);
+
           return (
             <div
               key={idx}
               className={`
-                relative aspect-square flex flex-col items-center justify-center text-xs rounded-full cursor-default select-none
-                ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600"}
-                ${isCurrent ? "bg-white text-black font-bold" : "hover:bg-surface-700"}
+                relative aspect-square flex flex-col items-center justify-center text-xs rounded-full select-none transition-all duration-150 group/day
+                ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600/50"}
+                ${
+                  isCurrent
+                    ? "bg-brand-500/10 border border-brand-500 text-brand-300 font-extrabold shadow-[0_0_10px_rgba(219,39,119,0.2)]"
+                    : "hover:bg-surface-700/60 hover:scale-105 active:scale-95 cursor-pointer"
+                }
               `}
               title={day.toLocaleDateString()}
             >
               <span>{format(day, "d")}</span>
+              
+              {/* Alert Indicator Dots */}
               {hasAlerts && (
-                <span className={`w-1 h-1 rounded-full absolute bottom-1 ${isCurrent ? "bg-black" : "bg-pink-500"}`} />
+                <div className="absolute bottom-1 flex gap-0.5 justify-center">
+                  {upcoming.length > 0 && (
+                    <span className="w-1 h-1 rounded-full bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.5)] animate-pulse" />
+                  )}
+                  {completed.length > 0 && (
+                    <span className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+                  )}
+                </div>
+              )}
+
+              {/* Tooltip on Hover */}
+              {hasAlerts && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-surface-raised border border-border-muted p-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-all duration-200 scale-95 group-hover/day:scale-100 z-50">
+                  <div className="text-[10px] font-bold text-neutral-400 mb-1 border-b border-border-muted pb-1 flex justify-between">
+                    <span>Alerts ({dayAlerts.length})</span>
+                    <span className="text-[8px] font-medium text-neutral-500">{format(day, "MMM d")}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                    {dayAlerts.map((alert) => (
+                      <div key={alert.id} className="text-[10px] text-white flex items-start gap-1">
+                        <span className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${alert.is_notified ? "bg-emerald-500" : "bg-pink-500 animate-pulse"}`} />
+                        <span className="truncate leading-relaxed">{alert.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -113,6 +153,7 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [firstName, setFirstName] = useState("there");
+  const [isNoteTypeModalOpen, setIsNoteTypeModalOpen] = useState(false);
 
   // Input states
   const [searchQuery, setSearchQuery] = useState("");
@@ -150,7 +191,7 @@ export default function DashboardPage() {
   }, [mounted, fetchData]);
 
   const handleCreateNote = () => {
-    router.push("/notes/new");
+    setIsNoteTypeModalOpen(true);
   };
 
   const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
@@ -433,6 +474,10 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      <NoteTypeModal
+        isOpen={isNoteTypeModalOpen}
+        onClose={() => setIsNoteTypeModalOpen(false)}
+      />
     </div>
   );
 }

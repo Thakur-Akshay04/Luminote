@@ -42,8 +42,9 @@ async def semantic_search(
         items = [SearchResultItem(**r) for r in json.loads(cached)]
         return SearchResponse(results=items, cached=True)
 
-    # Get embedding for the search query
-    query_embedding = await get_embedding(body.query)
+    # Get embedding for the search query - prepending instruction for BGE embedding retrieval optimization
+    query_for_embedding = f"Represent this sentence for searching relevant passages: {body.query}"
+    query_embedding = await get_embedding(query_for_embedding)
     if not query_embedding:
         return SearchResponse(results=[], cached=False)
 
@@ -60,8 +61,10 @@ async def semantic_search(
                     ELSE 0.55
                 END AS raw_semantic,
                 ts_rank(
-                    to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(array_to_string(tags, ' '), '')),
-                    plainto_tsquery('english', :query)
+                    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+                    setweight(to_tsvector('english', coalesce(content, '')), 'B') ||
+                    setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'A'),
+                    websearch_to_tsquery('english', :query)
                 ) AS fts_rank
             FROM notes
             WHERE user_id = :user_id
@@ -70,20 +73,21 @@ async def semantic_search(
             SELECT
                 *,
                 GREATEST(0.0, (raw_semantic - 0.45) / 0.40) AS scaled_semantic,
-                LEAST(fts_rank * 10.0, 1.0) AS keyword_score
+                LEAST(fts_rank * 5.0, 1.0) AS keyword_score
             FROM scored_notes
         ),
         final_notes AS (
             SELECT
                 *,
-                GREATEST(scaled_semantic, keyword_score) AS similarity
+                -- Hybrid weighted sum + small boost for matching both semantic & FTS keyword signals
+                (scaled_semantic * 0.6) + (keyword_score * 0.4) + (scaled_semantic * keyword_score * 0.1) AS similarity
             FROM hybrid_notes
         )
         SELECT *
         FROM final_notes
-        WHERE similarity >= 0.35
+        WHERE similarity >= 0.20
         ORDER BY similarity DESC
-        LIMIT 5
+        LIMIT 10
         """
     )
     result = await db.execute(

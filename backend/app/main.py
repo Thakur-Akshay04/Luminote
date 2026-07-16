@@ -93,6 +93,7 @@ async def lifespan(app: FastAPI):
     media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
     os.makedirs(os.path.join(media_base, "drawings"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
+    os.makedirs(os.path.join(media_base, "uploads"), exist_ok=True)
 
     # Setup connection manager and start background alert checker
     app.state.alert_manager = ConnectionManager()
