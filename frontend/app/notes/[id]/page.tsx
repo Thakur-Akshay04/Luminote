@@ -9,7 +9,8 @@ import AIPanel from "@/components/AIPanel";
 import DrawingCanvas, { DrawingCanvasRef } from "@/components/DrawingCanvas";
 import AudioRecorder from "@/components/AudioRecorder";
 import ChecklistEditor from "@/components/ChecklistEditor";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import type { NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
@@ -102,6 +103,92 @@ const generateSecureId = (): string => {
   }
   return "fallback-id-" + Date.now();
 };
+
+const ResizableImageNodeView = (props: NodeViewProps) => {
+  const { node, updateAttributes, selected } = props;
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startWidth = imgRef.current ? imgRef.current.clientWidth : 300;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const currentWidth = startWidth + (moveEvent.clientX - startX);
+      const newWidth = Math.max(80, Math.min(1200, currentWidth));
+      updateAttributes({ width: `${newWidth}px` });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
+  return (
+    <NodeViewWrapper className="inline-block relative group my-2">
+      <div className="relative inline-block select-none">
+        <img
+          ref={imgRef}
+          src={node.attrs.src}
+          alt={node.attrs.alt}
+          style={{
+            width: node.attrs.width || "100%",
+            height: "auto",
+            display: "block",
+            maxWidth: "100%",
+          }}
+          className={`rounded-lg transition-all duration-200 border-2 ${
+            selected
+              ? "border-brand-500 shadow-lg ring-2 ring-brand-500/20"
+              : "border-transparent"
+          }`}
+        />
+        {/* Resizer Handle at bottom-right edge */}
+        <div
+          onMouseDown={onMouseDown}
+          className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 bg-brand-500 hover:bg-brand-400 rounded flex items-center justify-center cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-md border border-white/20 select-none"
+        >
+          <svg
+            className="w-2.5 h-2.5 text-white"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            <line x1="22" y1="6" x2="6" y2="22" />
+            <line x1="22" y1="14" x2="14" y2="22" />
+          </svg>
+        </div>
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+const ResizableImage = ImageExtension.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: "100%",
+        parseHTML: (element) => element.getAttribute("width"),
+        renderHTML: (attributes) => {
+          return {
+            width: attributes.width,
+          };
+        },
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageNodeView);
+  },
+});
 
 function NoteEditorContent() {
   const router = useRouter();
@@ -346,7 +433,7 @@ function NoteEditorContent() {
       TextStyleExtended,
       Color,
       Highlight.configure({ multicolor: true }),
-      ImageExtension,
+      ResizableImage,
       LinkExtension.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: "Start writing your note..." }),
       CharacterCount,
@@ -381,7 +468,11 @@ function NoteEditorContent() {
 
     isEditorInitialized.current = true;
     if (!isSame) {
-      editor.commands.setContent(initialContent);
+      setTimeout(() => {
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(initialContent);
+        }
+      }, 0);
     }
   }, [editor, note]);
 
