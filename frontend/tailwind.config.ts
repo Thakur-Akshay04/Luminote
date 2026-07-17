@@ -11,6 +11,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: [
+          "Nunito",
           "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -22,6 +23,11 @@ const config: Config = {
           "Fira Sans",
           "Droid Sans",
           "Helvetica Neue",
+          "sans-serif"
+        ],
+        display: [
+          "Quicksand",
+          "Nunito",
           "sans-serif"
         ],
         mono: ["JetBrains Mono", "Fira Code", "monospace"],

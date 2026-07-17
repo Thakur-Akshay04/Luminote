@@ -17,6 +17,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Workflow,
+  Pencil,
 
   Zap,
   Globe,
@@ -627,36 +628,40 @@ export default function LandingPage() {
           {/* Left Column: Headline and CTAs */}
           <div className="lg:col-span-5 flex flex-col items-start text-left gap-6 animate-slide-up">
 
-            {/* Tag Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold">
-              <Notebook className="w-3.5 h-3.5 shrink-0" />
-              <span>Semantic Notes · Voice · AI Copilot</span>
+            {/* Live Announcement Badge */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-neutral-300 text-xs font-semibold hover:border-brand-500/40 hover:bg-brand-500/5 transition-all duration-300 group cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.02)]">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-brand-400 relative shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-400"></span>
+              </span>
+              <span>Introducing the personal Notes</span>
+              <ArrowRight className="w-3 h-3 text-neutral-500 group-hover:text-brand-400 group-hover:translate-x-0.5 transition-all" />
             </div>
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08] text-wrap-balance">
-              Your thoughts, <br />
-              <span className="text-white">indexed by meaning.</span>
+              Notes that <br />
+              <span className="text-white">connect themselves...</span>
             </h1>
 
             {/* Subtitle */}
             <p className="text-zinc-400 text-sm sm:text-base leading-relaxed text-wrap-pretty">
-              Luminote is a secure, blazing-fast workspace for your notes. Auto-summarize lectures, transcribe voice memos, and find everything using semantic vector search.
+              Ditch the folders. Just write. Luminote automatically summarizes, structures, and connects your thoughts for you.
             </p>
 
             {/* Features checkmarks list */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-brand-400 shrink-0" />
-                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">AI semantic conceptual search</span>
+                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">Find notes by meaning, even if you forgot the words</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-brand-400 shrink-0" />
-                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">Real-time voice memo transcripts</span>
+                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">Speak your mind, This will clean up the transcripts</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-brand-400 shrink-0" />
-                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">AES-256 data isolation by design</span>
+                <span className="text-xs sm:text-sm text-neutral-300 font-semibold">Isolated database architecture for 100% privacy</span>
               </div>
             </div>
 
@@ -684,37 +689,39 @@ export default function LandingPage() {
           <div id="showcase" className="lg:col-span-7 w-full flex flex-col gap-5 scroll-mt-24">
 
             {/* Interactive Navigation Tabs */}
-            <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#0c0c0e]/80 border border-white/[0.08] rounded-xl w-full backdrop-blur-md shadow-2xl">
-              <button
-                onClick={() => handleTabClick("capture")}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-[11px] sm:text-xs font-semibold tracking-wide btn-smooth-hover ${activeTab === "capture"
-                  ? "bg-white text-black shadow-lg"
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.05]"
-                  }`}
-              >
-                <Notebook className="w-3.5 h-3.5 shrink-0" />
-                <span>1. Capture</span>
-              </button>
-              <button
-                onClick={() => handleTabClick("summarize")}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-[11px] sm:text-xs font-semibold tracking-wide btn-smooth-hover ${activeTab === "summarize"
-                  ? "bg-white text-black shadow-lg"
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.05]"
-                  }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span>2. Summarize</span>
-              </button>
-              <button
-                onClick={() => handleTabClick("ask")}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-[11px] sm:text-xs font-semibold tracking-wide btn-smooth-hover ${activeTab === "ask"
-                  ? "bg-white text-black shadow-lg"
-                  : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.05]"
-                  }`}
-              >
-                <Bot className="w-3.5 h-3.5 shrink-0" />
-                <span>3. Ask AI</span>
-              </button>
+            <div className="flex justify-center w-full mb-1">
+              <div className="inline-flex gap-1 p-1 bg-[#0c0c0f]/60 border border-white/[0.06] rounded-full backdrop-blur-xl shadow-xl">
+                <button
+                  onClick={() => handleTabClick("capture")}
+                  className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "capture"
+                    ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]"
+                    }`}
+                >
+                  <Notebook className="w-3.5 h-3.5 shrink-0" />
+                  <span>1. Capture</span>
+                </button>
+                <button
+                  onClick={() => handleTabClick("summarize")}
+                  className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "summarize"
+                    ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]"
+                    }`}
+                >
+                  <Pencil className="w-3.5 h-3.5 shrink-0" />
+                  <span>2. Summarize</span>
+                </button>
+                <button
+                  onClick={() => handleTabClick("ask")}
+                  className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "ask"
+                    ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.04]"
+                    }`}
+                >
+                  <Bot className="w-3.5 h-3.5 shrink-0" />
+                  <span>3. Ask AI</span>
+                </button>
+              </div>
             </div>
 
             {/* 3D Tilted Browser Mockup Window */}
@@ -724,17 +731,17 @@ export default function LandingPage() {
               <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[90%] h-[60%] rounded-full bg-brand-500/[0.04] blur-[100px] pointer-events-none -z-10 animate-pulse-slow" style={{ animationDuration: '8s' }} />
 
               <TiltMockup>
-                <div className="w-full rounded-2xl border border-white/[0.08] bg-[#0c0c0f]/80 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden aspect-[16/10.5] sm:aspect-[16/9.5] flex flex-col transition-all duration-500 hover:border-white/20 animate-book-open">
+                <div className="w-full rounded-2xl border border-white/[0.08] bg-gradient-to-b from-[#0e0e12]/90 to-[#07070a]/90 backdrop-blur-xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),0_0_50px_rgba(139,92,246,0.03)] overflow-hidden aspect-[16/10.5] sm:aspect-[16/9.5] flex flex-col transition-all duration-500 hover:border-white/[0.16] hover:shadow-[0_40px_80px_-15px_rgba(0,0,0,0.95),0_0_60px_rgba(139,92,246,0.08)] animate-book-open">
                   {/* Title Bar */}
-                  <div className="h-11 border-b border-white/[0.06] bg-[#08080a] px-4 flex items-center justify-between shrink-0">
+                  <div className="h-11 border-b border-white/[0.06] bg-[#08080b]/80 px-4 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-neutral-800" />
-                      <div className="w-3 h-3 rounded-full bg-neutral-800" />
-                      <div className="w-3 h-3 rounded-full bg-neutral-800" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-white/[0.12]" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-white/[0.12]" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-white/[0.12]" />
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-[#141417] border border-white/[0.04] rounded-md text-[10px] sm:text-xs text-neutral-400 font-mono w-40 sm:w-60 justify-center">
-                      <Shield className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span className="truncate">luminote.app/notes/roadmap</span>
+                    <div className="flex items-center gap-2 px-4 py-1 bg-black/45 border border-white/[0.05] rounded-full text-[10px] sm:text-xs text-neutral-400 font-mono w-44 sm:w-64 justify-center">
+                      <Shield className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                      <span className="truncate tracking-wide text-neutral-400">luminote.app/notes/roadmap</span>
                     </div>
                     <div className="w-14" />
                   </div>
@@ -745,17 +752,17 @@ export default function LandingPage() {
                     <div className="absolute top-0 bottom-0 left-[60px] sm:left-[80px] w-[6px] shadow-inner bg-gradient-to-r from-black/35 via-white/[0.03] to-black/35 z-20 pointer-events-none" />
 
                     {/* App Sidebar Mockup */}
-                    <div className="w-12 sm:w-16 border-r border-white/[0.06] bg-[#08080a]/50 flex flex-col items-center py-4 gap-4 shrink-0 z-10">
-                      <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 mb-2 flex items-center justify-center shadow-sm">
+                    <div className="w-12 sm:w-16 border-r border-white/[0.06] bg-[#07070a]/40 flex flex-col items-center py-4 gap-4 shrink-0 z-10">
+                      <div className="w-8 h-8 rounded-xl bg-white/[0.03] border border-white/[0.06] text-neutral-400 flex items-center justify-center shrink-0">
                         <Notebook className="w-4 h-4" />
                       </div>
-                      <div className="w-8 h-8 rounded-lg bg-[#1f1f23] border border-white/[0.06] flex items-center justify-center text-white shadow-inner">
+                      <div className="w-8 h-8 rounded-xl bg-brand-600 border border-brand-400/30 flex items-center justify-center text-white shadow-[0_0_15px_rgba(139,92,246,0.35)] shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
-                      <div className="w-8 h-8 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-neutral-500 hover:text-neutral-300 transition-colors">
+                      <div className="w-8 h-8 rounded-xl hover:bg-white/[0.04] flex items-center justify-center text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
                         <Search className="w-4 h-4" />
                       </div>
-                      <div className="w-8 h-8 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-neutral-500 hover:text-neutral-300 transition-colors">
+                      <div className="w-8 h-8 rounded-xl hover:bg-white/[0.04] flex items-center justify-center text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
                         <Bell className="w-4 h-4" />
                       </div>
                     </div>
@@ -767,9 +774,9 @@ export default function LandingPage() {
                         <div className="space-y-1 mb-4 shrink-0">
                           <div className="text-[9px] sm:text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Workspace Note</div>
                           <h2 className="text-base sm:text-xl font-bold text-white leading-tight">🚀 Product Launch Roadmap</h2>
-                          <div className="flex gap-2 pt-0.5" style={{ transform: "translateZ(20px)" }}>
-                            <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-semibold uppercase tracking-wider">#launch</span>
-                            <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-semibold uppercase tracking-wider">#marketing</span>
+                          <div className="flex gap-2 pt-1" style={{ transform: "translateZ(20px)" }}>
+                            <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-bold uppercase tracking-wider">#launch</span>
+                            <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-bold uppercase tracking-wider">#marketing</span>
                           </div>
                         </div>
 
@@ -780,22 +787,22 @@ export default function LandingPage() {
                           </p>
 
                           {/* Pending Action Items Section */}
-                          <div className="space-y-2 bg-[#101014]/80 border border-white/[0.04] p-3.5 rounded-xl backdrop-blur-md shadow-lg" style={{ transform: "translateZ(15px)" }}>
+                          <div className="space-y-2.5 bg-[#121217]/60 border border-white/[0.06] p-4 rounded-2xl backdrop-blur-md shadow-xl" style={{ transform: "translateZ(15px)" }}>
                             <div className="font-bold text-white text-[10px] sm:text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-neutral-400" />
                               <span>Pending Action Items</span>
                             </div>
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-2 text-neutral-400">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2.5 text-neutral-400">
+                                <CheckCircle2 className="w-4 h-4 text-brand-400 shrink-0" />
                                 <span className="line-through text-neutral-500 text-[11px] sm:text-[13px]">Coordinate launch dates with stakeholders</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <div className="w-3.5 h-3.5 rounded-full border border-white/20 hover:border-white/40 shrink-0 transition-colors" />
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-4 h-4 rounded-full border border-white/20 hover:border-brand-500/40 hover:bg-brand-500/5 shrink-0 transition-all duration-200 cursor-pointer" />
                                 <span className="text-[11px] sm:text-[13px]">Finalize design assets for Product Hunt launch page</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <div className="w-3.5 h-3.5 rounded-full border border-white/20 hover:border-white/40 shrink-0 transition-colors" />
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-4 h-4 rounded-full border border-white/20 hover:border-brand-500/40 hover:bg-brand-500/5 shrink-0 transition-all duration-200 cursor-pointer" />
                                 <span className="text-[11px] sm:text-[13px]">Deploy staging build and run performance audits</span>
                               </div>
                             </div>
@@ -804,18 +811,18 @@ export default function LandingPage() {
                           {/* Multimodal Rich Media Attachments */}
                           <div className="grid grid-cols-2 gap-3 mt-2 shrink-0">
                             {/* Audio Attachment */}
-                            <div className="border border-white/[0.05] bg-[#101014]/50 p-2.5 rounded-xl flex items-center gap-3" style={{ transform: "translateZ(25px)" }}>
-                              <div className="w-7 h-7 rounded bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 shadow-lg">
+                            <div className="border border-white/[0.06] bg-[#121217]/40 p-3 rounded-2xl flex items-center gap-3" style={{ transform: "translateZ(25px)" }}>
+                              <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 shadow-lg">
                                 <Mic className="w-4 h-4" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-[10px] font-bold text-white truncate">Voice Memo #01</div>
                                 {/* Animated Waveform */}
-                                <div className="flex items-end gap-[2.5px] h-6 mt-1 overflow-hidden">
+                                <div className="flex items-end gap-[2px] h-6 mt-1 overflow-hidden">
                                   {waveformHeights.map((h, i) => (
                                     <div
                                       key={i}
-                                      className="flex-1 bg-brand-500/40 rounded-sm transition-all duration-150"
+                                      className="flex-1 bg-gradient-to-t from-brand-600 to-brand-400 rounded-sm transition-all duration-150"
                                       style={{ height: `${h}px` }}
                                     />
                                   ))}
@@ -824,16 +831,16 @@ export default function LandingPage() {
                             </div>
 
                             {/* Sketch Attachment */}
-                            <div className="border border-white/[0.05] bg-[#101014]/50 p-2.5 rounded-xl flex flex-col justify-between" style={{ transform: "translateZ(25px)" }}>
-                              <div className="flex items-center gap-2 mb-1">
-                                <div className="w-5 h-5 rounded bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
-                                  <Palette className="w-3 h-3" />
+                            <div className="border border-white/[0.06] bg-[#121217]/40 p-3 rounded-2xl flex flex-col justify-between" style={{ transform: "translateZ(25px)" }}>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <div className="w-6 h-6 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
+                                  <Palette className="w-3.5 h-3.5" />
                                 </div>
                                 <span className="text-[10px] font-bold text-white truncate">PH Wireframe.png</span>
                               </div>
                               {/* Hand-drawn Mockup SVG */}
-                              <div className="bg-[#030303]/80 border border-white/[0.05] rounded p-1.5 h-10 flex items-center justify-center overflow-hidden">
-                                <svg className="w-full h-full text-neutral-600 opacity-65 stroke-current" viewBox="0 0 100 40" fill="none" strokeWidth="1.5">
+                              <div className="bg-[#030303]/60 border border-white/[0.05] rounded-xl p-1.5 h-10 flex items-center justify-center overflow-hidden">
+                                <svg className="w-full h-full text-brand-400/40 stroke-current" viewBox="0 0 100 40" fill="none" strokeWidth="1.5">
                                   <path d="M 5 5 L 95 5 L 95 35 L 5 35 Z" strokeDasharray="2 2" />
                                   <path d="M 5 13 L 95 13" />
                                   <path d="M 12 24 L 60 24" strokeWidth="1" />
@@ -848,12 +855,12 @@ export default function LandingPage() {
                       {/* AI Copilot Side Panel (Visible in SUMMARIZE Mode with Typing Effect) */}
                       <div
                         style={{ transform: "translateZ(40px)" }}
-                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#0a0a0d]/95 border-l border-white/[0.06] p-4 flex flex-col gap-4 shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "summarize" ? "translate-x-0 opacity-100 font-sans" : "translate-x-full opacity-0 pointer-events-none"
+                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#09090c]/95 border-l border-white/[0.06] p-4 flex flex-col gap-4 shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "summarize" ? "translate-x-0 opacity-100 font-sans" : "translate-x-full opacity-0 pointer-events-none"
                           }`}
                       >
                         <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 shrink-0">
                           <div className="w-6 h-6 rounded-md bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center">
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </div>
                           <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider">AI Copilot Analysis</span>
                         </div>
@@ -861,7 +868,7 @@ export default function LandingPage() {
                         <div className="flex-1 flex flex-col gap-4 text-left overflow-y-auto pr-0.5">
                           <div className="space-y-1.5">
                             <div className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wide font-bold">Auto Summary</div>
-                            <p className="text-[11px] sm:text-xs text-neutral-300 leading-relaxed bg-white/[0.02] p-2.5 rounded-lg border border-white/[0.04] min-h-[90px] relative font-mono select-none">
+                            <p className="text-[11px] sm:text-xs text-neutral-300 leading-relaxed bg-[#121217]/60 border border-white/[0.04] p-3 rounded-xl min-h-[90px] relative font-mono select-none">
                               {typedSummary}
                               <span className="w-1.5 h-3.5 bg-brand-400 inline-block animate-pulse ml-0.5 align-middle" />
                             </p>
@@ -870,15 +877,15 @@ export default function LandingPage() {
                           <div className="space-y-1.5">
                             <div className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wide font-bold">Generated Tags</div>
                             <div className="flex flex-wrap gap-1.5">
-                              <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] font-semibold text-brand-300">#product-launch</span>
-                              <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] font-semibold text-brand-300">#roadmap</span>
-                              <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-semibold">#task-list</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] font-bold text-brand-300">#product-launch</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] font-bold text-brand-300">#roadmap</span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-[9px] sm:text-[10px] text-brand-300 font-bold">#task-list</span>
                             </div>
                           </div>
 
                           <div className="space-y-1.5">
                             <div className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wide font-bold">Extracted Reminders</div>
-                            <div className="flex items-center gap-2 text-[11px] sm:text-xs text-neutral-300 bg-[#141417] p-2.5 rounded-lg border border-white/[0.04]">
+                            <div className="flex items-center gap-2 text-[11px] sm:text-xs text-neutral-300 bg-[#121217]/60 p-3 rounded-xl border border-white/[0.04]">
                               <Bell className="w-3.5 h-3.5 text-brand-400 shrink-0" />
                               <span>Notify: Next Friday (Release Date)</span>
                             </div>
@@ -889,7 +896,7 @@ export default function LandingPage() {
                       {/* AI Assistant Chat Panel (Visible in ASK AI Mode with Typing Effect) */}
                       <div
                         style={{ transform: "translateZ(40px)" }}
-                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#0a0a0d]/95 border-l border-white/[0.06] p-4 flex flex-col shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "ask" ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
+                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#09090c]/95 border-l border-white/[0.06] p-4 flex flex-col shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "ask" ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
                           }`}
                       >
                         {/* Chat Panel Header */}
@@ -902,16 +909,16 @@ export default function LandingPage() {
 
                         {/* Chat Content Messages */}
                         <div className="flex-1 flex flex-col gap-3 py-3 overflow-y-auto text-left text-[11px] sm:text-xs min-h-0 pr-0.5">
-                          <div className="self-end max-w-[85%] bg-white text-black p-2.5 rounded-lg rounded-tr-none leading-normal shadow-md font-semibold select-none">
+                          <div className="self-end max-w-[85%] bg-white text-black px-3.5 py-2.5 rounded-2xl rounded-tr-none leading-normal shadow-lg font-bold select-none">
                             What are the remaining tasks and deadlines?
                           </div>
-                          <div className="self-start max-w-[85%] bg-[#101014] border border-white/[0.04] text-neutral-200 p-2.5 rounded-lg rounded-tl-none leading-relaxed space-y-1.5 shadow-md">
+                          <div className="self-start max-w-[85%] bg-[#121217]/60 border border-white/[0.06] text-neutral-200 p-3 rounded-2xl rounded-tl-none leading-relaxed space-y-1.5 shadow-lg">
                             <div className="font-bold text-brand-300 text-[10px] uppercase tracking-wide">Assistant Response</div>
                             <p className="whitespace-pre-line min-h-[90px] select-none font-mono">
                               {typedChat}
                               <span className="w-1.5 h-3.5 bg-brand-400 inline-block animate-pulse ml-0.5 align-middle" />
                             </p>
-                            <div className="text-[10px] text-brand-400 font-bold bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded inline-block mt-1">
+                            <div className="text-[10px] text-brand-400 font-bold bg-brand-500/10 border border-brand-500/20 px-2.5 py-0.5 rounded-full inline-block mt-1">
                               📅 Deadline: Next Friday
                             </div>
                           </div>
@@ -919,10 +926,10 @@ export default function LandingPage() {
 
                         {/* Chat Panel Input */}
                         <div className="pt-2 border-t border-white/[0.04] shrink-0 flex gap-1.5">
-                          <div className="flex-1 bg-[#101014] border border-white/[0.06] rounded-lg px-2.5 py-1.5 text-[10px] sm:text-xs text-neutral-500 text-left select-none cursor-text">
+                          <div className="flex-1 bg-[#121217]/60 border border-white/[0.06] rounded-xl px-3 py-2 text-[10px] sm:text-xs text-neutral-500 text-left select-none cursor-text">
                             Ask follow-up question...
                           </div>
-                          <button className="bg-white hover:bg-neutral-200 text-black rounded-lg p-1.5 transition-colors shrink-0">
+                          <button className="bg-white hover:bg-neutral-200 text-black rounded-xl p-2 transition-colors shrink-0 shadow-[0_4px_12px_rgba(255,255,255,0.15)]">
                             <ArrowRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1155,22 +1162,22 @@ export default function LandingPage() {
                 {/* Step 1 */}
                 <div className="relative group/step">
                   <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-[10px] font-bold text-brand-300">1</div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Capture Anything</h4>
-                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Type text notes, record voice memos, check off workflows, or draw diagram sketches.</p>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">Dump your thoughts</h4>
+                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Quick text, voice memos, workflows, or sketches. Drop it in raw without worrying about formatting or folders.</p>
                 </div>
 
                 {/* Step 2 */}
                 <div className="relative group/step">
                   <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-[10px] font-bold text-brand-300">2</div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Auto enrichment</h4>
-                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">The backend identifies deadlines, processes summaries, and links vector semantic tags.</p>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">Let the magic happen</h4>
+                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">We automatically extract tasks/deadlines, generate concise summaries, and link related thoughts together.</p>
                 </div>
 
                 {/* Step 3 */}
                 <div className="relative group/step">
                   <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-[10px] font-bold text-brand-300">3</div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Prompt & Ask</h4>
-                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Chat with single notes or search your entire personal repository in natural language.</p>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">Ask your second brain</h4>
+                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Ask questions, search by concepts, or query your entire personal database in plain English.</p>
                 </div>
               </div>
             </div>
