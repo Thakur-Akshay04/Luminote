@@ -2,7 +2,9 @@ import hashlib
 import json
 import logging
 import re
-from typing import Optional
+from typing import Optional, cast
+
+from groq.types.chat import ChatCompletionMessageParam
 
 import httpx
 
@@ -81,9 +83,10 @@ Note content:
     try:
         response = await client.chat.completions.create(
             model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
             temperature=0.3,
             max_tokens=512,
+            timeout=30,
         )
         raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)
@@ -167,16 +170,22 @@ Answer the user's questions based on the note content. Be concise and accurate. 
             if role in ("user", "assistant") and msg_content:
                 messages.append({"role": role, "content": _sanitize_user_content(str(msg_content)[:2000])})
 
+    if not sanitized_question:
+        return "Please ask a valid question."
+
     messages.append({"role": "user", "content": sanitized_question})
 
     try:
         response = await client.chat.completions.create(
             model=MODEL,
-            messages=messages,
+            messages=cast(list[ChatCompletionMessageParam], messages),
             temperature=0.4,
             max_tokens=1024,
+            timeout=30,
         )
-        return (response.choices[0].message.content or "").strip()
+        if response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content.strip()
+        return "Sorry, I could not generate an answer at this time."
     except Exception as e:
         logger.error("Groq Q&A error: %s", e)
         return "Sorry, I could not generate an answer at this time."
@@ -184,7 +193,7 @@ Answer the user's questions based on the note content. Be concise and accurate. 
 
 async def summarize_note_with_ai(
     content: str,
-    format: str = "paragraph",
+    summary_format: str = "paragraph",
     extract_alerts: bool = True,
     current_time_str: str = ""
 ) -> dict:
@@ -196,7 +205,7 @@ async def summarize_note_with_ai(
         "paragraph": "a concise 2-3 sentence paragraph summarizing the note content",
         "bullets": "a bulleted list of the main takeaways (each bullet starting with a dash '-')",
         "actions": "a checklist of actionable tasks/to-dos extracted from the note (each starting with '- [ ]')"
-    }.get(format, "a concise 2-3 sentence paragraph")
+    }.get(summary_format, "a concise 2-3 sentence paragraph")
 
     sanitized_content = _sanitize_user_content(content[:4000])
 
@@ -234,9 +243,10 @@ Note content:
     try:
         response = await client.chat.completions.create(
             model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
             temperature=0.3,
             max_tokens=1024,
+            timeout=30,
         )
         raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)

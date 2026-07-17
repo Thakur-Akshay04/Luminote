@@ -183,7 +183,7 @@ async def summarize(
 
     enrichment = await summarize_note_with_ai(
         content=text_content,
-        format=body.format,
+        summary_format=body.format,
         extract_alerts=body.extract_alerts,
         current_time_str=current_time_str
     )

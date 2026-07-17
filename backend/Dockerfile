@@ -36,7 +36,7 @@ RUN groupadd --gid 1001 appuser && \
 
 WORKDIR /app
 
-COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser ./app ./app
 
 # Switch to non-root user
 USER appuser

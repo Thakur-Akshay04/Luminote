@@ -107,7 +107,7 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
 
         current_time_str = datetime.now(timezone.utc).isoformat()
         enrichment, embedding = await asyncio.gather(
-            summarize_note_with_ai(text_content, format="paragraph", extract_alerts=True, current_time_str=current_time_str),
+            summarize_note_with_ai(text_content, summary_format="paragraph", extract_alerts=True, current_time_str=current_time_str),
             get_embedding(text_content),
         )
 
