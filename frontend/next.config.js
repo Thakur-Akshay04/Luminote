@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   // In Next.js 15, experimental.serverComponentsExternalPackages is now top-level
   serverExternalPackages: [],

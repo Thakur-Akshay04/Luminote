@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -12,8 +13,21 @@ from app.groq_client import client, MODEL
 logger = logging.getLogger(__name__)
 
 
-def _md5(text: str) -> str:
-    return hashlib.md5(text.encode()).hexdigest()
+def _sha256(text: str) -> str:
+    """Use SHA-256 instead of MD5 for cache key hashing (cryptographically secure)."""
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _sanitize_user_content(text: str) -> str:
+    """
+    Sanitize user-provided content before injecting into LLM prompts.
+    Strips control characters and excessive whitespace to reduce prompt injection risk.
+    """
+    # Remove ASCII control characters (except newline, tab, carriage return)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Collapse excessive blank lines (more than 2 consecutive) to prevent prompt padding attacks
+    text = re.sub(r'\n{4,}', '\n\n\n', text)
+    return text.strip()
 
 
 def _extract_json_content(raw: str) -> str:
@@ -36,13 +50,13 @@ def _extract_json_content(raw: str) -> str:
 async def get_ai_enrichment(content: str) -> dict:
     """
     Full AI pipeline:
-    1. MD5 hash the content
+    1. SHA-256 hash the content
     2. Check Redis cache at ai_response:{hash}
     3. On miss: call Groq for summary + tags
     4. Return { summary, tags }
     Result is cached for 7 days.
     """
-    content_hash = _md5(content)
+    content_hash = _sha256(content)
     cache_key = f"ai_response:{content_hash}"
 
     redis = await get_redis()
@@ -53,6 +67,8 @@ async def get_ai_enrichment(content: str) -> dict:
 
     logger.info("AI cache MISS for hash %s — calling Groq", content_hash)
 
+    sanitized_content = _sanitize_user_content(content[:4000])
+
     prompt = f"""Analyze the following note content and return a JSON object with exactly two fields:
 - "summary": a concise 1-3 sentence summary of the note
 - "tags": an array of 3-7 relevant keyword tags (single words or short phrases, lowercase)
@@ -60,7 +76,7 @@ async def get_ai_enrichment(content: str) -> dict:
 Respond with ONLY valid JSON, no markdown, no explanation.
 
 Note content:
-{content[:4000]}"""
+{sanitized_content}"""
 
     try:
         response = await client.chat.completions.create(
@@ -96,8 +112,8 @@ async def get_embedding(text: str) -> list[float]:
         if getattr(settings, "hf_api_key", None):
             headers["Authorization"] = f"Bearer {settings.hf_api_key}"
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
                 api_url,
                 headers=headers,
                 json={"inputs": text[:8000]},
@@ -131,10 +147,13 @@ async def ask_question(content: str, question: str, chat_history: Optional[list[
     """
     Send note content + question to Groq and return the answer.
     """
+    sanitized_content = _sanitize_user_content(content[:6000])
+    sanitized_question = _sanitize_user_content(question[:2000])
+
     system_prompt = f"""You are a helpful assistant. The user has a note with the following content:
 
 ---
-{content[:6000]}
+{sanitized_content}
 ---
 
 Answer the user's questions based on the note content. Be concise and accurate. If the answer cannot be found in the note, say so."""
@@ -146,9 +165,9 @@ Answer the user's questions based on the note content. Be concise and accurate. 
             role = msg.get("role")
             msg_content = msg.get("content")
             if role in ("user", "assistant") and msg_content:
-                messages.append({"role": role, "content": msg_content})
+                messages.append({"role": role, "content": _sanitize_user_content(str(msg_content)[:2000])})
 
-    messages.append({"role": "user", "content": question})
+    messages.append({"role": "user", "content": sanitized_question})
 
     try:
         response = await client.chat.completions.create(
@@ -179,6 +198,8 @@ async def summarize_note_with_ai(
         "actions": "a checklist of actionable tasks/to-dos extracted from the note (each starting with '- [ ]')"
     }.get(format, "a concise 2-3 sentence paragraph")
 
+    sanitized_content = _sanitize_user_content(content[:4000])
+
     prompt = f"""You are an advanced AI note-assistant. 
 Current date/time context: {current_time_str}
 
@@ -208,7 +229,7 @@ JSON Schema:
 }}
 
 Note content:
-{content[:4000]}"""
+{sanitized_content}"""
 
     try:
         response = await client.chat.completions.create(

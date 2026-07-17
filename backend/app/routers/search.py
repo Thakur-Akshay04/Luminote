@@ -15,12 +15,31 @@ from app.services.auth_service import decode_token
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+# Maximum allowed query length to prevent abuse
+MAX_QUERY_LENGTH = 512
+
 
 async def get_current_user(authorization: str = Header(...)) -> str:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
     token = authorization.split(" ", 1)[1]
     return await decode_token(token)
+
+
+def _validate_embedding_vector(embedding: list[float]) -> str:
+    """
+    Build a safe embedding string for pgvector by validating each value is a finite number.
+    Prevents injection through malformed embedding values.
+    """
+    validated = []
+    for v in embedding:
+        if not isinstance(v, (int, float)):
+            raise ValueError(f"Embedding contains non-numeric value: {type(v)}")
+        fv = float(v)
+        if not (-1e10 < fv < 1e10):
+            raise ValueError(f"Embedding value out of safe range: {fv}")
+        validated.append(str(fv))
+    return "[" + ",".join(validated) + "]"
 
 
 @router.post("", response_model=SearchResponse)
@@ -33,7 +52,15 @@ async def semantic_search(
     if not body.query or not re.search(r"\w", body.query):
         return SearchResponse(results=[], cached=False)
 
-    query_hash = hashlib.md5(f"{user_id}:{body.query}".encode()).hexdigest()
+    # Enforce maximum query length to prevent abuse
+    if len(body.query) > MAX_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Query too long. Maximum length is {MAX_QUERY_LENGTH} characters."
+        )
+
+    # Use SHA-256 instead of MD5 for cache key hashing (cryptographically secure)
+    query_hash = hashlib.sha256(f"{user_id}:{body.query}".encode()).hexdigest()
     cache_key = f"search:{query_hash}"
 
     redis = await get_redis()
@@ -48,8 +75,16 @@ async def semantic_search(
     if not query_embedding:
         return SearchResponse(results=[], cached=False)
 
+    # Validate and build safe embedding string for pgvector
+    try:
+        embedding_str = _validate_embedding_vector(query_embedding)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid embedding vector: {e}"
+        )
+
     # pgvector + Full-text search hybrid search
-    embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
     stmt = text(
         """
         WITH scored_notes AS (
