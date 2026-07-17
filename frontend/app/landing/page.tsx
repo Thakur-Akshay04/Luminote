@@ -225,13 +225,8 @@ function SparkleMountainBackground() {
       const valsNeeded = totalCount * 10;
       const randomValues = new Uint32Array(valsNeeded);
 
-      if (typeof window !== "undefined" && window.crypto) {
-        window.crypto.getRandomValues(randomValues);
-      } else {
-        for (let i = 0; i < valsNeeded; i++) {
-          randomValues[i] = Math.floor(Math.random() * 4294967296);
-        }
-      }
+      // This runs inside useEffect (client-only), so window.crypto is always available
+      window.crypto.getRandomValues(randomValues);
 
       let randIdx = 0;
       const nextRandom = (): number => {
