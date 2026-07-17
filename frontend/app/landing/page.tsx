@@ -212,6 +212,15 @@ function SparkleMountainBackground() {
       }
     };
 
+    const secureRandom = (): number => {
+      if (typeof window !== "undefined" && window.crypto) {
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        return array[0] / 4294967296; // 2^32
+      }
+      return Math.random();
+    };
+
     const generateParticles = (canvasWidth: number, canvasHeight: number) => {
       const list: SparkleParticle[][] = [];
 
@@ -220,35 +229,35 @@ function SparkleMountainBackground() {
         const conf = configs[l];
 
         for (let i = 0; i < conf.count; i++) {
-          const x = Math.random() * canvasWidth;
+          const x = secureRandom() * canvasWidth;
 
           let y = 0;
           let depthOffset = 0;
 
           if (conf.isAmbient) {
-            y = Math.random() * canvasHeight;
+            y = secureRandom() * canvasHeight;
             depthOffset = 0;
           } else if (conf.isTopOnly) {
             // Concentrated density in the top areas of the screen using exponential bias
             const maxTopHeight = canvasHeight * 0.48;
-            y = Math.pow(Math.random(), 1.4) * maxTopHeight;
+            y = Math.pow(secureRandom(), 1.4) * maxTopHeight;
             depthOffset = 0;
           } else {
             const mountainY = getMountainCurve(x, l, canvasHeight);
             y = mountainY;
             const maxDepth = canvasHeight - mountainY;
-            depthOffset = Math.random() * maxDepth;
+            depthOffset = secureRandom() * maxDepth;
           }
 
           // Back/ambient/top sparkles are tiny, front are slightly larger
           const baseSize = (conf.isAmbient || conf.isTopOnly) ? 0.6 : l === 0 ? 0.9 : l === 1 ? 1.4 : 1.9;
-          const size = baseSize + Math.random() * 0.8;
+          const size = baseSize + secureRandom() * 0.8;
 
-          const colorBase = conf.colors[Math.floor(Math.random() * conf.colors.length)];
+          const colorBase = conf.colors[Math.floor(secureRandom() * conf.colors.length)];
           const isSlow = conf.isAmbient || conf.isTopOnly;
-          const twinkleSpeed = (isSlow ? 0.004 : 0.007) + Math.random() * 0.012;
-          const phase = Math.random() * Math.PI * 2;
-          const driftX = (Math.random() - 0.5) * (isSlow ? 0.02 : 0.04);
+          const twinkleSpeed = (isSlow ? 0.004 : 0.007) + secureRandom() * 0.012;
+          const phase = secureRandom() * Math.PI * 2;
+          const driftX = (secureRandom() - 0.5) * (isSlow ? 0.02 : 0.04);
 
           layerParticles.push({
             x,
@@ -256,8 +265,8 @@ function SparkleMountainBackground() {
             depthOffset,
             size,
             color: colorBase,
-            alpha: Math.random() * 0.5 + 0.1,
-            targetAlpha: Math.random() * (isSlow ? 0.55 : 0.7) + 0.2,
+            alpha: secureRandom() * 0.5 + 0.1,
+            targetAlpha: secureRandom() * (isSlow ? 0.55 : 0.7) + 0.2,
             twinkleSpeed,
             phase,
             driftX,

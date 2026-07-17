@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { clearAuth, getUser } from "@/lib/auth";
@@ -53,6 +53,81 @@ function NavbarContent() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
+
+  const navRef = useRef<HTMLDivElement>(null);
+  const showcaseRef = useRef<HTMLAnchorElement>(null);
+  const featuresRef = useRef<HTMLAnchorElement>(null);
+  const securityRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    if (user) return;
+
+    const sections = ["showcase", "features", "security"];
+    const observerOptions = {
+      root: null,
+      rootMargin: "-40% 0px -50% 0px",
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    sections.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    const handleScroll = () => {
+      if (window.scrollY < 100) {
+        setActiveSection(null);
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!activeSection) {
+      setPillStyle((prev) => ({ ...prev, opacity: 0 }));
+      return;
+    }
+
+    let activeRef: React.RefObject<HTMLAnchorElement | null> | null = null;
+    if (activeSection === "showcase") activeRef = showcaseRef;
+    if (activeSection === "features") activeRef = featuresRef;
+    if (activeSection === "security") activeRef = securityRef;
+
+    if (activeRef?.current && navRef.current) {
+      const activeEl = activeRef.current;
+      const navEl = navRef.current;
+      
+      const activeRect = activeEl.getBoundingClientRect();
+      const navRect = navEl.getBoundingClientRect();
+      
+      const left = activeRect.left - navRect.left;
+      const width = activeRect.width;
+
+      setPillStyle({
+        left,
+        width,
+        opacity: 1
+      });
+    }
+  }, [activeSection, scrolled]);
 
   useEffect(() => {
     if (user) {
@@ -139,22 +214,46 @@ function NavbarContent() {
           </Link>
 
           {/* Landing Navigation Links */}
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-2 relative" ref={navRef}>
+            {/* Sliding highlight pill */}
+            <div 
+              className="absolute bg-white/[0.06] border border-white/[0.05] rounded-full transition-all duration-300 ease-out pointer-events-none"
+              style={{
+                left: `${pillStyle.left}px`,
+                width: `${pillStyle.width}px`,
+                opacity: pillStyle.opacity,
+                height: "30px",
+                top: "50%",
+                transform: "translateY(-50%)"
+              }}
+            />
             <a 
               href="#showcase" 
-              className="text-[13px] font-medium text-neutral-400 hover:text-white px-4 py-1.5 rounded-full hover:bg-white/[0.06] transition-all duration-200"
+              ref={showcaseRef}
+              className={clsx(
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
+                activeSection === "showcase" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+              )}
             >
               Showcase
             </a>
             <a 
               href="#features" 
-              className="text-[13px] font-medium text-neutral-400 hover:text-white px-4 py-1.5 rounded-full hover:bg-white/[0.06] transition-all duration-200"
+              ref={featuresRef}
+              className={clsx(
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
+                activeSection === "features" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+              )}
             >
               Features
             </a>
             <a 
               href="#security" 
-              className="text-[13px] font-medium text-neutral-400 hover:text-white px-4 py-1.5 rounded-full hover:bg-white/[0.06] transition-all duration-200"
+              ref={securityRef}
+              className={clsx(
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
+                activeSection === "security" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+              )}
             >
               Security
             </a>
