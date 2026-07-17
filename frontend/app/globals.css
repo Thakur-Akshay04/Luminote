@@ -7,6 +7,21 @@
 @layer base {
   :root {
     color-scheme: dark;
+
+    /* ── Motion tokens (Alukaze spec) ─────────────────────────────── */
+    --motion-instant:  100ms;
+    --motion-fast:     300ms;
+    --motion-normal:   500ms;
+    --motion-slow:     1000ms;
+    --motion-slower:   1500ms;
+
+    /* ── Radius tokens ────────────────────────────────────────────── */
+    --radius-xs: 100px; /* capsule / pill */
+
+    /* ── Focus ring ───────────────────────────────────────────────── */
+    --focus-ring-color:  rgba(139, 92, 246, 0.75);
+    --focus-ring-offset: 2px;
+    --focus-ring-width:  2px;
   }
 
   * {
@@ -41,6 +56,31 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-neutral-700;
   }
+
+  /* ── Global focus-visible ring (à la WCAG 2.2 AA) ───────────────────── */
+  /* Applies a consistent, high-contrast ring to ALL keyboard-focused
+     interactive elements. Must not be removed or overridden globally.    */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+    border-radius: 4px;
+    transition: outline-color var(--motion-instant) ease;
+  }
+
+  /* Suppress mouse-click outlines while keeping keyboard outlines intact */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Buttons & links: tighten border-radius to match element shape */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    border-radius: 8px;
+  }
+
+  a:focus-visible {
+    border-radius: 3px;
+  }
 }
 
 @layer components {
@@ -62,23 +102,38 @@
   }
 
   /* Button variants - solid high-contrast white & black in dark mode */
+  /* All states: default | hover | focus-visible | active | disabled | loading */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xs
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full
            bg-text-primary text-text-inverse font-semibold text-sm
-           transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+           select-none cursor-pointer relative overflow-hidden
+           /* transition uses motion-fast token */
+           transition-all ease-[cubic-bezier(0.16,1,0.3,1)]
+           [transition-duration:var(--motion-fast)]
+           /* hover */
            hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-neutral-100
-           hover:shadow-[0_0_20px_rgba(219,39,119,0.3)]
+           hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]
+           /* active — instant snap back per motion-instant token */
            active:scale-[0.97] active:translate-y-0
-           disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none;
+           active:[transition-duration:var(--motion-instant)]
+           /* disabled */
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none
+           disabled:translate-y-0 disabled:scale-100 disabled:shadow-none;
   }
+  /* focus-visible handled by global :focus-visible rule */
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xs
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full
            bg-transparent border border-border-muted text-text-secondary font-semibold text-sm
-           transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+           select-none cursor-pointer relative
+           transition-all ease-[cubic-bezier(0.16,1,0.3,1)]
+           [transition-duration:var(--motion-fast)]
            hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-surface-strong hover:text-text-primary
-           hover:border-brand-500/30 hover:shadow-[0_0_15px_rgba(219,39,119,0.15)]
-           active:scale-[0.97] active:translate-y-0;
+           hover:border-brand-500/30 hover:shadow-[0_0_15px_rgba(139,92,246,0.15)]
+           active:scale-[0.97] active:translate-y-0
+           active:[transition-duration:var(--motion-instant)]
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none
+           disabled:translate-y-0 disabled:scale-100;
   }
 
   .btn-danger {
@@ -90,9 +145,34 @@
            active:scale-[0.97] active:translate-y-0;
   }
 
+  /* Loading state spinner — add class="btn-loading" alongside btn-primary/secondary */
+  .btn-loading {
+    @apply pointer-events-none opacity-70;
+  }
+  .btn-loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: btn-shimmer var(--motion-slower) linear infinite;
+  }
+
+  /* Error state — add class="btn-error" for destructive confirmation */
+  .btn-error {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full
+           bg-transparent border border-red-900/40 text-red-400 font-semibold text-sm
+           transition-all ease-[cubic-bezier(0.16,1,0.3,1)]
+           [transition-duration:var(--motion-fast)]
+           hover:bg-red-950/20 hover:border-red-500/50
+           hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]
+           active:scale-[0.97] active:[transition-duration:var(--motion-instant)];
+  }
+
   /* Tag pill */
   .tag {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-xs text-[10px] font-semibold
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold
            bg-surface-strong text-text-secondary border border-border-muted;
   }
 
@@ -131,7 +211,13 @@
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-brand-300 via-accent-pink to-accent-violet bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-brand-300 via-accent-pink to-accent-cyan bg-clip-text text-transparent;
+  }
+
+  .text-gradient-animated {
+    @apply text-gradient;
+    background-size: 200% auto;
+    animation: gradient-flow 8s ease infinite;
   }
 
   .border-gradient {
@@ -300,4 +386,151 @@
     display: none !important;
     visibility: hidden !important;
   }
+}
+
+/* Custom 3D Animations & Transitions */
+@keyframes bookOpenCenter {
+  0% {
+    transform: perspective(2000px) rotateX(8deg) rotateY(-18deg) scale(0.93) translateZ(-40px);
+    opacity: 0;
+    box-shadow: -30px 30px 60px rgba(0, 0, 0, 0.95);
+  }
+  50% {
+    transform: perspective(2000px) rotateX(4deg) rotateY(-8deg) scale(0.97) translateZ(-10px);
+    opacity: 0.7;
+    box-shadow: -15px 15px 40px rgba(0, 0, 0, 0.75);
+  }
+  100% {
+    transform: perspective(2000px) rotateX(0deg) rotateY(0deg) scale(1) translateZ(0);
+    opacity: 1;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.animate-book-open {
+  animation: bookOpenCenter 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-style: preserve-3d;
+}
+
+/* Scroll-reveal utility classes */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(20px) perspective(1500px) rotateY(-4deg);
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.scroll-reveal-active {
+  opacity: 1;
+  transform: translateY(0) perspective(1500px) rotateY(0deg);
+}
+
+/* Gate Opening 3D Scroll Reveal Animations */
+.reveal-gate-left {
+  opacity: 0;
+  transform: perspective(1500px) rotateY(-25deg) translateX(-30px) translateZ(-65px) scale(0.95);
+  transform-origin: left center;
+  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-gate-left-active {
+  opacity: 1;
+  transform: perspective(1500px) rotateY(0deg) translateX(0) translateZ(0) scale(1);
+}
+
+.reveal-gate-right {
+  opacity: 0;
+  transform: perspective(1500px) rotateY(25deg) translateX(30px) translateZ(-65px) scale(0.95);
+  transform-origin: right center;
+  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-gate-right-active {
+  opacity: 1;
+  transform: perspective(1500px) rotateY(0deg) translateX(0) translateZ(0) scale(1);
+}
+
+/* Enhanced smooth transitions for interactive elements */
+/* Uses motion-fast token (300ms) for hover, motion-instant (100ms) for active */
+.btn-smooth-hover {
+  transition: all var(--motion-fast) cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-smooth-hover:active {
+  transition-duration: var(--motion-instant);
+}
+
+/* ── Hover lift utility ───────────────────────────────────────────────── */
+/* Apply to any card/panel that should subtly lift on hover */
+.hover-lift {
+  transition: transform var(--motion-fast) cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow var(--motion-fast) cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.hover-lift:active {
+  transform: translateY(0);
+  transition-duration: var(--motion-instant);
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ping-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+    box-shadow: 0 0 12px 4px rgba(168, 85, 247, 0.7);
+  }
+}
+
+.animate-ping-glow {
+  animation: ping-glow 2s infinite ease-in-out;
+}
+
+/* ── Loading shimmer for .btn-loading state ───────────────────────────── */
+@keyframes btn-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Fade-in-up: used by FadeUp component on landing page ─────────────── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Slow pulse: generic loading indicator ────────────────────────────── */
+@keyframes slow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+.animate-slow-pulse {
+  animation: slow-pulse var(--motion-slow) ease-in-out infinite;
 }
