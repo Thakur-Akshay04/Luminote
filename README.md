@@ -1,4 +1,4 @@
-# Luminote — Smart Collaborative Workspace
+# Luminote
 
 Luminote is a high-fidelity, collaborative markdown workspace that connects your notes, tasks, drawings, and audio recordings using a fullscreen, interactive thought map powered by customized spring physics and advanced AI summarization, semantic search, and document Q&A.
 
