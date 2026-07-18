@@ -19,6 +19,16 @@ interface Node {
   glowColor: string;
 }
 
+// Cryptographically secure random float generator [0, 1) to pass security audits
+const getRandom = (): number => {
+  if (typeof window !== "undefined" && window.crypto) {
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return array[0] / 4294967296;
+  }
+  return 0.5;
+};
+
 export default function InteractiveThoughtMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -211,8 +221,8 @@ export default function InteractiveThoughtMap() {
             nvx += (targetCenter.x - nx) * 0.03;
             nvy += (targetCenter.y - ny) * 0.03;
           } else {
-            nvx += (Math.random() - 0.5) * 0.12;
-            nvy += (Math.random() - 0.5) * 0.12;
+            nvx += (getRandom() - 0.5) * 0.12;
+            nvy += (getRandom() - 0.5) * 0.12;
 
             const core = prevNodes.find((n) => n.id === "core") || targetCenter;
             const dxCore = core.x - nx;

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { setAuth } from "@/lib/auth";
-import { Notebook, Mail, Lock, Loader2, AlertCircle, CheckCircle, ArrowLeft, User } from "lucide-react";
+import { Notebook, Mail, Lock, Loader2, AlertCircle, CheckCircle, ArrowLeft, User, Eye, EyeOff } from "lucide-react";
 import SparkleMountainBackground from "@/components/SparkleMountainBackground";
 import InteractiveThoughtMap from "@/components/InteractiveThoughtMap";
 
@@ -14,7 +14,9 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [confirm, setConfirm] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -85,7 +87,7 @@ export default function RegisterPage() {
           {/* Heading */}
           <div className="space-y-1">
             <h1 className="text-4xl font-extrabold text-white tracking-tight leading-none">
-              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace</span>.
+              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace.</span>
             </h1>
           </div>
 
@@ -164,7 +166,7 @@ export default function RegisterPage() {
                   id="email"
                   type="email"
                   className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email..."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -179,14 +181,21 @@ export default function RegisterPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
                 <input
                   id="password"
-                  type="password"
-                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  type={showPassword ? "text" : "password"}
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-12 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
                   placeholder="Min. 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="new-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
               {/* Strength indicator */}
               {passwordStrength && (
@@ -213,7 +222,7 @@ export default function RegisterPage() {
               <label htmlFor="confirm" className="text-sm font-semibold text-neutral-300">Confirm password</label>
               <div className="relative">
                 {confirm && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
+                  <div className="absolute right-12 top-1/2 -translate-y-1/2 z-10">
                     {confirm === password ? (
                       <CheckCircle className="w-5 h-5 text-emerald-500" />
                     ) : (
@@ -223,14 +232,21 @@ export default function RegisterPage() {
                 )}
                 <input
                   id="confirm"
-                  type="password"
-                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-5 pr-12 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  type={showConfirm ? "text" : "password"}
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-5 pr-20 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
                   placeholder="Repeat password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   autoComplete="new-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors focus:outline-none"
+                >
+                  {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 

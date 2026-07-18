@@ -70,7 +70,7 @@ export default function LoginPage() {
           {/* Heading */}
           <div className="space-y-1">
             <h1 className="text-4xl font-extrabold text-white tracking-tight leading-none">
-              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace</span>.
+              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace.</span>
             </h1>
           </div>
 
@@ -133,7 +133,7 @@ export default function LoginPage() {
                   id="email"
                   type="email"
                   className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email..."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -150,7 +150,7 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-12 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
-                  placeholder="••••••••"
+                  placeholder="Enter your password..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
