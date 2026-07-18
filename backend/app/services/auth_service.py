@@ -50,12 +50,12 @@ async def decode_token(token: str) -> str:
     return user_id
 
 
-async def register_user(email: str, password: str, db: AsyncSession) -> User:
+async def register_user(email: str, password: str, name: str | None, db: AsyncSession) -> User:
     result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    user = User(id=uuid.uuid4(), email=email, password_hash=hash_password(password))
+    user = User(id=uuid.uuid4(), email=email, name=name, password_hash=hash_password(password))
     db.add(user)
     await db.commit()
     await db.refresh(user)

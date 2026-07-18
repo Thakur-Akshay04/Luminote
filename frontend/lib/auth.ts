@@ -6,6 +6,7 @@ const USER_KEY = "luminote_user";
 export interface StoredUser {
   user_id: string;
   email: string;
+  name?: string;
 }
 
 export function setAuth(token: string, user: StoredUser): void {

@@ -5,10 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { setAuth } from "@/lib/auth";
-import { Notebook, Mail, Lock, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Notebook, Mail, Lock, Loader2, AlertCircle, CheckCircle, ArrowLeft, User } from "lucide-react";
+import SparkleMountainBackground from "@/components/SparkleMountainBackground";
+import InteractiveThoughtMap from "@/components/InteractiveThoughtMap";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -28,10 +31,11 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await authApi.register(email, password);
+      const res = await authApi.register(email, password, name);
       setAuth(res.data.access_token, {
         user_id: res.data.user_id,
         email: res.data.email,
+        name: res.data.name,
       });
       router.push("/notes");
     } catch (err: unknown) {
@@ -46,124 +50,208 @@ export default function RegisterPage() {
 
   const passwordStrength =
     password.length === 0 ? null :
-    password.length < 8 ? "weak" :
-    password.length < 12 ? "medium" : "strong";
+      password.length < 8 ? "weak" :
+        password.length < 12 ? "medium" : "strong";
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="relative w-full max-w-sm animate-slide-up">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-4 shadow-sm">
-            <Notebook className="w-6 h-6 text-black fill-black/10" />
+    <div className="min-h-screen bg-[#030303] text-zinc-300 relative flex overflow-hidden font-sans">
+      {/* Animated pixel sparkle mountain background */}
+      <SparkleMountainBackground />
+
+      {/* Interactive Thought Node Graph Map (Full Bleed Background) */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        <InteractiveThoughtMap />
+      </div>
+
+      {/* Go Back button */}
+      <Link
+        href="/landing"
+        className="absolute top-6 left-6 z-30 flex items-center gap-2 text-xs font-semibold text-neutral-400 hover:text-white border border-white/[0.08] hover:border-white/20 bg-[#0c0c0e]/60 hover:bg-[#0c0c0e] px-3.5 py-2 rounded-full backdrop-blur-md transition-all duration-300 group shadow-lg"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+        Go Back
+      </Link>
+
+      {/* Left Column Showcase Overlay (Hidden on Mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 min-h-screen relative z-10 flex-col justify-between p-12 pointer-events-none">
+        {/* Floating Top-Left Header */}
+        <div className="max-w-sm mt-6 space-y-5 pointer-events-auto select-none">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0c0c0e]/80 border border-white/[0.08] backdrop-blur-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-neutral-400">Luminote Workspace</span>
           </div>
-          <h1 className="text-2xl font-bold text-gradient">Create account</h1>
-          <p className="text-gray-500 text-sm mt-1">Start taking smarter notes today</p>
+
+          {/* Heading */}
+          <div className="space-y-1">
+            <h1 className="text-4xl font-extrabold text-white tracking-tight leading-none">
+              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace</span>.
+            </h1>
+          </div>
+
+          {/* Features Checklist */}
+          <div className="space-y-2.5 pt-3 border-t border-white/[0.04] max-w-[280px]">
+            <div className="flex items-center gap-2.5 text-[11px] text-neutral-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+              <span>Real-time voice recordings</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-[11px] text-neutral-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400 shadow-[0_0_8px_rgba(219,39,119,0.6)]" />
+              <span>Freehand canvas sketchpad</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-[11px] text-neutral-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+              <span>Sprint checklists & schedules</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-[11px] text-neutral-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 shadow-[0_0_8px_rgba(217,70,239,0.6)]" />
+              <span>Interactive AI Agents</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="glass p-6 flex flex-col gap-4">
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
-            </div>
-          )}
+      {/* Right Column - Auth Form Card */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 relative z-10 min-h-screen">
+        {/* Glow block behind form */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-brand-500/5 blur-[100px] pointer-events-none" />
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-xs font-medium text-gray-400">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-              <input
-                id="email"
-                type="email"
-                className="input pl-10"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
+        <div className="relative w-full max-w-[400px] animate-slide-up">
+          {/* Logo (only visible on mobile/tablet) */}
+          <div className="flex flex-col items-center mb-8 lg:hidden">
+            <div className="w-12 h-12 rounded-2xl bg-neutral-900/60 border border-white/[0.08] flex items-center justify-center mb-4 shadow-xl text-white">
+              <Notebook className="w-6 h-6 fill-white/10" />
             </div>
+            <h1 className="text-2xl font-bold text-gradient">Create account</h1>
+            <p className="text-neutral-400 text-sm mt-1">Start taking smarter notes today</p>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-xs font-medium text-gray-400">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-              <input
-                id="password"
-                type="password"
-                className="input pl-10"
-                placeholder="Min. 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-              />
-            </div>
-            {/* Strength indicator */}
-            {passwordStrength && (
-              <div className="flex gap-1 mt-1">
-                {["weak", "medium", "strong"].map((level, i) => {
-                  const active =
-                    passwordStrength === "weak" ? i === 0 :
-                    passwordStrength === "medium" ? i <= 1 : true;
-                  const color =
-                    passwordStrength === "weak" ? "bg-red-500" :
-                    passwordStrength === "medium" ? "bg-amber-400" : "bg-emerald-500";
-                  return (
-                    <div
-                      key={level}
-                      className={`h-1 flex-1 rounded-full transition-all ${active ? color : "bg-surface-600"}`}
-                    />
-                  );
-                })}
+          {/* Desktop Heading (hidden on mobile) */}
+          <div className="hidden lg:block mb-8">
+            <h1 className="text-4xl font-extrabold text-white tracking-tight">Create account</h1>
+            <p className="text-neutral-400 text-base mt-2">Start taking smarter notes today</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="bg-[#0c0c0e]/10 border border-white/[0.05] backdrop-blur-md px-8 py-10 rounded-2xl shadow-2xl flex flex-col gap-6">
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {error}
               </div>
             )}
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="confirm" className="text-xs font-medium text-gray-400">Confirm password</label>
-            <div className="relative">
-              {confirm && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {confirm === password ? (
-                    <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-400" />
-                  )}
+            <div className="flex flex-col gap-2">
+              <label htmlFor="name" className="text-sm font-semibold text-neutral-300">Name</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                <input
+                  id="name"
+                  type="text"
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="email" className="text-sm font-semibold text-neutral-300">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                <input
+                  id="email"
+                  type="email"
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="password" className="text-sm font-semibold text-neutral-300">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                <input
+                  id="password"
+                  type="password"
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-12 pr-5 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  placeholder="Min. 8 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+              {/* Strength indicator */}
+              {passwordStrength && (
+                <div className="flex gap-1 mt-1">
+                  {["weak", "medium", "strong"].map((level, i) => {
+                    const active =
+                      passwordStrength === "weak" ? i === 0 :
+                        passwordStrength === "medium" ? i <= 1 : true;
+                    const color =
+                      passwordStrength === "weak" ? "bg-red-500" :
+                        passwordStrength === "medium" ? "bg-amber-400" : "bg-emerald-500";
+                    return (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-all ${active ? color : "bg-neutral-800"}`}
+                      />
+                    );
+                  })}
                 </div>
               )}
-              <input
-                id="confirm"
-                type="password"
-                className="input"
-                placeholder="Repeat password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                autoComplete="new-password"
-              />
             </div>
-          </div>
 
-          <button
-            id="register-btn"
-            type="submit"
-            className="btn-primary mt-2"
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {loading ? "Creating account…" : "Create account"}
-          </button>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="confirm" className="text-sm font-semibold text-neutral-300">Confirm password</label>
+              <div className="relative">
+                {confirm && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
+                    {confirm === password ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-400" />
+                    )}
+                  </div>
+                )}
+                <input
+                  id="confirm"
+                  type="password"
+                  className="w-full bg-[#121217]/60 border border-white/[0.08] rounded-xl pl-5 pr-12 py-3.5 text-white placeholder-neutral-500 text-base focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-all duration-300"
+                  placeholder="Repeat password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
 
-          <p className="text-center text-sm text-gray-500">
-            Already have an account?{" "}
-            <Link href="/login" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
-              Sign in
-            </Link>
-          </p>
-        </form>
+            <button
+              id="register-btn"
+              type="submit"
+              className="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] active:translate-y-0 active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 mt-2 text-base"
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              {loading ? "Creating account…" : "Create account"}
+            </button>
+
+            <p className="text-center text-base text-neutral-400 mt-3">
+              Already have an account?{" "}
+              <Link href="/login" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   );

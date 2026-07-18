@@ -67,6 +67,7 @@ export interface AuthResponse {
   token_type: string;
   user_id: string;
   email: string;
+  name?: string;
 }
 
 export interface Alert {

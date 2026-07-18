@@ -20,13 +20,14 @@ async def get_current_user(authorization: str = Header(...)) -> str:
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    user = await register_user(body.email, body.password, db)
+    user = await register_user(body.email, body.password, body.name, db)
     # Auto-login after register
     _, token = await login_user(body.email, body.password, db)
     return TokenResponse(
         access_token=token,
         user_id=str(user.id),
         email=user.email,
+        name=user.name,
     )
 
 
