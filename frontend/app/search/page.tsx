@@ -45,20 +45,20 @@ export default function SearchPage() {
 
   const searchTips = [
     {
-      label: "Conceptual",
-      example: "notes about machine learning optimization",
+      label: "Research & Concepts",
+      example: "key insights from my books and reading list",
       icon: Brain,
       color: "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40 hover:bg-purple-500/10",
     },
     {
-      label: "Thematic",
-      example: "meeting notes with action items",
+      label: "Meetings & Tasks",
+      example: "weekly project meeting notes with tasks",
       icon: Zap,
       color: "text-amber-400 border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:bg-amber-500/10",
     },
     {
-      label: "Descriptive",
-      example: "ideas for my startup product",
+      label: "Sketches & Creative",
+      example: "UI wireframes and sketch ideas for the landing page",
       icon: Sparkles,
       color: "text-pink-400 border-pink-500/20 bg-pink-500/5 hover:border-pink-500/40 hover:bg-pink-500/10",
     },
@@ -67,14 +67,14 @@ export default function SearchPage() {
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-16 min-h-[calc(100vh-1px)] flex flex-col justify-center">
       {/* Premium Ambient Background Blur Circle */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-brand-500/10 rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-gradient-to-r from-emerald-500/5 via-cyan-500/5 to-indigo-500/5 rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
 
       <div className="w-full">
         {/* Header */}
         <div className="text-center mb-12 animate-fade-in flex flex-col items-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-gradient tracking-tight mb-3">Find your notes</h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-amber-200 via-orange-400 to-pink-600 bg-clip-text text-transparent tracking-tight mb-3">Find your notes</h1>
           <p className="text-gray-400 text-sm max-w-md leading-relaxed">
-            Search by meaning, context, or concepts instead of just exact matching keywords — powered by pgvector.
+            Search by meaning, context, or concepts instead of just exact matching keywords.
           </p>
         </div>
 
@@ -137,12 +137,6 @@ export default function SearchPage() {
                   ? "No results found"
                   : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
               </h2>
-              {cached && (
-                <div className="flex items-center gap-1.5 text-xs text-accent-cyan bg-accent-cyan/10 border border-accent-cyan/20 px-3 py-1 rounded-full font-semibold shadow-sm animate-pulse">
-                  <Zap className="w-3.5 h-3.5" />
-                  Served from Cache
-                </div>
-              )}
             </div>
 
             {results.length > 0 ? (

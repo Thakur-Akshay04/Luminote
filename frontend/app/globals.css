@@ -211,13 +211,13 @@
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-brand-300 via-accent-pink to-accent-cyan bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-amber-200 via-orange-400 to-pink-500 bg-clip-text text-transparent;
+    background-size: 200% auto;
+    animation: gradient-flow 12s ease infinite;
   }
 
   .text-gradient-animated {
     @apply text-gradient;
-    background-size: 200% auto;
-    animation: gradient-flow 8s ease infinite;
   }
 
   .border-gradient {

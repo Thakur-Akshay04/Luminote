@@ -60,10 +60,6 @@ export default function SearchResult({ item, rank }: SearchResultProps) {
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${theme.bg}`}>
               {theme.label}
             </span>
-            <div className="flex items-center gap-1 bg-neutral-900/55 border border-white/[0.04] px-2.5 py-1 rounded-lg">
-              <Zap className={`w-3.5 h-3.5 ${theme.text}`} />
-              <span className={`text-xs font-bold ${theme.text}`}>{similarityPct}%</span>
-            </div>
           </div>
         </div>
 

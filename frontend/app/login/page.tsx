@@ -26,6 +26,9 @@ export default function LoginPage() {
       setAuth(res.data.access_token, {
         user_id: res.data.user_id,
         email: res.data.email,
+        name: res.data.name,
+        avatar_url: res.data.avatar_url,
+        display_name: res.data.display_name,
       });
       router.push("/notes");
     } catch (err: unknown) {
@@ -70,7 +73,7 @@ export default function LoginPage() {
           {/* Heading */}
           <div className="space-y-1">
             <h1 className="text-4xl font-extrabold text-white tracking-tight leading-none">
-              Create your <span className="bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace.</span>
+              Create your <span className="bg-gradient-to-r from-amber-200 via-orange-400 to-pink-500 bg-clip-text text-transparent bg-[length:200%_auto] bg-left hover:bg-right transition-all duration-700 cursor-pointer pointer-events-auto">workspace.</span>
             </h1>
           </div>
 
