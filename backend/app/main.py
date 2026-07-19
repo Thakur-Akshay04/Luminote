@@ -14,8 +14,9 @@ from app.database import AsyncSessionLocal, init_db
 from app.models.alert import Alert
 from app.models.note import Note
 from app.redis_client import close_redis
-from app.routers import alerts, auth, notes, search
+from app.routers import alerts, auth, notes, search, users
 from app.routers import drawing, audio, checklist, tasks
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -94,6 +95,7 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(media_base, "drawings"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(media_base, "avatars"), exist_ok=True)
 
     # Setup connection manager and start background alert checker
     app.state.alert_manager = ConnectionManager()
@@ -120,6 +122,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(search.router)
 app.include_router(alerts.router)

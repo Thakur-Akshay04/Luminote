@@ -18,6 +18,8 @@ class TokenResponse(BaseModel):
     user_id: str
     email: str
     name: str | None = None
+    avatar_url: str | None = None
+    display_name: str | None = None
 
 
 class UpdatePasswordRequest(BaseModel):

@@ -64,20 +64,20 @@ const config: Config = {
           primary: "#f4f4f5",
           secondary: "#a1a1aa",
           tertiary: "#71717a",
-          inverse: "#09090b",
+          inverse: "#030303",
         },
         surface: {
-          base: "#09090b",
-          raised: "#18181b",
-          strong: "#27272a",
-          900: "#18181b", // raised card/sidebar
-          800: "#09090b", // base background
-          700: "#27272a", // strong (hover states)
-          600: "#27272a", // border muted
+          base: "#030303",
+          raised: "#0c0c0e",
+          strong: "#18181b",
+          900: "#0c0c0e", // raised card/sidebar
+          800: "#030303", // base background
+          700: "#18181b", // strong (hover states)
+          600: "#16161a", // border muted
           500: "#71717a", // tertiary text
         },
         border: {
-          muted: "#27272a",
+          muted: "#16161a",
         },
         brand: {
           50:  "#f5f3ff",
@@ -102,7 +102,7 @@ const config: Config = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "hero-gradient":
-          "linear-gradient(135deg, #09090b 0%, #18181b 100%)",
+          "linear-gradient(135deg, #030303 0%, #0c0c0e 100%)",
       },
       animation: {
         "fade-in":    "fadeIn 0.4s ease-out",

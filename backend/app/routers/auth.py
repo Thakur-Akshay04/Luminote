@@ -28,6 +28,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         user_id=str(user.id),
         email=user.email,
         name=user.name,
+        avatar_url=user.avatar_url,
+        display_name=user.display_name,
     )
 
 
@@ -38,6 +40,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         access_token=token,
         user_id=str(user.id),
         email=user.email,
+        name=user.name,
+        avatar_url=user.avatar_url,
+        display_name=user.display_name,
     )
 
 

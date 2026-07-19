@@ -1,31 +1,26 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated, getUser, clearAuth } from "@/lib/auth";
 import type { StoredUser } from "@/lib/auth";
-import { notesApi, authApi } from "@/lib/api";
+import { notesApi, usersApi } from "@/lib/api";
 import {
-  User,
-  Lock,
-  Bot,
-  Database,
-  ShieldAlert,
-  Download,
-  Upload,
-  Trash2,
   Loader2,
   CheckCircle,
   AlertCircle,
   Save,
+  ShieldAlert,
+  Trash2,
+  Download,
+  Upload,
 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<StoredUser | null>(null);
-  const [activeTab, setActiveTab] = useState<"account" | "ai" | "data" | "danger">("account");
 
-  // Auth / Redirect
+  // Auth Redirect & Load User
   useEffect(() => {
     if (!isAuthenticated()) {
       router.replace("/login");
@@ -34,20 +29,11 @@ export default function SettingsPage() {
     }
   }, [router]);
 
-  // Tab 1: Account (Password Change)
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-
-  // Tab 2: AI Preferences
+  // ── Existing Settings Logic: AI settings ────────────────────────────────────
   const [aiFormat, setAiFormat] = useState<"paragraph" | "bullets" | "actions">("paragraph");
   const [aiExtractAlerts, setAiExtractAlerts] = useState(true);
   const [aiSuccess, setAiSuccess] = useState(false);
 
-  // Load AI Preferences from localStorage on load
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedFormat = localStorage.getItem("luminote_ai_format");
@@ -61,7 +47,14 @@ export default function SettingsPage() {
     }
   }, []);
 
-  // Tab 3: Backup & Restore
+  const handleSaveAiSettings = () => {
+    localStorage.setItem("luminote_ai_format", aiFormat);
+    localStorage.setItem("luminote_ai_extract_alerts", String(aiExtractAlerts));
+    setAiSuccess(true);
+    setTimeout(() => setAiSuccess(false), 2000);
+  };
+
+  // ── Existing Settings Logic: Backups ────────────────────────────────────────
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -72,51 +65,6 @@ export default function SettingsPage() {
   const [wiping, setWiping] = useState(false);
   const [wipeError, setWipeError] = useState<string | null>(null);
   const [wipeSuccess, setWipeSuccess] = useState<string | null>(null);
-
-  // Tab 4: Danger Zone
-  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Password strength logic
-  const passwordStrength =
-    newPassword.length === 0 ? null :
-    newPassword.length < 8 ? "weak" :
-    newPassword.length < 12 ? "medium" : "strong";
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setPasswordError("New passwords do not match.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setPasswordError("Password must be at least 8 characters.");
-      return;
-    }
-    setPasswordLoading(true);
-    setPasswordError(null);
-    setPasswordSuccess(null);
-    try {
-      await authApi.updatePassword(currentPassword, newPassword);
-      setPasswordSuccess("Password updated successfully.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (err: any) {
-      const message = err.response?.data?.detail || "Failed to update password. Verify current password.";
-      setPasswordError(message);
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
-
-  const handleSaveAiSettings = () => {
-    localStorage.setItem("luminote_ai_format", aiFormat);
-    localStorage.setItem("luminote_ai_extract_alerts", String(aiExtractAlerts));
-    setAiSuccess(true);
-    setTimeout(() => setAiSuccess(false), 2000);
-  };
 
   const handleExportData = async () => {
     setExporting(true);
@@ -168,7 +116,6 @@ export default function SettingsPage() {
         let count = 0;
         for (const item of notes) {
           try {
-            // Import note
             await notesApi.create({
               title: item.title || "Imported Note",
               content: item.content || "",
@@ -185,7 +132,6 @@ export default function SettingsPage() {
       } finally {
         setImporting(false);
         setImportProgress("");
-        // Clear input value
         e.target.value = "";
       }
     };
@@ -238,9 +184,15 @@ export default function SettingsPage() {
     }
   };
 
+  // ── Feature 4: Danger Zone ──────────────────────────────────────────────────
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const handleDeleteAccount = async () => {
-    if (!user || deleteConfirmInput !== user.email) {
-      setDeleteError("Confirmation email does not match your account email.");
+    if (deleteConfirmInput !== "DELETE") {
+      setDeleteError("Confirmation text must match DELETE exactly.");
       return;
     }
 
@@ -248,162 +200,38 @@ export default function SettingsPage() {
     setDeleteError(null);
 
     try {
-      await authApi.deleteAccount();
+      await usersApi.deleteMe();
       clearAuth();
-      router.push("/landing");
+      router.push("/");
     } catch (err: any) {
-      const message = err.response?.data?.detail || "Failed to delete account. Please try again.";
-      setDeleteError(message);
+      setDeleteError(err.response?.data?.detail || "Failed to delete account. Please try again.");
       setDeletingAccount(false);
     }
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-800">
+      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
       </div>
     );
   }
 
-  const tabs = [
-    { id: "account", label: "Account & Password", icon: User },
-    { id: "ai", label: "AI Settings", icon: Bot },
-    { id: "data", label: "Backup & Data", icon: Database },
-    { id: "danger", label: "Danger Zone", icon: ShieldAlert },
-  ] as const;
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 animate-slide-up">
-      <div className="mb-8">
+      <div className="mb-8 border-b border-white/[0.06] pb-5">
         <h1 className="text-3xl font-bold text-gradient">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Configure your Luminote account, preferences, and backups</p>
+        <p className="text-gray-500 text-sm mt-1">Configure your workspace preferences and backups</p>
       </div>
 
-      {/* Tabs list (horizontal top bar) */}
-      <div className="flex border-b border-white/[0.06] mb-8 overflow-x-auto gap-2">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all shrink-0
-              ${activeTab === id
-                ? "border-brand-500 text-white font-semibold"
-                : "border-transparent text-neutral-400 hover:text-neutral-200 hover:border-white/[0.06]"
-              }`}
-          >
-            <Icon className={`w-4 h-4 ${activeTab === id ? "text-brand-500" : "text-neutral-500"}`} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Panels */}
-      <div className="glass p-6">
-        
-        {/* Tab 1: Account Settings */}
-        {activeTab === "account" && (
+      <div className="flex flex-col gap-8">
+        {/* ── WORKSPACE PREFERENCES / AI SETTINGS SECTION ──────────────────── */}
+        <section className="glass p-6 flex flex-col gap-6">
+          <h2 className="text-xl font-bold text-neutral-200 border-b border-white/[0.04] pb-2">Workspace Preferences</h2>
+          
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-200">Account details</h2>
-              <div className="mt-3 p-4 rounded-xl bg-neutral-900 border border-white/[0.04]">
-                <div className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">User Email</div>
-                <div className="text-sm font-mono text-gray-200 mt-1">{user.email}</div>
-              </div>
-            </div>
-
-            <div className="h-px bg-white/[0.06]" />
-
-            <form onSubmit={handlePasswordChange} className="flex flex-col gap-4">
-              <h2 className="text-lg font-semibold text-neutral-200">Change Password</h2>
-
-              {passwordError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {passwordError}
-                </div>
-              )}
-
-              {passwordSuccess && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-                  <CheckCircle className="w-4 h-4 shrink-0" />
-                  {passwordSuccess}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-400">Current Password</label>
-                <input
-                  type="password"
-                  className="input"
-                  placeholder="Enter current password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-400">New Password</label>
-                <input
-                  type="password"
-                  className="input"
-                  placeholder="Min. 8 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-                
-                {passwordStrength && (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-gray-500">Strength:</span>
-                    <span className={`text-[10px] font-semibold uppercase tracking-tight
-                      ${passwordStrength === "weak" ? "text-red-400" : ""}
-                      ${passwordStrength === "medium" ? "text-amber-400" : ""}
-                      ${passwordStrength === "strong" ? "text-emerald-400" : ""}
-                    `}>
-                      {passwordStrength}
-                    </span>
-                    <div className="flex gap-1 flex-1 max-w-[80px] h-1 bg-neutral-900 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-300
-                        ${passwordStrength === "weak" ? "w-1/3 bg-red-400" : ""}
-                        ${passwordStrength === "medium" ? "w-2/3 bg-amber-400" : ""}
-                        ${passwordStrength === "strong" ? "w-full bg-emerald-400" : ""}
-                      `} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-gray-400">Confirm New Password</label>
-                <input
-                  type="password"
-                  className="input"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn-primary mt-2 flex items-center justify-center gap-2 self-start px-6"
-                disabled={passwordLoading}
-              >
-                {passwordLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                Change Password
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Tab 2: AI Preferences */}
-        {activeTab === "ai" && (
-          <div className="flex flex-col gap-6">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-200">AI Summary Format</h2>
+              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">AI Summary Format</h3>
               <p className="text-xs text-gray-500 mt-1">Select the default format used when generating automatic summaries.</p>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
@@ -434,7 +262,7 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between py-2">
               <div>
-                <h2 className="text-lg font-semibold text-neutral-200">Extract alerts</h2>
+                <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Extract alerts</h3>
                 <p className="text-xs text-gray-500 mt-1">Extract dates/reminders automatically and show them in your calendar.</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -465,13 +293,15 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Tab 3: Backup & Restore */}
-        {activeTab === "data" && (
+        {/* ── BACKUP & DATA SECTION ────────────────────────────────────────── */ }
+        <section className="glass p-6 flex flex-col gap-6">
+          <h2 className="text-xl font-bold text-neutral-200 border-b border-white/[0.04] pb-2">Backup & Data</h2>
+
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-200">Export Notes</h2>
+              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Export Notes</h3>
               <p className="text-xs text-gray-500 mt-1">Download all your notes as a JSON backup file to store locally.</p>
               
               {exportError && <div className="text-xs text-red-400 mt-2">{exportError}</div>}
@@ -489,7 +319,7 @@ export default function SettingsPage() {
             <div className="h-px bg-white/[0.06]" />
 
             <div>
-              <h2 className="text-lg font-semibold text-neutral-200">Import Notes</h2>
+              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Import Notes</h3>
               <p className="text-xs text-gray-500 mt-1">Upload a previously exported JSON backup file to restore your notes.</p>
               
               {importError && (
@@ -532,9 +362,9 @@ export default function SettingsPage() {
             <div className="h-px bg-white/[0.06]" />
 
             <div className="p-4 rounded-xl bg-red-950/10 border border-red-900/20">
-              <h2 className="text-sm font-bold text-red-400 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">
                 <Trash2 className="w-4 h-4" /> Wipe Notes
-              </h2>
+              </h3>
               <p className="text-xs text-gray-500 mt-1">This will permanently delete ALL notes and reminders in your workspace. This action cannot be undone.</p>
               
               {wipeError && (
@@ -563,55 +393,79 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Tab 4: Danger Zone (Account Deletion) */}
-        {activeTab === "danger" && (
-          <div className="flex flex-col gap-6">
-            <div className="p-4 rounded-xl bg-red-950/10 border border-red-900/20">
-              <h2 className="text-lg font-bold text-red-400 flex items-center gap-2">
-                <Trash2 className="w-5 h-5" /> Delete Account
-              </h2>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                Permanently delete your account and all associated notes, reminders, and summaries. 
-                This action is irreversible. All session data will be invalidated immediately.
-              </p>
+        {/* ── DANGER ZONE ───────────────────────────────────────────────────── */}
+        <section className="glass p-6 border-red-950/50 bg-red-950/[0.02]">
+          <h2 className="text-xl font-bold text-red-400 border-b border-red-900/20 pb-2 flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 animate-pulse" /> Danger Zone
+          </h2>
+          <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+            Deleting your account will permanently wipe all notes, audio records, canvas drawings, and calendars from our database. This action is final and cannot be reversed.
+          </p>
+          
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            className="btn-danger mt-5 inline-flex items-center gap-2 bg-transparent hover:bg-red-950/40 text-red-400 border border-red-500/20 font-semibold text-xs py-2 px-6 rounded-lg hover:border-red-500/40 shadow-sm"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Account
+          </button>
+        </section>
+      </div>
 
-              {deleteError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm mt-4">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {deleteError}
-                </div>
-              )}
+      {/* ── Danger Zone Confirmation Modal ────────────────────────────────── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-surface-900 border border-border-muted rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 animate-pulse" /> Confirm Account Deletion
+            </h3>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              This action is final and will completely wipe all of your data. To proceed, please type <span className="font-mono text-white font-bold">DELETE</span> in the field below.
+            </p>
+            
+            <div className="flex flex-col gap-2 mt-2">
+              <label className="text-xs font-semibold text-neutral-400">
+                Type DELETE to confirm:
+              </label>
+              <input
+                type="text"
+                placeholder="Type DELETE"
+                className="input"
+                value={deleteConfirmInput}
+                onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              />
+            </div>
 
-              <div className="flex flex-col gap-3 mt-5">
-                <label className="text-xs font-semibold text-neutral-400">
-                  To confirm, type your account email: <span className="font-mono text-gray-200">{user.email}</span>
-                </label>
-                
-                <div className="flex flex-col sm:flex-row gap-3 max-w-md mt-1">
-                  <input
-                    type="email"
-                    placeholder="Enter your email"
-                    className="input !py-2.5"
-                    value={deleteConfirmInput}
-                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
-                  />
-                  <button
-                    onClick={handleDeleteAccount}
-                    disabled={deletingAccount}
-                    className="btn-danger flex items-center justify-center gap-2 shrink-0 px-6 !py-2.5"
-                  >
-                    {deletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                    Delete Account
-                  </button>
-                </div>
-              </div>
+            {deleteError && (
+              <div className="text-xs text-red-400 font-semibold">{deleteError}</div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmInput("");
+                  setDeleteError(null);
+                }}
+                className="btn-secondary px-4 py-2 text-xs"
+                disabled={deletingAccount}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmInput !== "DELETE" || deletingAccount}
+                className="btn-danger px-4 py-2 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deletingAccount ? "Deleting..." : "Permanently Delete"}
+              </button>
             </div>
           </div>
-        )}
-        
-      </div>
+        </div>
+      )}
     </div>
   );
 }

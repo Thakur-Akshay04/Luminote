@@ -43,7 +43,9 @@ async def decode_token(token: str) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     redis = await get_redis()
-    stored = await redis.get(f"session:{token}")
+    stored = await redis.get(f"session:{user_id}:{token}")
+    if not stored:
+        stored = await redis.get(f"session:{token}")
     if not stored:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
 
@@ -74,6 +76,8 @@ async def login_user(email: str, password: str, db: AsyncSession) -> tuple[User,
 
     token = create_access_token(str(user.id))
     redis = await get_redis()
-    await redis.setex(f"session:{token}", settings.session_ttl, str(user.id))
-
+    await redis.setex(f"session:{user.id}:{token}", settings.session_ttl, str(user.id))
+    await redis.sadd(f"user_sessions:{user.id}", token)
+    await redis.expire(f"user_sessions:{user.id}", settings.session_ttl)
+    
     return user, token

@@ -61,6 +61,10 @@ async def init_db() -> None:
 
         migration_stmts = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT true",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(50)",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS note_type VARCHAR(20) DEFAULT 'text'",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS media_url TEXT",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS transcript TEXT",

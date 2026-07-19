@@ -2,6 +2,8 @@ export interface User {
   user_id: string;
   email: string;
   access_token: string;
+  avatar_url?: string | null;
+  display_name?: string | null;
 }
 
 export interface ChecklistItem {
@@ -68,6 +70,8 @@ export interface AuthResponse {
   user_id: string;
   email: string;
   name?: string;
+  avatar_url?: string | null;
+  display_name?: string | null;
 }
 
 export interface Alert {

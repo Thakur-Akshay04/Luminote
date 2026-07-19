@@ -7,7 +7,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { searchApi } from "@/lib/api";
 import type { SearchResultItem } from "@/types";
 import SearchResult from "@/components/SearchResult";
-import { Search, Loader2, Sparkles, Zap } from "lucide-react";
+import { Search, Loader2, Sparkles, Zap, Brain } from "lucide-react";
 
 export default function SearchPage() {
   const router = useRouter();
@@ -43,116 +43,149 @@ export default function SearchPage() {
     }
   }, [query, loading]);
 
+  const searchTips = [
+    {
+      label: "Conceptual",
+      example: "notes about machine learning optimization",
+      icon: Brain,
+      color: "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40 hover:bg-purple-500/10",
+    },
+    {
+      label: "Thematic",
+      example: "meeting notes with action items",
+      icon: Zap,
+      color: "text-amber-400 border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:bg-amber-500/10",
+    },
+    {
+      label: "Descriptive",
+      example: "ideas for my startup product",
+      icon: Sparkles,
+      color: "text-pink-400 border-pink-500/20 bg-pink-500/5 hover:border-pink-500/40 hover:bg-pink-500/10",
+    },
+  ];
+
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-      {/* Header */}
-      <div className="text-center mb-10 animate-fade-in">
+    <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-16 min-h-[calc(100vh-1px)] flex flex-col justify-center">
+      {/* Premium Ambient Background Blur Circle */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-brand-500/10 rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
 
-        <h1 className="text-4xl font-bold text-gradient mb-2">Find your notes</h1>
-        <p className="text-gray-500 text-sm">
-          Search by meaning, not just keywords — powered by vector embeddings
-        </p>
-      </div>
-
-      {/* Search form */}
-      <form onSubmit={handleSearch} className="relative mb-8 animate-slide-up">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
-        <input
-          ref={inputRef}
-          id="search-input"
-          type="text"
-          className="input pl-12 pr-32 py-4 text-base rounded-2xl"
-          placeholder="Describe what you're looking for…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <button
-          id="search-btn"
-          type="submit"
-          disabled={loading || !query.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 btn-primary px-4 py-2 text-sm"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Search className="w-4 h-4" />
-          )}
-          {loading ? "Searching…" : "Search"}
-        </button>
-      </form>
-
-      {/* Loading state */}
-      {loading && (
-        <div className="flex flex-col items-center gap-4 py-16 animate-fade-in">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-brand-500/30 animate-ping absolute inset-0" />
-            <div className="w-12 h-12 rounded-full border-2 border-t-brand-500 border-brand-500/20 animate-spin" />
-          </div>
-          <div className="text-center">
-            <p className="text-gray-300 font-medium text-sm">Searching the embedding space…</p>
-            <p className="text-gray-600 text-xs mt-1">Running cosine similarity with pgvector</p>
-          </div>
+      <div className="w-full">
+        {/* Header */}
+        <div className="text-center mb-12 animate-fade-in flex flex-col items-center">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-gradient tracking-tight mb-3">Find your notes</h1>
+          <p className="text-gray-400 text-sm max-w-md leading-relaxed">
+            Search by meaning, context, or concepts instead of just exact matching keywords — powered by pgvector.
+          </p>
         </div>
-      )}
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-fade-in">
-          {error}
-        </div>
-      )}
+        {/* Search form */}
+        <form onSubmit={handleSearch} className="relative mb-12 animate-slide-up">
+          <div className="relative flex items-center bg-surface-900 border border-white/[0.06] rounded-2xl p-2 hover:border-brand-400/40 focus-within:border-brand-400/50 transition-all shadow-xl">
+            <Search className="w-5 h-5 text-neutral-500 ml-3 pointer-events-none shrink-0" />
+            <input
+              ref={inputRef}
+              id="search-input"
+              type="text"
+              className="w-full bg-transparent border-0 outline-none focus:ring-0 text-white placeholder:text-neutral-500 pl-3 pr-28 py-3 text-base"
+              placeholder="Describe what you're looking for…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              id="search-btn"
+              type="submit"
+              disabled={loading || !query.trim()}
+              className="absolute right-2 btn-primary px-5 py-2.5 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40 disabled:hover:translate-y-0"
+            >
+              {loading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Search className="w-3.5 h-3.5" />
+              )}
+              {loading ? "Searching…" : "Search"}
+            </button>
+          </div>
+        </form>
 
-      {/* Results */}
-      {!loading && searched && (
-        <div className="animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-400">
-              {results.length === 0
-                ? "No results found"
-                : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
-            </h2>
-            {cached && (
-              <div className="flex items-center gap-1.5 text-xs text-accent-cyan">
-                <Zap className="w-3.5 h-3.5" />
-                Served from cache
+        {/* Loading state */}
+        {loading && (
+          <div className="flex flex-col items-center gap-4 py-16 animate-fade-in">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full border-2 border-brand-500/30 animate-ping absolute inset-0" />
+              <div className="w-12 h-12 rounded-full border-2 border-t-brand-500 border-brand-500/20 animate-spin" />
+            </div>
+            <div className="text-center">
+              <p className="text-gray-300 font-medium text-sm">Searching the embedding space…</p>
+              <p className="text-gray-600 text-xs mt-1">Running cosine similarity calculations</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center animate-fade-in mb-8">
+            {error}
+          </div>
+        )}
+
+        {/* Results */}
+        {!loading && searched && (
+          <div className="animate-fade-in mb-12">
+            <div className="flex items-center justify-between mb-5 border-b border-white/[0.04] pb-3">
+              <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                {results.length === 0
+                  ? "No results found"
+                  : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
+              </h2>
+              {cached && (
+                <div className="flex items-center gap-1.5 text-xs text-accent-cyan bg-accent-cyan/10 border border-accent-cyan/20 px-3 py-1 rounded-full font-semibold shadow-sm animate-pulse">
+                  <Zap className="w-3.5 h-3.5" />
+                  Served from Cache
+                </div>
+              )}
+            </div>
+
+            {results.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {results.map((item, i) => (
+                  <SearchResult key={item.id} item={item} rank={i + 1} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 rounded-2xl border border-dashed border-white/5 bg-surface-900/40 p-8 flex flex-col items-center justify-center gap-2">
+                <Search className="w-8 h-8 text-neutral-600" />
+                <p className="text-neutral-400 font-medium text-sm mt-1">No notes matched your query.</p>
+                <p className="text-neutral-600 text-xs">Try phrasing your search in a different way.</p>
               </div>
             )}
           </div>
+        )}
 
-          {results.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {results.map((item, i) => (
-                <SearchResult key={item.id} item={item} rank={i + 1} />
+        {/* Idle state tips */}
+        {!searched && !loading && (
+          <div className="flex flex-col gap-4 animate-fade-in">
+            <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Try searching for</h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {searchTips.map(({ label, example, icon: Icon, color }) => (
+                <button
+                  key={label}
+                  onClick={() => { setQuery(example); inputRef.current?.focus(); }}
+                  className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all text-left group hover:-translate-y-0.5 active:translate-y-0 ${color}`}
+                >
+                  <div className="w-8 h-8 rounded-full border border-current/15 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block mb-1 uppercase tracking-tight opacity-90">{label}</span>
+                    <span className="text-xs text-neutral-400 group-hover:text-neutral-200 transition-colors italic leading-relaxed">&ldquo;{example}&rdquo;</span>
+                  </div>
+                </button>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-12 text-gray-600 text-sm">
-              <p>No notes matched your query.</p>
-              <p className="mt-1 text-xs">Try a different phrasing or create more notes first.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Idle state tips */}
-      {!searched && !loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in">
-          {[
-            { label: "Conceptual", example: "notes about machine learning optimization" },
-            { label: "Thematic", example: "meeting notes with action items" },
-            { label: "Descriptive", example: "ideas for my startup product" },
-          ].map(({ label, example }) => (
-            <button
-              key={label}
-              onClick={() => { setQuery(example); inputRef.current?.focus(); }}
-              className="glass-hover p-4 text-left flex flex-col gap-1 rounded-xl group"
-            >
-              <span className="text-xs font-semibold text-brand-400 group-hover:text-brand-300">{label}</span>
-              <span className="text-xs text-gray-500 group-hover:text-gray-400">&ldquo;{example}&rdquo;</span>
-            </button>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -301,7 +301,7 @@ export default function LandingPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-900">
+      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
         <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );

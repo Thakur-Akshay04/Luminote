@@ -7,6 +7,8 @@ export interface StoredUser {
   user_id: string;
   email: string;
   name?: string;
+  avatar_url?: string | null;
+  display_name?: string | null;
 }
 
 export function setAuth(token: string, user: StoredUser): void {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { clearAuth, getUser } from "@/lib/auth";
 import type { StoredUser } from "@/lib/auth";
-import { alertsApi } from "@/lib/api";
+import { alertsApi, BASE_URL } from "@/lib/api";
 import type { Alert } from "@/types";
 import {
   BookOpen,
@@ -28,6 +28,27 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
+function getInitials(email: string, name?: string): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    if (parts[0]) return parts[0][0].toUpperCase();
+  }
+  const emailPart = email.split("@")[0];
+  if (emailPart.length >= 2) {
+    return emailPart.slice(0, 2).toUpperCase();
+  }
+  return emailPart[0]?.toUpperCase() || "?";
+}
+
+const getAvatarUrl = (url?: string | null) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${BASE_URL}${url}`;
+};
+
 function NavbarContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,6 +64,11 @@ function NavbarContent() {
 
   useEffect(() => {
     setUser(getUser());
+    const handleUserUpdate = () => {
+      setUser(getUser());
+    };
+    window.addEventListener("user_update", handleUserUpdate);
+    return () => window.removeEventListener("user_update", handleUserUpdate);
   }, []);
 
   useEffect(() => {
@@ -279,19 +305,27 @@ function NavbarContent() {
   }
 
   return (
-    <aside className="w-64 h-screen border-r border-surface-600 bg-surface-800 flex flex-col justify-between py-6 px-4 shrink-0 sticky top-0 animate-fade-in">
+    <aside className="w-64 h-screen border-r border-border-muted bg-surface-900 flex flex-col justify-between py-6 px-4 shrink-0 sticky top-0 animate-fade-in">
       <div className="flex flex-col gap-8">
         {/* Profile / Header */}
         <Link 
-          href="/settings"
+          href="/profile"
           className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-700/50 transition-colors cursor-pointer group"
         >
-          <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:border-brand-500/40 transition-colors">
-            <Notebook className="w-4 h-4 text-brand-500 fill-brand-500/20" />
-          </div>
+          {user.avatar_url ? (
+            <img
+              src={getAvatarUrl(user.avatar_url)}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full object-cover shadow-sm shrink-0 border border-brand-500/20 group-hover:border-brand-500/40 transition-colors"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:border-brand-500/40 transition-colors font-bold text-xs uppercase">
+              {getInitials(user.email, user.display_name || user.name)}
+            </div>
+          )}
           <div className="flex-1 min-w-0 flex items-center justify-between">
             <span className="text-sm font-semibold text-neutral-200 truncate group-hover:text-white transition-colors">
-              {user.email.split("@")[0]}
+              {user.display_name || user.email.split("@")[0]}
             </span>
             <span className="text-[10px] text-neutral-500 group-hover:text-neutral-300 transition-colors">▼</span>
           </div>
@@ -511,7 +545,7 @@ function NavbarContent() {
 
 export default function Navbar() {
   return (
-    <Suspense fallback={<aside className="w-64 h-screen border-r border-surface-600 bg-surface-800 shrink-0 sticky top-0" />}>
+    <Suspense fallback={<aside className="w-64 h-screen border-r border-border-muted bg-surface-900 shrink-0 sticky top-0" />}>
       <NavbarContent />
     </Suspense>
   );

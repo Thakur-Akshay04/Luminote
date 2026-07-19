@@ -163,7 +163,7 @@ export default function DashboardPage() {
       router.replace("/landing");
     } else {
       const user = getUser();
-      setFirstName(user?.email?.split("@")[0] ?? "there");
+      setFirstName((user?.display_name || user?.email?.split("@")[0]) ?? "there");
       setMounted(true);
     }
   }, [router]);

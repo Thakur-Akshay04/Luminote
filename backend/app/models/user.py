@@ -21,3 +21,8 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pending_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_verified: Mapped[bool] = mapped_column(default=True, server_default=text("true"), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+

@@ -119,3 +119,24 @@ export const searchApi = {
     api.post<SearchResponse>("/search", { query }),
 };
 
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const usersApi = {
+  uploadAvatar: (file: Blob, onUploadProgress?: (progressEvent: any) => void) => {
+    const formData = new FormData();
+    formData.append("file", file, "avatar.jpg");
+    return api.post<{ avatar_url: string }>("/users/me/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress,
+    });
+  },
+  deleteAvatar: () => api.delete<{ message: string }>("/users/me/avatar"),
+  changeEmail: (newEmail: string, confirmNewEmail: string) =>
+    api.patch<{ message: string }>("/users/me/email", { new_email: newEmail, confirm_new_email: confirmNewEmail }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.patch<{ message: string }>("/users/me/password", { current_password: currentPassword, new_password: newPassword }),
+  changeName: (displayName: string) =>
+    api.patch<{ display_name: string }>("/users/me/name", { display_name: displayName }),
+  deleteMe: () => api.delete<void>("/users/me"),
+};
+
+
