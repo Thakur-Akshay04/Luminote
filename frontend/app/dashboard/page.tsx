@@ -46,23 +46,23 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
   const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
   return (
-    <div className="bg-surface-900 p-5 rounded-2xl border border-white/[0.06] shadow-xl relative overflow-hidden group/calendar">
+    <div className="bg-[#0c0c0e]/50 border border-white/[0.04] backdrop-blur-sm p-5 rounded-2xl shadow-xl relative overflow-hidden group/calendar">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-bold text-white tracking-tight uppercase">
+        <span className="text-xs font-bold text-neutral-300 tracking-wider uppercase">
           {format(currentMonth, "MMMM yyyy")}
         </span>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           <button
             onClick={handlePrevMonth}
-            className="p-1.5 hover:bg-surface-700 rounded-full text-neutral-400 hover:text-white transition-all active:scale-90"
+            className="p-1.5 hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.1] rounded-lg text-neutral-400 hover:text-white transition-all active:scale-90"
             aria-label="Previous month"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleNextMonth}
-            className="p-1.5 hover:bg-surface-700 rounded-full text-neutral-400 hover:text-white transition-all active:scale-90"
+            className="p-1.5 hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.1] rounded-lg text-neutral-400 hover:text-white transition-all active:scale-90"
             aria-label="Next month"
           >
             <ChevronRight className="w-3.5 h-3.5" />
@@ -71,7 +71,7 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
       </div>
 
       {/* Weekdays */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-500 mb-3 tracking-wider">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-neutral-500 mb-3 tracking-widest uppercase">
         {WEEKDAYS.map((day) => (
           <span key={day}>{day}</span>
         ))}
@@ -93,16 +93,16 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
               key={idx}
               className={`
                 relative aspect-square flex flex-col items-center justify-center text-xs rounded-full select-none transition-all duration-150 group/day
-                ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600/50"}
+                ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600/40"}
                 ${
                   isCurrent
-                    ? "bg-brand-500/10 border border-brand-500 text-brand-300 font-extrabold shadow-[0_0_10px_rgba(219,39,119,0.2)]"
-                    : "hover:bg-surface-700/60 hover:scale-105 active:scale-95 cursor-pointer"
+                    ? "bg-brand-500/10 border border-brand-500/50 text-brand-300 font-extrabold shadow-[0_0_12px_rgba(168,85,247,0.25)]"
+                    : "hover:bg-white/[0.03] hover:border-white/[0.06] hover:scale-105 active:scale-95 cursor-pointer border border-transparent"
                 }
               `}
               title={day.toLocaleDateString()}
             >
-              <span>{format(day, "d")}</span>
+              <span className="font-semibold">{format(day, "d")}</span>
               
               {/* Alert Indicator Dots */}
               {hasAlerts && (
@@ -118,10 +118,10 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
 
               {/* Tooltip on Hover */}
               {hasAlerts && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-surface-raised border border-border-muted p-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-all duration-200 scale-95 group-hover/day:scale-100 z-50">
-                  <div className="text-[10px] font-bold text-neutral-400 mb-1 border-b border-border-muted pb-1 flex justify-between">
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-48 bg-surface-raised border border-border-muted p-3 rounded-xl shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-all duration-200 scale-95 group-hover/day:scale-100 z-50">
+                  <div className="text-[10px] font-bold text-neutral-400 mb-1.5 border-b border-border-muted pb-1.5 flex justify-between">
                     <span>Alerts ({dayAlerts.length})</span>
-                    <span className="text-[8px] font-medium text-neutral-500">{format(day, "MMM d")}</span>
+                    <span className="text-[8px] font-semibold text-neutral-500">{format(day, "MMM d")}</span>
                   </div>
                   <div className="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar">
                     {dayAlerts.map((alert) => (
@@ -383,26 +383,26 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Right Sidebar Column (Calendar/Upcoming) ── */}
-      <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-surface-600 bg-surface-900 px-6 py-8 flex flex-col gap-6 shrink-0 min-h-[calc(100vh-1px)]">
+      <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col gap-6 shrink-0 min-h-[calc(100vh-1px)]">
         {/* Calendar widget */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <MiniCalendar alerts={alerts} />
           {/* Legend */}
-          <div className="flex justify-end gap-3 text-[10px] text-neutral-500 px-1">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-500" /> Upcoming
+          <div className="flex justify-end gap-3 text-[10px] text-neutral-500 px-1 font-semibold">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.4)]" /> Upcoming
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" /> Completed
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] shadow-[0_0_4px_rgba(16,185,129,0.4)]" /> Completed
             </span>
           </div>
         </div>
 
         {/* Upcoming Events banner */}
         <div className="flex flex-col gap-4">
-          <div className="bg-pink-950/20 border border-pink-900/30 text-pink-400 font-semibold rounded-lg px-4 py-2.5 flex items-center gap-2 text-xs">
-            <Bell className="w-4 h-4 text-pink-400" />
-            Upcoming Events
+          <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl px-4 py-3 flex items-center gap-2.5 shadow-sm text-sm font-bold text-neutral-200">
+            <Bell className="w-4 h-4 text-brand-400 fill-brand-400/10" />
+            <span>Upcoming Events</span>
           </div>
 
           {/* Upcoming Alerts List */}
@@ -419,11 +419,13 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : upcomingAlerts.length === 0 ? (
-            <div className="text-center py-8 text-neutral-500 text-xs italic">
-              No upcoming alerts scheduled
+            <div className="text-center rounded-xl border border-dashed border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col items-center justify-center gap-2">
+              <Bell className="w-6 h-6 text-neutral-600 animate-bounce" style={{ animationDuration: '3s' }} />
+              <p className="text-neutral-400 font-medium text-xs">No upcoming alerts scheduled</p>
+              <p className="text-neutral-600 text-[10px]">Create an alert inside any note to stay notified</p>
             </div>
           ) : (
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-3">
               {upcomingAlerts.slice(0, 5).map((alert) => {
                 const alertDate = new Date(alert.alert_time);
                 const dayName = format(alertDate, "EEE").toUpperCase();
@@ -432,26 +434,26 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={alert.id}
-                    className="flex gap-4 items-center py-3 border-b border-surface-700 last:border-0 hover:bg-surface-700/50 px-2 rounded-lg transition-colors group"
+                    className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative"
                   >
                     {/* Pink date badge */}
-                    <div className="w-12 h-12 flex flex-col items-center justify-center rounded-xl border border-pink-500/40 text-pink-400 bg-surface-900 shrink-0 shadow-sm">
-                      <span className="text-[8px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
-                      <span className="text-base font-extrabold leading-none mt-1">{dayNum}</span>
+                    <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
+                      <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
+                      <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
                     </div>
 
                     {/* Alert Info */}
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-white truncate leading-snug group-hover:text-pink-400 transition-colors">
+                      <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
                         {alert.title}
                       </h4>
-                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-neutral-400">
-                        <Clock className="w-3 h-3 text-neutral-500" />
+                      <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
+                        <Clock className="w-3 h-3 text-neutral-600" />
                         <span>{format(alertDate, "h:mm a")}</span>
                         {alert.note_title && (
                           <Link
                             href={`/notes/${alert.note_id}`}
-                            className="truncate max-w-[120px] text-pink-400 font-semibold hover:underline"
+                            className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
                           >
                             • {alert.note_title}
                           </Link>

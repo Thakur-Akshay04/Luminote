@@ -104,6 +104,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const textInputStyleRef = useRef<{ x: number; y: number } | null>(null);
     const textValueRef = useRef("");
     const textInputRef = useRef<HTMLTextAreaElement>(null);
+    const customColorInputRef = useRef<HTMLInputElement>(null);
 
     // Drawing Versioning State
     const [versions, setVersions] = useState<string[]>([]);
@@ -485,7 +486,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         if (hadActiveText) {
           finalizeText();
         }
-        
+
         // Push state before placing new text
         if (undoStack.current.length >= 50) {
           undoStack.current.shift();
@@ -736,11 +737,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Pencil */}
               <button
                 onClick={() => handleToolChange("pen")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "pen"
+                className={`p-2 rounded-xs transition-colors ${tool === "pen"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Pencil tool"
                 aria-label="Pencil tool"
                 id="drawing-pen-btn"
@@ -751,11 +751,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Marker */}
               <button
                 onClick={() => handleToolChange("marker")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "marker"
+                className={`p-2 rounded-xs transition-colors ${tool === "marker"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Marker tool"
                 aria-label="Marker tool"
                 id="drawing-marker-btn"
@@ -766,11 +765,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Highlighter */}
               <button
                 onClick={() => handleToolChange("highlighter")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "highlighter"
+                className={`p-2 rounded-xs transition-colors ${tool === "highlighter"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Highlighter tool"
                 aria-label="Highlighter tool"
                 id="drawing-highlighter-btn"
@@ -781,11 +779,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Spray */}
               <button
                 onClick={() => handleToolChange("spray")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "spray"
+                className={`p-2 rounded-xs transition-colors ${tool === "spray"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Spray tool"
                 aria-label="Spray tool"
                 id="drawing-spray-btn"
@@ -796,11 +793,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Eraser */}
               <button
                 onClick={() => handleToolChange("eraser")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "eraser"
+                className={`p-2 rounded-xs transition-colors ${tool === "eraser"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Eraser tool"
                 aria-label="Eraser tool"
                 id="drawing-eraser-btn"
@@ -814,11 +810,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Line */}
               <button
                 onClick={() => handleToolChange("line")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "line"
+                className={`p-2 rounded-xs transition-colors ${tool === "line"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Line tool"
                 aria-label="Line tool"
                 id="drawing-line-btn"
@@ -829,11 +824,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Rectangle */}
               <button
                 onClick={() => handleToolChange("rect")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "rect"
+                className={`p-2 rounded-xs transition-colors ${tool === "rect"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Rectangle tool"
                 aria-label="Rectangle tool"
                 id="drawing-rect-btn"
@@ -844,11 +838,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Circle */}
               <button
                 onClick={() => handleToolChange("circle")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "circle"
+                className={`p-2 rounded-xs transition-colors ${tool === "circle"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Circle tool"
                 aria-label="Circle tool"
                 id="drawing-circle-btn"
@@ -859,11 +852,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Text */}
               <button
                 onClick={() => handleToolChange("text")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "text"
+                className={`p-2 rounded-xs transition-colors ${tool === "text"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Text tool"
                 aria-label="Text tool"
                 id="drawing-text-btn"
@@ -874,11 +866,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               {/* Fill */}
               <button
                 onClick={() => handleToolChange("fill")}
-                className={`p-2 rounded-xs transition-colors ${
-                  tool === "fill"
+                className={`p-2 rounded-xs transition-colors ${tool === "fill"
                     ? "bg-[#e31c5f] text-white border border-[#e31c5f]"
                     : "text-text-secondary hover:bg-surface-strong"
-                }`}
+                  }`}
                 title="Fill tool"
                 aria-label="Fill tool"
                 id="drawing-fill-btn"
@@ -943,6 +934,31 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                         )}
                       </button>
                     ))}
+                    {/* Gradient Custom Color Button */}
+                    <div className="relative w-7 h-7 hover:scale-110 transition-transform">
+                      <button
+                        onClick={() => customColorInputRef.current?.click()}
+                        className="w-7 h-7 rounded-full border border-white/10 relative bg-[conic-gradient(from_0deg,red,yellow,lime,cyan,blue,magenta,red)] shadow-sm animate-fade-in"
+                        title="Custom color gradient picker"
+                        aria-label="Custom color picker"
+                        type="button"
+                      >
+                        {!PRESET_COLORS.includes(color) && (
+                          <Check className="w-3 h-3 absolute inset-0 m-auto text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                        )}
+                      </button>
+                      <input
+                        ref={customColorInputRef}
+                        type="color"
+                        value={color}
+                        onChange={(e) => {
+                          const selectedColor = e.target.value;
+                          setColor(selectedColor);
+                          setHexInput(selectedColor);
+                        }}
+                        className="absolute left-20 top-0 opacity-0 pointer-events-none w-full h-full"
+                      />
+                    </div>
                   </div>
                   <div className="flex gap-1.5">
                     <input
@@ -1067,11 +1083,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         {/* Status Message */}
         {message && (
           <div
-            className={`px-3 py-2 rounded-xs text-xs font-medium animate-fade-in ${
-              message.type === "success"
+            className={`px-3 py-2 rounded-xs text-xs font-medium animate-fade-in ${message.type === "success"
                 ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
                 : "bg-red-500/10 border border-red-500/20 text-red-400"
-            }`}
+              }`}
           >
             {message.text}
           </div>
@@ -1150,11 +1165,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                     key={versionUrl}
                     role="button"
                     tabIndex={0}
-                    className={`relative flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border cursor-pointer group transition-all ${
-                      isActive
+                    className={`relative flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border cursor-pointer group transition-all ${isActive
                         ? "border-[#e31c5f] shadow-md shadow-brand-500/10 ring-1 ring-[#e31c5f]"
                         : "border-white/[0.06] hover:border-brand-400/50"
-                    }`}
+                      }`}
                     onClick={() => {
                       if (!isActive) {
                         setSwitchVersionTarget(versionNum);

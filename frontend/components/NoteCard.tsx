@@ -90,58 +90,71 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
 
   const getPreview = () => {
     if (note.summary) return note.summary;
-    if (effectiveType === "checklist" && note.content) {
-      try {
-        const data = JSON.parse(note.content);
-        if (data && typeof data === "object" && "description" in data) {
-          return data.description.slice(0, 120);
+    let text = "";
+    if (note.content) {
+      const cleanContent = note.content.trim();
+      if (cleanContent.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(cleanContent);
+          if (parsed && typeof parsed === "object") {
+            if (parsed.type === "doc") {
+              text = extractTextFromTiptapJson(parsed).trim();
+            } else if ("description" in parsed) {
+              text = (parsed.description || "").trim();
+            }
+          }
+        } catch {
+          text = cleanContent;
         }
-      } catch {
-        // Fallback
+      } else {
+        text = cleanContent;
       }
     }
-    if (effectiveType === "text" && note.content) {
-      try {
-        const parsed = JSON.parse(note.content);
-        if (parsed && typeof parsed === "object" && parsed.type === "doc") {
-          const text = extractTextFromTiptapJson(parsed).trim();
-          return text.slice(0, 120);
-        }
-      } catch {
-        // Fallback
+
+    const cleaned = text
+      .replace(/^(Start writing here[…\.]*|Start writing)\s*/i, "")
+      .trim();
+
+    if (note.note_type === "audio") {
+      if (!cleaned) {
+        return "Start writing here...";
       }
+      return cleaned.slice(0, 120);
     }
-    const cleanContent = note.content.trim();
-    if (cleanContent.startsWith("Start writing here…") || cleanContent === "Draw here") {
-      const rest = cleanContent.replace(/^Start writing here…\s*/, "").trim();
-      return rest.slice(0, 120);
+
+    if (!cleaned) {
+      if (effectiveType === "drawing") return "";
+      return "Start writing here...";
     }
-    return note.content.slice(0, 120);
+    return cleaned.slice(0, 120);
   };
   const preview = getPreview();
 
   const getWordCount = () => {
-    if (effectiveType === "checklist" && note.content) {
-      try {
-        const data = JSON.parse(note.content);
-        const text = data.description || "";
-        return text.split(/\s+/).filter(Boolean).length;
-      } catch {
-        // Fallback
-      }
-    }
-    if (effectiveType === "text" && note.content) {
-      try {
-        const parsed = JSON.parse(note.content);
-        if (parsed && typeof parsed === "object" && parsed.type === "doc") {
-          const text = extractTextFromTiptapJson(parsed).trim();
-          return text.split(/\s+/).filter(Boolean).length;
+    let text = "";
+    if (note.content) {
+      const cleanContent = note.content.trim();
+      if (cleanContent.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(cleanContent);
+          if (parsed && typeof parsed === "object") {
+            if (parsed.type === "doc") {
+              text = extractTextFromTiptapJson(parsed).trim();
+            } else if ("description" in parsed) {
+              text = (parsed.description || "").trim();
+            }
+          }
+        } catch {
+          text = cleanContent;
         }
-      } catch {
-        // Fallback
+      } else {
+        text = cleanContent;
       }
     }
-    return note.content.split(/\s+/).filter(Boolean).length;
+    const cleaned = text
+      .replace(/^(Start writing here[…\.]*|Start writing|Draw here)\s*/i, "")
+      .trim();
+    return cleaned.split(/\s+/).filter(Boolean).length;
   };
   const wordCount = getWordCount();
 
@@ -180,15 +193,15 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
                 </div>
               </div>
             )}
-            
+
             {items.length > 0 ? (
               <div className="flex flex-col gap-1.5 bg-emerald-500/[0.02] border border-emerald-500/5 rounded-lg p-2.5">
                 {items.slice(0, 2).map((item) => (
                   <div key={item.id} className="flex items-center gap-2 text-xs text-neutral-300">
                     <div className={clsx(
                       "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0",
-                      item.checked 
-                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" 
+                      item.checked
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
                         : "border-neutral-700 bg-neutral-900"
                     )}>
                       {item.checked && (
@@ -221,14 +234,14 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
             {/* Minimal Sketchpad Outline */}
             <div className="relative h-24 w-full rounded-lg border border-violet-500/10 bg-violet-950/10 overflow-hidden flex items-center justify-center group-hover:bg-violet-950/20 group-hover:border-violet-500/20 transition-all duration-300">
               {/* Dot Grid Background */}
-              <div 
-                className="absolute inset-0 opacity-[0.03]" 
+              <div
+                className="absolute inset-0 opacity-[0.03]"
                 style={{
                   backgroundImage: "radial-gradient(#8b5cf6 1px, transparent 1px)",
                   backgroundSize: "12px 12px"
                 }}
               />
-              
+
               {/* Clean abstract stroke line */}
               <svg className="w-1/2 h-1/2 opacity-35 text-violet-400 group-hover:opacity-60 transition-opacity duration-300" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 25 C 25 5, 45 35, 60 20 S 75 10, 90 20" />
@@ -354,8 +367,12 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
           <div className="flex items-center gap-1.5">
             <Clock className="w-3 h-3 text-neutral-600" />
             <span>{timeAgo}</span>
-            <span>•</span>
-            <span>{wordCount} word{wordCount !== 1 ? "s" : ""}</span>
+            {(effectiveType === "text" || effectiveType === "audio") && (
+              <>
+                <span>•</span>
+                <span>{wordCount} word{wordCount !== 1 ? "s" : ""}</span>
+              </>
+            )}
           </div>
 
           {/* Tags */}
