@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
 
+    # Frontend URL — used for email verification redirects
+    frontend_url: str = "http://localhost:3000"
+
     # AI cache TTLs (seconds)
     ai_cache_ttl: int = 7 * 24 * 60 * 60       # 7 days
     search_cache_ttl: int = 10 * 60              # 10 minutes

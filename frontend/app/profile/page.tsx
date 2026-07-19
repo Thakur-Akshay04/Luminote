@@ -458,8 +458,10 @@ export default function ProfilePage() {
               )}
 
               <div className="flex items-center gap-4">
-                <div 
-                  className="relative w-24 h-24 rounded-full overflow-hidden border border-white/[0.08] shadow-lg group cursor-pointer bg-neutral-900 flex items-center justify-center shrink-0"
+                <button
+                  type="button"
+                  aria-label="Change profile photo"
+                  className="relative w-24 h-24 rounded-full overflow-hidden border border-white/[0.08] shadow-lg group cursor-pointer bg-neutral-900 flex items-center justify-center shrink-0 focus:outline-none focus:ring-2 focus:ring-brand-400/60"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {user.avatar_url ? (
@@ -474,10 +476,10 @@ export default function ProfilePage() {
                     </span>
                   )}
                   {/* Camera Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 group-focus:opacity-100 flex items-center justify-center transition-all duration-200">
                     <Camera className="w-6 h-6 text-white" />
                   </div>
-                </div>
+                </button>
 
                 <div className="flex flex-col gap-1">
                   <button

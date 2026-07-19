@@ -21,6 +21,21 @@ from app.services.email_service import send_verification_email
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+def _safe_path(base_dir: str, filename: str) -> str:
+    """Resolve `filename` inside `base_dir` and raise 400 if path escapes the base.
+
+    Defends against directory traversal (e.g. ../../etc/passwd).
+    """
+    resolved = os.path.realpath(os.path.join(base_dir, filename))
+    real_base = os.path.realpath(base_dir)
+    if not resolved.startswith(real_base + os.sep) and resolved != real_base:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path",
+        )
+    return resolved
+
+
 async def invalidate_user_sessions(user_id: str, redis) -> None:
     """Invalidate all active sessions for a user in O(1) time."""
     tokens = await redis.smembers(f"user_sessions:{user_id}")
@@ -63,7 +78,8 @@ async def upload_avatar(
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
     avatars_dir = os.path.join(media_dir, "avatars")
     os.makedirs(avatars_dir, exist_ok=True)
-    file_path = os.path.join(avatars_dir, f"{user_id}.jpg")
+    # Guard against path traversal — user_id comes from JWT but we still validate
+    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
     img.save(file_path, "JPEG")
 
     # Update avatar_url in database
@@ -101,7 +117,8 @@ async def delete_avatar(
 
     # Remove file from disk
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    file_path = os.path.join(media_dir, "avatars", f"{user_id}.jpg")
+    avatars_dir = os.path.join(media_dir, "avatars")
+    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
@@ -159,6 +176,7 @@ async def verify_email(
     token: str,
     db: AsyncSession = Depends(get_db)
 ):
+    import re
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "email_verification":
@@ -168,8 +186,22 @@ async def verify_email(
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
+    # Guard: both fields must be present in the token
+    if not user_id or not new_email:
+        raise HTTPException(status_code=400, detail="Invalid token payload")
+
+    # Validate email format before touching the database
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email):
+        raise HTTPException(status_code=400, detail="Invalid email address in token")
+
+    # Parse UUID safely
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid token payload")
+
     # Fetch user by id
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -187,8 +219,8 @@ async def verify_email(
     redis = await get_redis()
     await redis.delete(f"user:{user_id}")
 
-    # Redirect to frontend profile with confirmation flag
-    return RedirectResponse(url="http://localhost:3000/profile?email_verified=true")
+    # Redirect to frontend profile (URL driven by config, not hardcoded)
+    return RedirectResponse(url=f"{settings.frontend_url}/profile?email_verified=true")
 
 
 @router.patch("/me/password", status_code=200)
@@ -274,7 +306,8 @@ async def delete_me(
 
     # Clean up avatar on disk
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    file_path = os.path.join(media_dir, "avatars", f"{user_id}.jpg")
+    avatars_dir = os.path.join(media_dir, "avatars")
+    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
