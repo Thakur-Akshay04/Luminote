@@ -305,34 +305,39 @@ function NavbarContent() {
   }
 
   return (
-    <aside className="w-64 h-screen border-r border-border-muted bg-surface-900 flex flex-col justify-between py-6 px-4 shrink-0 sticky top-0 animate-fade-in">
+    <aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-white/[0.04] bg-[#0c0c0e]/80 backdrop-blur-md flex flex-col justify-between py-8 px-5 shrink-0 sticky top-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)] animate-fade-in z-40">
+      {/* Glow highlight inside container */}
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-brand-500/5 to-transparent rounded-t-2xl pointer-events-none -z-10" />
+
       <div className="flex flex-col gap-8">
-        {/* Profile / Header */}
+        {/* Profile Card Header */}
         <Link 
           href="/profile"
-          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-700/50 transition-colors cursor-pointer group"
+          className="flex items-center gap-3.5 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.08] transition-all cursor-pointer group shadow-sm"
         >
           {user.avatar_url ? (
             <img
               src={getAvatarUrl(user.avatar_url)}
               alt="Avatar"
-              className="w-8 h-8 rounded-full object-cover shadow-sm shrink-0 border border-brand-500/20 group-hover:border-brand-500/40 transition-colors"
+              className="w-10 h-10 rounded-full object-cover shadow-md shrink-0 border-2 border-brand-500/20 group-hover:border-brand-500/50 transition-colors"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:border-brand-500/40 transition-colors font-bold text-xs uppercase">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-500/20 to-pink-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 shadow-md shrink-0 group-hover:border-brand-500/40 transition-colors font-bold text-sm uppercase">
               {getInitials(user.email, user.display_name || user.name)}
             </div>
           )}
-          <div className="flex-1 min-w-0 flex items-center justify-between">
-            <span className="text-sm font-semibold text-neutral-200 truncate group-hover:text-white transition-colors">
+          
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider leading-none mb-1">Workspace</span>
+            <span className="text-sm font-bold text-neutral-200 truncate group-hover:text-white transition-colors">
               {user.display_name || user.email.split("@")[0]}
             </span>
-            <span className="text-[10px] text-neutral-500 group-hover:text-neutral-300 transition-colors">▼</span>
           </div>
+          <ChevronDown className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors shrink-0" />
         </Link>
 
         {/* Nav Links */}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2.5">
           {navLinks.map(({ href, label, icon: Icon, hasDropdown }) => {
             const isActive = pathname.startsWith(href);
             
@@ -341,10 +346,10 @@ function NavbarContent() {
                 <div key={href} className="flex flex-col gap-1">
                   <div
                     className={clsx(
-                      "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer select-none focus:outline-none focus:bg-surface-700 focus:text-white",
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer select-none border-l-2 focus:outline-none",
                       isActive && !activeType
-                        ? "bg-surface-700 text-white font-semibold shadow-sm"
-                        : "text-neutral-400 hover:text-white hover:bg-surface-700"
+                        ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
+                        : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
                     )}
                     role="button"
                     tabIndex={0}
@@ -361,7 +366,7 @@ function NavbarContent() {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className={clsx("w-4 h-4", isActive ? "text-brand-500" : "text-neutral-500")} />
+                      <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-brand-500" : "text-neutral-500")} />
                       <span>{label}</span>
                     </div>
                     <ChevronDown
@@ -374,7 +379,7 @@ function NavbarContent() {
                   
                   {/* Dropdown Options */}
                   {notesDropdownOpen && (
-                    <div className="flex flex-col gap-1 pl-4 mt-1 border-l border-surface-600 ml-5">
+                    <div className="flex flex-col gap-1 pl-4 mt-1 border-l border-white/[0.06] ml-5">
                       {dropdownOptions.map((opt) => {
                         const optHref = `/notes?type=${opt.type}`;
                         const isOptActive = pathname.startsWith("/notes") && activeType === opt.type;
@@ -385,10 +390,10 @@ function NavbarContent() {
                             key={opt.type}
                             href={optHref}
                             className={clsx(
-                              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150",
+                              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 border-l-2",
                               isOptActive
-                                ? "bg-surface-700 text-white font-semibold shadow-sm"
-                                : "text-neutral-400 hover:text-white hover:bg-surface-700/50"
+                                ? "bg-white/[0.03] text-white border-brand-500"
+                                : "text-neutral-400 hover:text-white hover:bg-white/[0.01] border-transparent"
                             )}
                           >
                             <OptIcon className={clsx("w-3.5 h-3.5", isOptActive ? "text-brand-500" : "text-neutral-500")} />
@@ -407,13 +412,13 @@ function NavbarContent() {
                 key={href}
                 href={href}
                 className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2",
                   isActive
-                    ? "bg-surface-700 text-white font-semibold shadow-sm"
-                    : "text-neutral-400 hover:text-white hover:bg-surface-700"
+                    ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
+                    : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
                 )}
               >
-                <Icon className={clsx("w-4 h-4", isActive ? "text-brand-500" : "text-neutral-500")} />
+                <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-brand-500" : "text-neutral-500")} />
                 {label}
               </Link>
             );
@@ -422,7 +427,7 @@ function NavbarContent() {
       </div>
 
       {/* Bottom Actions */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2.5">
         <div className="relative">
           <button
             onClick={() => {
@@ -433,7 +438,7 @@ function NavbarContent() {
                 localStorage.setItem("read_alerts", JSON.stringify(ids));
               }
             }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white hover:bg-surface-700 w-full text-left transition-colors relative"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors relative"
           >
             <Bell className="w-4 h-4 text-neutral-500" />
             <span>Notifications</span>
@@ -444,7 +449,7 @@ function NavbarContent() {
 
           {/* Notifications Popover */}
           {notificationsOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
+            <div className="absolute bottom-full left-0 mb-3 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border-muted pb-2">
                 <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
@@ -516,23 +521,27 @@ function NavbarContent() {
             </div>
           )}
         </div>
+        
         <button
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white hover:bg-surface-700 w-full text-left transition-colors"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors"
           onClick={() => router.push("/settings")}
         >
           <Settings className="w-4 h-4 text-neutral-500" />
           Settings
         </button>
         <button
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white hover:bg-surface-700 w-full text-left transition-colors"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors"
           onClick={() => router.push("/help")}
         >
           <HelpCircle className="w-4 h-4 text-neutral-500" />
           Help
         </button>
+        
+        <div className="h-px bg-white/[0.04] my-1" />
+
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/20 w-full text-left transition-colors"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-950/15 w-full text-left transition-colors"
           title="Logout"
         >
           <LogOut className="w-4 h-4 text-red-400" />
@@ -545,7 +554,7 @@ function NavbarContent() {
 
 export default function Navbar() {
   return (
-    <Suspense fallback={<aside className="w-64 h-screen border-r border-border-muted bg-surface-900 shrink-0 sticky top-0" />}>
+    <Suspense fallback={<aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-white/[0.04] bg-[#0c0c0e]/80 shrink-0 sticky top-4" />}>
       <NavbarContent />
     </Suspense>
   );
