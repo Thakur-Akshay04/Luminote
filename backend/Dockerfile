@@ -4,7 +4,7 @@ FROM python:3.12-slim AS builder
 WORKDIR /build
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --only-binary :all: --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: --prefix=/install -r requirements.txt
 
 # Pre-download the default fastembed model BAAI/bge-small-en-v1.5 to cache it in the image
 RUN PYTHONPATH=/install/lib/python3.12/site-packages python -c "from fastembed import TextEmbedding; TextEmbedding()"
