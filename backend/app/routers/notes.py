@@ -7,8 +7,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate, SummarizeRequest, SummarizeResponse
-from app.services.ai_service import ask_question, summarize_note_with_ai
+from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate, SummarizeRequest, SummarizeResponse, AIActionRequest, AIActionResponse
+from app.services.ai_service import ask_question, summarize_note_with_ai, execute_ai_action
 from app.auth.clerk import get_current_user
 from app.services.note_service import (
     create_note,
@@ -249,3 +249,22 @@ async def upload_image(
         )
     
     return {"url": f"/media/uploads/{filename}"}
+
+
+@router.post("/{note_id}/ai-action", response_model=AIActionResponse)
+async def ai_action(
+    note_id: uuid.UUID,
+    body: AIActionRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Verify note existence and ownership
+    await get_note(note_id, uuid.UUID(user_id), db)
+    
+    result = await execute_ai_action(
+        action=body.action,
+        text=body.text,
+        param=body.param
+    )
+    
+    return AIActionResponse(result=result)

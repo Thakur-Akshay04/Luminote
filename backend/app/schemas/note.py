@@ -80,3 +80,13 @@ class SummarizeResponse(BaseModel):
     note: NoteResponse
     alerts: list[AlertResponse]
 
+
+class AIActionRequest(BaseModel):
+    action: str  # "rewrite" | "translate" | "tone" | "grammar" | "simplify" | "expand"
+    text: str
+    param: Optional[str] = None
+
+
+class AIActionResponse(BaseModel):
+    result: str
+

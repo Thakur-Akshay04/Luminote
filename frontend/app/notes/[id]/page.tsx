@@ -1783,7 +1783,7 @@ function NoteEditorContent() {
         {/* AI Panel */}
         {noteType === "text" && showAI && note && (
           <div className="hidden lg:flex flex-col w-80 xl:w-96 border-l border-white/[0.06] overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
-            <AIPanel note={note} onUpdateNote={setNote} />
+            <AIPanel note={note} onUpdateNote={setNote} editor={editor} />
           </div>
         )}
       </div>
@@ -1791,7 +1791,7 @@ function NoteEditorContent() {
       {/* Mobile AI panel (bottom sheet) */}
       {noteType === "text" && showAI && note && (
         <div className="lg:hidden border-t border-white/[0.06] max-h-64 overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
-          <AIPanel note={note} onUpdateNote={setNote} />
+          <AIPanel note={note} onUpdateNote={setNote} editor={editor} />
         </div>
       )}
     </div>

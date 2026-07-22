@@ -114,6 +114,8 @@ export const notesApi = {
   },
   transcribeAudio: (id: string, force: boolean = false) =>
     api.post<TranscriptResponse>(`/notes/${id}/transcribe${force ? "?force=true" : ""}`),
+  aiAction: (id: string, action: string, text: string, param?: string) =>
+    api.post<{ result: string }>(`/notes/${id}/ai-action`, { action, text, param }),
 
   // To-do Checklist
   toggleChecklistItem: (id: string, index: number, checked: boolean) =>

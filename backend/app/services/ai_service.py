@@ -262,3 +262,39 @@ Note content:
     except Exception as e:
         logger.error("Error generating AI summary: %s", e)
         return {"summary": "Failed to generate summary.", "tags": [], "alerts": []}
+
+
+async def execute_ai_action(action: str, text: str, param: Optional[str] = None) -> str:
+    """
+    Perform a custom AI writing assistant action (rewrite, translate, tone change, grammar, simplify, expand)
+    on the provided text using Groq.
+    """
+    sanitized_text = _sanitize_user_content(text[:4000])
+    
+    if action == "tone":
+        tone = (param or "professional").strip().lower()
+        prompt = f"Rewrite the following text in a {tone} tone, preserving its core meaning. Respond with only the rewritten text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+    elif action == "translate":
+        lang = (param or "English").strip()
+        prompt = f"Translate the following text into {lang}. Respond with only the translation, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+    elif action == "grammar":
+        prompt = f"Fix any spelling, grammar, and punctuation errors in the following text, and polish it to flow naturally. Respond with only the corrected text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+    elif action == "simplify":
+        prompt = f"Simplify the vocabulary and structure of the following text to make it easy to understand. Respond with only the simplified text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+    elif action == "expand":
+        prompt = f"Expand on the following text by adding more detail and context, while keeping the tone appropriate. Respond with only the expanded text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+    else:
+        prompt = f"Rewrite or improve the following text. Respond with only the modified text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
+
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL,
+            messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
+            temperature=0.3,
+            max_tokens=1500,
+            timeout=30,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        logger.error("Error executing AI writing action %s: %s", action, e)
+        return "Failed to process text with AI. Please try again."
