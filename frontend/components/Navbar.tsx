@@ -309,9 +309,10 @@ function NavbarContent() {
             if (hasDropdown) {
               return (
                 <div key={href} className="flex flex-col">
-                  <div
+                  <button
+                    type="button"
                     className={clsx(
-                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2 cursor-pointer",
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2 cursor-pointer w-full text-left",
                       isActive
                         ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
                         : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
@@ -323,17 +324,17 @@ function NavbarContent() {
                       setNotesDropdownOpen(!notesDropdownOpen);
                     }}
                   >
-                    <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-3">
                       <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-brand-500" : "text-neutral-500")} />
                       <span>{label}</span>
-                    </div>
+                    </span>
                     <ChevronDown
                       className={clsx(
                         "w-4 h-4 text-neutral-500 transition-transform duration-200",
                         notesDropdownOpen && "rotate-180"
                       )}
                     />
-                  </div>
+                  </button>
 
                   {notesDropdownOpen && (
                     <div className="flex flex-col gap-1 pl-4 mt-1 border-l border-white/[0.06] ml-5">
