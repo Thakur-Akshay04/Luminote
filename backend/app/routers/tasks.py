@@ -9,21 +9,14 @@ import uuid
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.clerk import get_current_user
 from app.database import get_db
-from app.services.auth_service import decode_token
 from app.services.note_service import get_note
 from app.services.ai_tasks import extract_tasks
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notes", tags=["tasks"])
-
-
-async def get_current_user(authorization: str = Header(...)) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
-    token = authorization.split(" ", 1)[1]
-    return await decode_token(token)
 
 
 @router.post("/{note_id}/extract-tasks")

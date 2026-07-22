@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated, getUser, clearAuth } from "@/lib/auth";
-import type { StoredUser } from "@/lib/auth";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { notesApi, usersApi } from "@/lib/api";
 import {
   Loader2,
@@ -18,16 +17,8 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
-
-  // Auth Redirect & Load User
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/login");
-    } else {
-      setUser(getUser());
-    }
-  }, [router]);
+  const { isSignedIn, isLoaded } = useAuth();
+  const { signOut } = useClerk();
 
   // ── Existing Settings Logic: AI settings ────────────────────────────────────
   const [aiFormat, setAiFormat] = useState<"paragraph" | "bullets" | "actions">("paragraph");
@@ -201,15 +192,14 @@ export default function SettingsPage() {
 
     try {
       await usersApi.deleteMe();
-      clearAuth();
-      router.push("/");
+      await signOut({ redirectUrl: "/" });
     } catch (err: any) {
       setDeleteError(err.response?.data?.detail || "Failed to delete account. Please try again.");
       setDeletingAccount(false);
     }
   };
 
-  if (!user) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#030303]">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />

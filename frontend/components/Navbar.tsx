@@ -3,9 +3,8 @@
 import { useState, useEffect, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { clearAuth, getUser } from "@/lib/auth";
-import type { StoredUser } from "@/lib/auth";
-import { alertsApi, BASE_URL } from "@/lib/api";
+import { useUser, useClerk, UserButton } from "@clerk/nextjs";
+import { alertsApi } from "@/lib/api";
 import type { Alert } from "@/types";
 import {
   BookOpen,
@@ -25,51 +24,24 @@ import {
   Trash2,
   ExternalLink,
   X,
+  User as UserIcon,
 } from "lucide-react";
 import clsx from "clsx";
-
-function getInitials(email: string, name?: string): string {
-  if (name) {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    if (parts[0]) return parts[0][0].toUpperCase();
-  }
-  const emailPart = email.split("@")[0];
-  if (emailPart.length >= 2) {
-    return emailPart.slice(0, 2).toUpperCase();
-  }
-  return emailPart[0]?.toUpperCase() || "?";
-}
-
-const getAvatarUrl = (url?: string | null) => {
-  if (!url) return "";
-  if (url.startsWith("http")) return url;
-  return `${BASE_URL}${url}`;
-};
 
 function NavbarContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeType = searchParams.get("type");
-  
-  const [user, setUser] = useState<StoredUser | null>(null);
+
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+
   const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    setUser(getUser());
-    const handleUserUpdate = () => {
-      setUser(getUser());
-    };
-    window.addEventListener("user_update", handleUserUpdate);
-    return () => window.removeEventListener("user_update", handleUserUpdate);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -89,7 +61,7 @@ function NavbarContent() {
   const securityRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
-    if (user) return;
+    if (isSignedIn) return;
 
     const sections = ["showcase", "features", "security"];
     const observerOptions = {
@@ -98,7 +70,7 @@ function NavbarContent() {
       threshold: 0,
     };
 
-    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+    const observerCallback: IntersectionObserverCallback = (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           setActiveSection(entry.target.id);
@@ -113,70 +85,52 @@ function NavbarContent() {
       if (el) observer.observe(el);
     });
 
-    const handleScroll = () => {
-      if (window.scrollY < 100) {
-        setActiveSection(null);
-      }
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, [user]);
+    return () => observer.disconnect();
+  }, [isSignedIn]);
 
   useEffect(() => {
-    if (!activeSection) {
-      setPillStyle((prev) => ({ ...prev, opacity: 0 }));
-      return;
-    }
+    if (isSignedIn) return;
 
-    let activeRef: React.RefObject<HTMLAnchorElement | null> | null = null;
-    if (activeSection === "showcase") activeRef = showcaseRef;
-    if (activeSection === "features") activeRef = featuresRef;
-    if (activeSection === "security") activeRef = securityRef;
+    let targetRef: React.RefObject<HTMLAnchorElement | null> | null = null;
+    if (activeSection === "showcase") targetRef = showcaseRef;
+    else if (activeSection === "features") targetRef = featuresRef;
+    else if (activeSection === "security") targetRef = securityRef;
 
-    if (activeRef?.current && navRef.current) {
-      const activeEl = activeRef.current;
-      const navEl = navRef.current;
-      
-      const activeRect = activeEl.getBoundingClientRect();
-      const navRect = navEl.getBoundingClientRect();
-      
-      const left = activeRect.left - navRect.left;
-      const width = activeRect.width;
-
+    if (targetRef && targetRef.current && navRef.current) {
+      const navRect = navRef.current.getBoundingClientRect();
+      const targetRect = targetRef.current.getBoundingClientRect();
       setPillStyle({
-        left,
-        width,
-        opacity: 1
+        left: targetRect.left - navRect.left,
+        width: targetRect.width,
+        opacity: 1,
       });
+    } else {
+      setPillStyle((prev) => ({ ...prev, opacity: 0 }));
     }
-  }, [activeSection, scrolled]);
+  }, [activeSection, isSignedIn]);
 
   useEffect(() => {
-    if (user) {
-      const fetchAlerts = async () => {
-        try {
-          const res = await alertsApi.list();
-          setAlerts(res.data);
-        } catch {
-          // ignore
-        }
-      };
-      fetchAlerts();
-
-      try {
-        const stored = localStorage.getItem("read_alerts");
-        if (stored) {
-          setReadAlertIds(JSON.parse(stored));
-        }
-      } catch {
-        // ignore
-      }
+    if (!isSignedIn) return;
+    try {
+      const stored = localStorage.getItem("read_alerts");
+      if (stored) setReadAlertIds(JSON.parse(stored));
+    } catch {
+      setReadAlertIds([]);
     }
-  }, [user]);
+
+    const fetchAlerts = async () => {
+      try {
+        const res = await alertsApi.list();
+        setAlerts(res.data);
+      } catch {
+        // silent fail
+      }
+    };
+
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 15000);
+    return () => clearInterval(interval);
+  }, [isSignedIn]);
 
   const handleDeleteAlert = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -191,22 +145,20 @@ function NavbarContent() {
 
   const hasUnread = alerts.some((a) => !readAlertIds.includes(a.id));
 
-  // Keep notes dropdown open if current path is a notes list filter
   useEffect(() => {
     if (pathname.startsWith("/notes")) {
       setNotesDropdownOpen(true);
     }
   }, [pathname]);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push("/login");
+  const handleLogout = async () => {
+    await signOut({ redirectUrl: "/" });
   };
 
-  const navLinks = user
+  const navLinks = isSignedIn
     ? [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-        { href: "/notes",  label: "Notes",  icon: BookOpen, hasDropdown: true },
+        { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/search", label: "Search", icon: Search },
       ]
@@ -219,13 +171,17 @@ function NavbarContent() {
     { type: "checklist", label: "Checklist", icon: ListTodo },
   ];
 
-  if (!user) {
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
     return (
-      <header 
+      <header
         className={clsx(
           "sticky top-0 z-50 w-full transition-all duration-300 animate-fade-in",
-          scrolled 
-            ? "border-b border-white/[0.05] bg-[#030303]/45 backdrop-blur-md shadow-[0_2px_20px_rgba(0,0,0,0.5)] py-3.5" 
+          scrolled
+            ? "border-b border-white/[0.05] bg-[#030303]/45 backdrop-blur-md shadow-[0_2px_20px_rgba(0,0,0,0.5)] py-3.5"
             : "border-b border-transparent bg-transparent py-5"
         )}
       >
@@ -241,8 +197,7 @@ function NavbarContent() {
 
           {/* Landing Navigation Links */}
           <nav className="hidden md:flex items-center gap-2 relative" ref={navRef}>
-            {/* Sliding highlight pill */}
-            <div 
+            <div
               className="absolute bg-white/[0.06] border border-white/[0.05] rounded-full transition-all duration-300 ease-out pointer-events-none"
               style={{
                 left: `${pillStyle.left}px`,
@@ -250,11 +205,11 @@ function NavbarContent() {
                 opacity: pillStyle.opacity,
                 height: "30px",
                 top: "50%",
-                transform: "translateY(-50%)"
+                transform: "translateY(-50%)",
               }}
             />
-            <a 
-              href="#showcase" 
+            <a
+              href="#showcase"
               ref={showcaseRef}
               className={clsx(
                 "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
@@ -263,8 +218,8 @@ function NavbarContent() {
             >
               Showcase
             </a>
-            <a 
-              href="#features" 
+            <a
+              href="#features"
               ref={featuresRef}
               className={clsx(
                 "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
@@ -273,8 +228,8 @@ function NavbarContent() {
             >
               Features
             </a>
-            <a 
-              href="#security" 
+            <a
+              href="#security"
               ref={securityRef}
               className={clsx(
                 "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
@@ -286,14 +241,14 @@ function NavbarContent() {
           </nav>
 
           <div className="flex items-center gap-3 shrink-0">
-            <Link 
-              href="/login" 
+            <Link
+              href="/sign-in"
               className="text-[13px] font-medium text-neutral-400 hover:text-white border border-white/[0.1] hover:border-white/30 hover:bg-white/[0.05] transition-all duration-200 px-5 py-1.5 rounded-full"
             >
               Sign In
             </Link>
-            <Link 
-              href="/register" 
+            <Link
+              href="/sign-up"
               className="px-5 py-1.5 rounded-full bg-white text-black hover:bg-neutral-100 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] active:translate-y-0"
             >
               Get Started
@@ -304,65 +259,68 @@ function NavbarContent() {
     );
   }
 
+  const displayName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress || "User";
+
   return (
     <aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-white/[0.04] bg-[#0c0c0e]/80 backdrop-blur-md flex flex-col justify-between py-8 px-5 shrink-0 sticky top-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)] animate-fade-in z-40">
-      {/* Glow highlight inside container */}
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-brand-500/5 to-transparent rounded-t-2xl pointer-events-none -z-10" />
 
       <div className="flex flex-col gap-8">
         {/* Profile Card Header */}
-        <Link 
-          href="/profile"
-          className="flex items-center gap-3.5 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.08] transition-all cursor-pointer group shadow-sm"
-        >
-          {user.avatar_url ? (
-            <img
-              src={getAvatarUrl(user.avatar_url)}
-              alt="Avatar"
-              className="w-10 h-10 rounded-full object-cover shadow-md shrink-0 border-2 border-brand-500/20 group-hover:border-brand-500/50 transition-colors"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-500/20 to-pink-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 shadow-md shrink-0 group-hover:border-brand-500/40 transition-colors font-bold text-sm uppercase">
-              {getInitials(user.email, user.display_name || user.name)}
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] shadow-sm">
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 min-w-0 flex-1 group"
+          >
+            {user.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt={displayName}
+                className="w-10 h-10 rounded-full object-cover border border-brand-500/30 group-hover:border-brand-500 transition-colors"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 font-bold text-sm">
+                <UserIcon className="w-5 h-5" />
+              </div>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold text-white tracking-tight truncate group-hover:text-brand-300 transition-colors">
+                {displayName}
+              </span>
+              <span className="text-[11px] text-neutral-500 truncate">
+                {user.primaryEmailAddress?.emailAddress}
+              </span>
             </div>
-          )}
-          
-          <div className="flex-1 min-w-0 flex flex-col">
-            <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider leading-none mb-1">Workspace</span>
-            <span className="text-sm font-bold text-neutral-200 truncate group-hover:text-white transition-colors">
-              {user.display_name || user.email.split("@")[0]}
-            </span>
+          </Link>
+          <div className="shrink-0 pl-1">
+            <UserButton />
           </div>
-          <ChevronDown className="w-4 h-4 text-neutral-500 group-hover:text-neutral-300 transition-colors shrink-0" />
-        </Link>
+        </div>
 
-        {/* Nav Links */}
-        <div className="flex flex-col gap-2.5">
+        {/* Navigation Section */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 px-4 mb-1">
+            Menu
+          </span>
+
           {navLinks.map(({ href, label, icon: Icon, hasDropdown }) => {
-            const isActive = pathname.startsWith(href);
-            
+            const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+
             if (hasDropdown) {
               return (
-                <div key={href} className="flex flex-col gap-1">
+                <div key={href} className="flex flex-col">
                   <div
                     className={clsx(
-                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer select-none border-l-2 focus:outline-none",
-                      isActive && !activeType
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2 cursor-pointer",
+                      isActive
                         ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
                         : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
                     )}
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      router.push(href);
-                      setNotesDropdownOpen(!notesDropdownOpen);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        router.push(href);
-                        setNotesDropdownOpen(!notesDropdownOpen);
+                    onClick={() => {
+                      if (!pathname.startsWith("/notes")) {
+                        router.push("/notes");
                       }
+                      setNotesDropdownOpen(!notesDropdownOpen);
                     }}
                   >
                     <div className="flex items-center gap-3">
@@ -376,15 +334,14 @@ function NavbarContent() {
                       )}
                     />
                   </div>
-                  
-                  {/* Dropdown Options */}
+
                   {notesDropdownOpen && (
                     <div className="flex flex-col gap-1 pl-4 mt-1 border-l border-white/[0.06] ml-5">
                       {dropdownOptions.map((opt) => {
                         const optHref = `/notes?type=${opt.type}`;
                         const isOptActive = pathname.startsWith("/notes") && activeType === opt.type;
                         const OptIcon = opt.icon;
-                        
+
                         return (
                           <Link
                             key={opt.type}
@@ -450,7 +407,6 @@ function NavbarContent() {
           {/* Notifications Popover */}
           {notificationsOpen && (
             <div className="absolute bottom-full left-0 mb-3 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
-              {/* Header */}
               <div className="flex items-center justify-between border-b border-border-muted pb-2">
                 <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
                 <button
@@ -461,7 +417,6 @@ function NavbarContent() {
                 </button>
               </div>
 
-              {/* Notifications List */}
               <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-0.5">
                 {alerts.length === 0 ? (
                   <div className="text-center py-6 text-neutral-500 text-xs italic">
@@ -477,11 +432,13 @@ function NavbarContent() {
                           key={alert.id}
                           className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-base border border-border-muted hover:bg-surface-strong transition-colors group relative"
                         >
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5
-                            ${alert.is_notified 
-                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
-                              : "bg-pink-500/10 border-pink-500/20 text-pink-400"
-                            }`}
+                          <div
+                            className={clsx(
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5",
+                              alert.is_notified
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                : "bg-pink-500/10 border-pink-500/20 text-pink-400"
+                            )}
                           >
                             <Bell className="w-3.5 h-3.5" />
                           </div>
@@ -505,7 +462,6 @@ function NavbarContent() {
                             )}
                           </div>
 
-                          {/* Delete Button */}
                           <button
                             onClick={(e) => handleDeleteAlert(alert.id, e)}
                             className="absolute top-2 right-2 text-neutral-500 hover:text-red-400 p-1 rounded hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
@@ -521,7 +477,7 @@ function NavbarContent() {
             </div>
           )}
         </div>
-        
+
         <button
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors"
           onClick={() => router.push("/settings")}
@@ -536,7 +492,7 @@ function NavbarContent() {
           <HelpCircle className="w-4 h-4 text-neutral-500" />
           Help
         </button>
-        
+
         <div className="h-px bg-white/[0.04] my-1" />
 
         <button

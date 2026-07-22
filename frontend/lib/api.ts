@@ -1,7 +1,6 @@
 import axios from "axios";
-import { getToken, clearAuth } from "@/lib/auth";
+import { useAuth } from "@clerk/nextjs";
 import type {
-  AuthResponse,
   Note,
   NoteCreate,
   NoteUpdate,
@@ -19,38 +18,63 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:800
 
 const api = axios.create({ baseURL: BASE_URL });
 
-// Attach JWT to every request
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Attach Clerk JWT to every request automatically via window.Clerk
+api.interceptors.request.use(async (config) => {
+  if (typeof window !== "undefined" && (window as any).Clerk?.session) {
+    try {
+      const token = await (window as any).Clerk.session.getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (err) {
+      console.error("Failed to fetch Clerk token for API request:", err);
+    }
   }
   return config;
 });
 
-// On 401, clear auth and redirect
+// On 401, redirect to sign-in page
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
-      clearAuth();
-      window.location.href = "/login";
+      window.location.href = "/sign-in";
     }
     return Promise.reject(err);
   }
 );
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-export const authApi = {
-  register: (email: string, password: string, name?: string) =>
-    api.post<AuthResponse>("/auth/register", { email, password, name }),
-  login: (email: string, password: string) =>
-    api.post<AuthResponse>("/auth/login", { email, password }),
-  updatePassword: (currentPassword: string, newPassword: string) =>
-    api.put("/auth/password", { current_password: currentPassword, new_password: newPassword }),
-  deleteAccount: () =>
-    api.delete("/auth/account"),
-};
+// ── Hook for custom fetch calls with Clerk Auth ──────────────────────────────
+export function useApi() {
+  const { getToken } = useAuth();
+
+  const apiFetch = async (url: string, options: RequestInit = {}) => {
+    const token = await getToken();
+
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const res = await fetch(`${baseUrl}${url}`, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  };
+
+  return { apiFetch, notesApi, alertsApi, searchApi, usersApi };
+}
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 export const notesApi = {
@@ -70,7 +94,7 @@ export const notesApi = {
   summarize: (id: string, format: string, extractAlerts: boolean) =>
     api.post<SummarizeResponse>(`/notes/${id}/summarize`, { format, extract_alerts: extractAlerts }),
 
-  // ── Feature 1: Freehand Drawing ──────────────────────────────────────────
+  // Freehand Drawing
   saveDrawing: (id: string, base64Image: string) =>
     api.post<DrawingResponse>(`/notes/${id}/drawing`, { image: base64Image }),
   getDrawing: (id: string) =>
@@ -80,7 +104,7 @@ export const notesApi = {
   deleteDrawingVersion: (id: string, version: number) =>
     api.delete<DrawingResponse>(`/notes/${id}/drawing/version/${version}`),
 
-  // ── Feature 2: Audio Recording & Transcription ───────────────────────────
+  // Audio Recording & Transcription
   uploadAudio: (id: string, audioBlob: Blob) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.mp3");
@@ -91,7 +115,7 @@ export const notesApi = {
   transcribeAudio: (id: string, force: boolean = false) =>
     api.post<TranscriptResponse>(`/notes/${id}/transcribe${force ? "?force=true" : ""}`),
 
-  // ── Feature 3: To-do Checklist ───────────────────────────────────────────
+  // To-do Checklist
   toggleChecklistItem: (id: string, index: number, checked: boolean) =>
     api.patch(`/notes/${id}/checklist/${index}`, { checked }),
   extractTasks: (id: string) =>
@@ -132,11 +156,7 @@ export const usersApi = {
   deleteAvatar: () => api.delete<{ message: string }>("/users/me/avatar"),
   changeEmail: (newEmail: string, confirmNewEmail: string) =>
     api.patch<{ message: string }>("/users/me/email", { new_email: newEmail, confirm_new_email: confirmNewEmail }),
-  changePassword: (currentPassword: string, newPassword: string) =>
-    api.patch<{ message: string }>("/users/me/password", { current_password: currentPassword, new_password: newPassword }),
   changeName: (displayName: string) =>
     api.patch<{ display_name: string }>("/users/me/name", { display_name: displayName }),
   deleteMe: () => api.delete<void>("/users/me"),
 };
-
-

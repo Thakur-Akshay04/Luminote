@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate, SummarizeRequest, SummarizeResponse
 from app.services.ai_service import ask_question, summarize_note_with_ai
-from app.services.auth_service import decode_token
+from app.auth.clerk import get_current_user
 from app.services.note_service import (
     create_note,
     delete_note,
@@ -38,13 +38,6 @@ def extract_text_from_tiptap_json(node) -> str:
 
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-
-
-async def get_current_user(authorization: str = Header(...)) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
-    token = authorization.split(" ", 1)[1]
-    return await decode_token(token)
 
 
 @router.get("", response_model=list[NoteResponse])

@@ -1,7 +1,5 @@
-import Cookies from "js-cookie";
-
-const TOKEN_KEY = "luminote_token";
-const USER_KEY = "luminote_user";
+// Deprecated — Auth is now fully handled by Clerk (@clerk/nextjs)
+// These stubs exist only for backward compatibility with any remaining imports.
 
 export interface StoredUser {
   user_id: string;
@@ -11,30 +9,20 @@ export interface StoredUser {
   display_name?: string | null;
 }
 
-export function setAuth(token: string, user: StoredUser): void {
-  Cookies.set(TOKEN_KEY, token, { expires: 7, sameSite: "lax" });
-  Cookies.set(USER_KEY, JSON.stringify(user), { expires: 7, sameSite: "lax" });
-}
-
-export function getToken(): string | null {
-  return Cookies.get(TOKEN_KEY) ?? null;
-}
-
-export function getUser(): StoredUser | null {
-  const raw = Cookies.get(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as StoredUser;
-  } catch {
-    return null;
-  }
-}
-
-export function clearAuth(): void {
-  Cookies.remove(TOKEN_KEY);
-  Cookies.remove(USER_KEY);
-}
-
+/** @deprecated Use Clerk middleware instead — this always returns false. */
 export function isAuthenticated(): boolean {
-  return !!getToken();
+  return false;
 }
+
+/** @deprecated Auth tokens are now managed by Clerk. */
+export function getToken(): string | null {
+  return null;
+}
+
+/** @deprecated Use useUser() from @clerk/nextjs instead. */
+export function getUser(): StoredUser | null {
+  return null;
+}
+
+export function setAuth(): void {}
+export function clearAuth(): void {}

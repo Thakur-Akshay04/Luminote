@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { isAuthenticated, getUser } from "@/lib/auth";
+import { useUser } from "@clerk/nextjs";
+
 import { notesApi, alertsApi } from "@/lib/api";
 import type { Note, Alert } from "@/types";
 import NoteCard from "@/components/NoteCard";
@@ -158,15 +159,13 @@ export default function DashboardPage() {
   // Input states
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { user } = useUser();
+
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/landing");
-    } else {
-      const user = getUser();
-      setFirstName((user?.display_name || user?.email?.split("@")[0]) ?? "there");
-      setMounted(true);
-    }
-  }, [router]);
+    const name = user?.firstName || user?.username || user?.primaryEmailAddress?.emailAddress?.split("@")[0];
+    setFirstName(name ?? "there");
+    setMounted(true);
+  }, [user]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

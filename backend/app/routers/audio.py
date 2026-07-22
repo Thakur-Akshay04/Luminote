@@ -10,15 +10,16 @@ import uuid
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.groq_client import client
+from app.auth.clerk import get_current_user
 from app.models.note import Note
 from app.redis_client import get_redis
-from app.services.auth_service import decode_token
 from app.services.note_service import get_note
 
 logger = logging.getLogger(__name__)
@@ -33,13 +34,6 @@ ALLOWED_AUDIO_TYPES = {
     "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
     "video/webm",  # some browsers report webm audio as video/webm
 }
-
-
-async def get_current_user(authorization: str = Header(...)) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
-    token = authorization.split(" ", 1)[1]
-    return await decode_token(token)
 
 
 from pydantic import BaseModel

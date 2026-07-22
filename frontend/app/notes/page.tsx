@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+
 import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
 import NoteCard from "@/components/NoteCard";
@@ -22,10 +22,6 @@ function NotesContent() {
   const [error, setError] = useState<string | null>(null);
   const [isNoteTypeModalOpen, setIsNoteTypeModalOpen] = useState(false);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login");
-  }, [router]);
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);

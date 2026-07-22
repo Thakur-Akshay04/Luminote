@@ -9,21 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.redis_client import get_redis
 from app.config import settings
+from app.auth.clerk import get_current_user
 from app.schemas.search import SearchRequest, SearchResponse, SearchResultItem
 from app.services.ai_service import get_embedding
-from app.services.auth_service import decode_token
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 # Maximum allowed query length to prevent abuse
 MAX_QUERY_LENGTH = 512
-
-
-async def get_current_user(authorization: str = Header(...)) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
-    token = authorization.split(" ", 1)[1]
-    return await decode_token(token)
 
 
 def _validate_embedding_vector(embedding: list[float]) -> str:

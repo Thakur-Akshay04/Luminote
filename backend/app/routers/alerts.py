@@ -5,20 +5,13 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.auth.clerk import get_current_user, verify_token
 from app.models.alert import Alert
 from app.models.note import Note
 from app.schemas.alert import AlertCreate, AlertResponse
-from app.services.auth_service import decode_token
 from app.services.note_service import get_note
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
-
-
-async def get_current_user(authorization: str = Header(...)) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth header")
-    token = authorization.split(" ", 1)[1]
-    return await decode_token(token)
 
 
 @router.get("", response_model=list[AlertResponse])
@@ -91,7 +84,7 @@ async def websocket_alerts(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        user_id = await decode_token(token)
+        user_id = await verify_token(token, db)
     except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

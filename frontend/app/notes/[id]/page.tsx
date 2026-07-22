@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+
 import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
@@ -425,8 +425,12 @@ function NoteEditorContent() {
 
   // Tiptap Editor Setup
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: false,
+        underline: false,
+      }),
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       FontFamily,
@@ -491,9 +495,7 @@ function NoteEditorContent() {
     }
   };
 
-  useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login");
-  }, [router]);
+
 
   const fetchNote = useCallback(async () => {
     if (noteId === "new") {

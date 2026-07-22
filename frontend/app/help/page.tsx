@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+
 import {
   HelpCircle,
   Search,
@@ -68,12 +68,8 @@ export default function HelpPage() {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/login");
-    } else {
-      setMounted(true);
-    }
-  }, [router]);
+    setMounted(true);
+  }, []);
 
   if (!mounted) return null;
 

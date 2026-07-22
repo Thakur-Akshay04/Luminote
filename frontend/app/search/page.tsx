@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { isAuthenticated } from "@/lib/auth";
+
 import { searchApi } from "@/lib/api";
 import type { SearchResultItem } from "@/types";
 import SearchResult from "@/components/SearchResult";
@@ -20,9 +20,8 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login");
     inputRef.current?.focus();
-  }, [router]);
+  }, []);
 
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();

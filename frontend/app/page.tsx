@@ -2,21 +2,23 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+import { useAuth } from "@clerk/nextjs";
 
 export default function HomePage() {
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace("/dashboard");
+    if (!isLoaded) return;
+    if (isSignedIn) {
+      router.replace("/notes");
     } else {
       router.replace("/landing");
     }
-  }, [router]);
+  }, [isLoaded, isSignedIn, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-surface-base">
       <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );

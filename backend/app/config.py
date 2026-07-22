@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
 
+    # Clerk Authentication
+    clerk_secret_key: str = ""
+    clerk_jwks_url: str = ""
+
     # Frontend URL — used for email verification redirects
     frontend_url: str = "http://localhost:3000"
 

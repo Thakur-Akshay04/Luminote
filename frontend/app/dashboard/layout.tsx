@@ -2,9 +2,17 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
 export const metadata: Metadata = { title: "Dashboard Page" };
 
-export default function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
   return (
     <div className="min-h-screen flex bg-surface-800">
       <Navbar />

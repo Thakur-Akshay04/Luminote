@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { isAuthenticated } from "@/lib/auth";
+import { useAuth } from "@clerk/nextjs";
+
 import {
   Sparkles,
   Bot,
@@ -213,13 +214,16 @@ export default function LandingPage() {
 
   // Scroll reveals handled by <FadeUp> component
 
+  const { isSignedIn, isLoaded } = useAuth();
+
   useEffect(() => {
-    if (isAuthenticated()) {
+    if (!isLoaded) return;
+    if (isSignedIn) {
       router.replace("/dashboard");
     } else {
       setMounted(true);
     }
-  }, [router]);
+  }, [isLoaded, isSignedIn, router]);
 
   // Audio wave visualizer animation for capture mode
   const getSecureRandom = () => {

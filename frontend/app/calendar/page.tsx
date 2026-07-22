@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated } from "@/lib/auth";
+
 import { alertsApi, notesApi } from "@/lib/api";
 import type { Alert, Note } from "@/types";
 import {
@@ -51,10 +51,7 @@ export default function CalendarPage() {
   const [alertTime, setAlertTime] = useState("09:00");
   const [creatingAlert, setCreatingAlert] = useState(false);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login");
-  }, [router]);
+
 
   const fetchData = useCallback(async () => {
     setLoading(true);

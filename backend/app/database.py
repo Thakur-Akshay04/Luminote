@@ -60,6 +60,17 @@ async def init_db() -> None:
             pass
 
         migration_stmts = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_user_id TEXT UNIQUE",
+            "CREATE INDEX IF NOT EXISTS idx_users_clerk_id ON users (clerk_user_id)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT",
+            """
+            DO $$ 
+            BEGIN 
+              IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash') THEN 
+                ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL; 
+              END IF; 
+            END $$;
+            """,
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email TEXT",
