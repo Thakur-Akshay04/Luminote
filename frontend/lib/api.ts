@@ -91,8 +91,24 @@ export const notesApi = {
       },
     }),
   get: (id: string) => api.get<Note>(`/notes/${id}`),
-  create: (data: NoteCreate) => api.post<Note>("/notes", data),
-  update: (id: string, data: NoteUpdate) => api.put<Note>(`/notes/${id}`, data),
+  create: (data: NoteCreate) => {
+    const format = typeof window !== "undefined" ? localStorage.getItem("luminote_ai_format") : undefined;
+    const extractAlerts = typeof window !== "undefined" ? localStorage.getItem("luminote_ai_extract_alerts") !== "false" : undefined;
+    return api.post<Note>("/notes", {
+      ...data,
+      ...(format ? { summary_format: format } : {}),
+      ...(extractAlerts !== undefined ? { extract_alerts: extractAlerts } : {}),
+    });
+  },
+  update: (id: string, data: NoteUpdate) => {
+    const format = typeof window !== "undefined" ? localStorage.getItem("luminote_ai_format") : undefined;
+    const extractAlerts = typeof window !== "undefined" ? localStorage.getItem("luminote_ai_extract_alerts") !== "false" : undefined;
+    return api.put<Note>(`/notes/${id}`, {
+      ...data,
+      ...(format ? { summary_format: format } : {}),
+      ...(extractAlerts !== undefined ? { extract_alerts: extractAlerts } : {}),
+    });
+  },
   delete: (id: string) => api.delete(`/notes/${id}`),
   ask: (id: string, question: string) =>
     api.post<AskResponse>(`/notes/${id}/ask`, { question }),

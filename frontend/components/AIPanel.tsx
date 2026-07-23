@@ -155,6 +155,15 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
   const [summarizing, setSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && activeTab === "insights") {
+      const stored = localStorage.getItem("luminote_ai_format");
+      if (stored === "paragraph" || stored === "bullets" || stored === "actions") {
+        setFormat(stored);
+      }
+    }
+  }, [activeTab]);
+
   const handleSummarize = async () => {
     setSummarizing(true);
     setSummarizeError(null);
@@ -167,10 +176,11 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
         return;
       }
 
+      const activeFormat = (typeof window !== "undefined" && (localStorage.getItem("luminote_ai_format") as "paragraph" | "bullets" | "actions")) || format;
       const extractAlerts = typeof window !== "undefined"
         ? localStorage.getItem("luminote_ai_extract_alerts") !== "false"
         : true;
-      const res = await notesApi.summarize(activeId, format, extractAlerts);
+      const res = await notesApi.summarize(activeId, activeFormat, extractAlerts);
       if (onUpdateNote) {
         onUpdateNote(res.data.note);
       }
@@ -528,7 +538,12 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                     <button
                       key={fmt}
                       type="button"
-                      onClick={() => setFormat(fmt)}
+                      onClick={() => {
+                        setFormat(fmt);
+                        if (typeof window !== "undefined") {
+                          localStorage.setItem("luminote_ai_format", fmt);
+                        }
+                      }}
                       className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all
                         ${format === fmt
                           ? "bg-white/[0.08] text-white shadow-glow border border-white/[0.04]"

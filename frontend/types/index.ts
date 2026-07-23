@@ -36,6 +36,8 @@ export interface NoteCreate {
   note_type?: string;
   is_pinned?: boolean;
   is_favorite?: boolean;
+  summary_format?: string;
+  extract_alerts?: boolean;
 }
 
 export interface NoteUpdate {
@@ -45,6 +47,8 @@ export interface NoteUpdate {
   checklist_items?: ChecklistItem[];
   is_pinned?: boolean;
   is_favorite?: boolean;
+  summary_format?: string;
+  extract_alerts?: boolean;
 }
 
 export interface SearchResultItem {
