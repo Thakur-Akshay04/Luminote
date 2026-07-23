@@ -206,7 +206,7 @@ async def get_notes(
 ) -> list[Note]:
     stmt = select(Note).where(Note.user_id == user_id).order_by(Note.is_pinned.desc(), Note.updated_at.desc())
     if tag:
-        stmt = stmt.where(Note.tags.contains([tag]))
+        stmt = stmt.where(Note.tags.any(tag))
     if note_type:
         stmt = stmt.where(Note.note_type == note_type)
     if is_favorite is True:
