@@ -18,6 +18,8 @@ class NoteCreate(BaseModel):
     note_type: Optional[str] = "text"
     is_pinned: Optional[bool] = False
     is_favorite: Optional[bool] = False
+    summary_format: Optional[str] = "paragraph"
+    extract_alerts: Optional[bool] = True
 
 
 class NoteUpdate(BaseModel):
@@ -27,6 +29,8 @@ class NoteUpdate(BaseModel):
     checklist_items: Optional[list[ChecklistItem]] = None
     is_pinned: Optional[bool] = None
     is_favorite: Optional[bool] = None
+    summary_format: Optional[str] = None
+    extract_alerts: Optional[bool] = None
 
     @field_validator("checklist_items", mode="before")
     @classmethod

@@ -69,6 +69,8 @@ async def create(
         note_type=body.note_type,
         is_pinned=body.is_pinned,
         is_favorite=body.is_favorite,
+        summary_format=body.summary_format,
+        extract_alerts=body.extract_alerts,
     )
 
 
@@ -95,6 +97,8 @@ async def update(
         checklist_items=body.checklist_items,
         is_pinned=body.is_pinned,
         is_favorite=body.is_favorite,
+        summary_format=body.summary_format,
+        extract_alerts=body.extract_alerts,
     )
 
 

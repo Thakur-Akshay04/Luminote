@@ -202,10 +202,10 @@ async def summarize_note_with_ai(
     and optionally extract calendar events/alerts.
     """
     format_instruction = {
-        "paragraph": "a concise 2-3 sentence paragraph summarizing the note content",
-        "bullets": "a bulleted list of the main takeaways (each bullet starting with a dash '-')",
-        "actions": "a checklist of actionable tasks/to-dos extracted from the note (each starting with '- [ ]')"
-    }.get(summary_format, "a concise 2-3 sentence paragraph")
+        "paragraph": "a clean, textual paragraph overview summarizing core ideas",
+        "bullets": "a clear, scannable bullet point list of key insights (each bullet line starting with '- ')",
+        "actions": "actionable items, tasks, and follow-ups extracted from the note (each item starting with '- [ ] ')"
+    }.get(summary_format, "a clean, textual paragraph overview summarizing core ideas")
 
     sanitized_content = _sanitize_user_content(content[:4000])
 

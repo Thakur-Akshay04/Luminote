@@ -68,7 +68,13 @@ async def sync_ai_alerts(
     return new_alerts
 
 
-async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) -> None:
+async def _run_ai_pipeline(
+    note_id: uuid.UUID,
+    content: str,
+    session_factory,
+    summary_format: str = "paragraph",
+    extract_alerts: bool = True
+) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
         # Check note_type first to avoid using model for voice (audio) and drawing features
@@ -107,7 +113,12 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
 
         current_time_str = datetime.now(timezone.utc).isoformat()
         enrichment, embedding = await asyncio.gather(
-            summarize_note_with_ai(text_content, summary_format="paragraph", extract_alerts=True, current_time_str=current_time_str),
+            summarize_note_with_ai(
+                text_content,
+                summary_format=summary_format,
+                extract_alerts=extract_alerts,
+                current_time_str=current_time_str
+            ),
             get_embedding(text_content),
         )
 
@@ -146,6 +157,8 @@ async def create_note(
     note_type: Optional[str] = None,
     is_pinned: Optional[bool] = False,
     is_favorite: Optional[bool] = False,
+    summary_format: Optional[str] = "paragraph",
+    extract_alerts: Optional[bool] = True,
 ) -> Note:
     import json
     if content and (not note_type or note_type == "text"):
@@ -171,7 +184,14 @@ async def create_note(
 
     # Schedule AI enrichment in the background
     from app.database import AsyncSessionLocal
-    background_tasks.add_task(_run_ai_pipeline, note.id, content, AsyncSessionLocal)
+    background_tasks.add_task(
+        _run_ai_pipeline,
+        note.id,
+        content,
+        AsyncSessionLocal,
+        summary_format or "paragraph",
+        extract_alerts if extract_alerts is not None else True
+    )
 
     return note
 
@@ -220,6 +240,8 @@ async def update_note(
     checklist_items: Optional[list] = None,
     is_pinned: Optional[bool] = None,
     is_favorite: Optional[bool] = None,
+    summary_format: Optional[str] = None,
+    extract_alerts: Optional[bool] = None,
 ) -> Note:
     note = await get_note(note_id, user_id, db)
 
@@ -259,7 +281,14 @@ async def update_note(
 
     if content_changed:
         from app.database import AsyncSessionLocal
-        background_tasks.add_task(_run_ai_pipeline, note.id, content, AsyncSessionLocal)
+        background_tasks.add_task(
+            _run_ai_pipeline,
+            note.id,
+            content,
+            AsyncSessionLocal,
+            summary_format or "paragraph",
+            extract_alerts if extract_alerts is not None else True
+        )
 
     return note
 
