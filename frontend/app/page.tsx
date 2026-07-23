@@ -11,7 +11,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoaded) return;
     if (isSignedIn) {
-      router.replace("/notes");
+      router.replace("/dashboard");
     } else {
       router.replace("/landing");
     }

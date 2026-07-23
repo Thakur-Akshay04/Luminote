@@ -364,7 +364,7 @@ export default function LandingPage() {
             {/* Hero CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full sm:w-auto">
               <Link
-                href="/register"
+                href="/sign-up"
                 id="landing-cta-register"
                 className="px-8 py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold flex items-center justify-center gap-2 group text-sm sm:text-base shadow-lg hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_25px_rgba(139,92,246,0.35)] btn-smooth-hover text-center"
               >
@@ -372,7 +372,7 @@ export default function LandingPage() {
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
-                href="/login"
+                href="/sign-in"
                 id="landing-cta-login"
                 className="px-8 py-3.5 rounded-xl border border-white/[0.08] hover:border-brand-500/40 hover:bg-white/[0.02] text-neutral-300 hover:text-white font-bold text-sm sm:text-base hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_15px_rgba(139,92,246,0.15)] btn-smooth-hover flex items-center justify-center text-center"
               >

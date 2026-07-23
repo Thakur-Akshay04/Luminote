@@ -4,6 +4,8 @@ export default function SignUpPage() {
   return (
     <main className="min-h-screen w-full flex items-center justify-center bg-surface-base p-4">
       <SignUp
+        fallbackRedirectUrl="/dashboard"
+        forceRedirectUrl="/dashboard"
         appearance={{
           variables: {
             colorPrimary: "#6366f1",

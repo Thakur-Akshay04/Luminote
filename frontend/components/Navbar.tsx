@@ -9,7 +9,6 @@ import type { Alert } from "@/types";
 import {
   BookOpen,
   Search,
-  LogOut,
   Notebook,
   Calendar,
   LayoutDashboard,
@@ -152,15 +151,11 @@ function NavbarContent() {
     }
   }, [pathname]);
 
-  const handleLogout = async () => {
-    await signOut({ redirectUrl: "/" });
-  };
-
   const navLinks = isSignedIn
     ? [
+        { href: "/notes?favorite=true", label: "Favorites", icon: Star },
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
         { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
-        { href: "/notes?favorite=true", label: "Favorites", icon: Star },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/search", label: "Search", icon: Search },
       ]
@@ -500,17 +495,6 @@ function NavbarContent() {
         >
           <HelpCircle className="w-4 h-4 text-neutral-500" />
           Help
-        </button>
-
-        <div className="h-px bg-white/[0.04] my-1" />
-
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-950/15 w-full text-left transition-colors"
-          title="Logout"
-        >
-          <LogOut className="w-4 h-4 text-red-400" />
-          Logout
         </button>
       </div>
     </aside>
