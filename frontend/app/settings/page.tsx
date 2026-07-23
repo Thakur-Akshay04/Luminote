@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { notesApi, usersApi } from "@/lib/api";
 import type { Note } from "@/types";
 import {
@@ -13,15 +13,29 @@ import {
   ShieldAlert,
   Trash2,
   Download,
-  Upload,
+  FileText,
+  ListOrdered,
+  CheckSquare,
+  Zap,
+  User as UserIcon,
+  Sliders,
+  Database,
+  Calendar,
+  Shield,
+  LogOut,
+  X,
+  Check,
 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
   const { signOut } = useClerk();
 
-  // ── Existing Settings Logic: AI settings ────────────────────────────────────
+  const [activeSection, setActiveSection] = useState<"preferences" | "data" | "account">("preferences");
+
+  // ── AI Preferences ────────────────────────────────────────────────────────
   const [aiFormat, setAiFormat] = useState<"paragraph" | "bullets" | "actions">("paragraph");
   const [aiExtractAlerts, setAiExtractAlerts] = useState(true);
   const [aiSuccess, setAiSuccess] = useState(false);
@@ -43,16 +57,14 @@ export default function SettingsPage() {
     localStorage.setItem("luminote_ai_format", aiFormat);
     localStorage.setItem("luminote_ai_extract_alerts", String(aiExtractAlerts));
     setAiSuccess(true);
-    setTimeout(() => setAiSuccess(false), 2000);
+    setTimeout(() => setAiSuccess(false), 2500);
   };
 
-  // ── Existing Settings Logic: Backups ────────────────────────────────────────
+  // ── Backup & Wipe Data ───────────────────────────────────────────────────
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState("");
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+
   const [wipeConfirmInput, setWipeConfirmInput] = useState("");
   const [wiping, setWiping] = useState(false);
   const [wipeError, setWipeError] = useState<string | null>(null);
@@ -61,6 +73,7 @@ export default function SettingsPage() {
   const handleExportData = async () => {
     setExporting(true);
     setExportError(null);
+    setExportSuccess(null);
     try {
       const res = await notesApi.list();
       const notes = res.data.filter((note: Note) => note.note_type === "text" || note.note_type === "checklist");
@@ -72,71 +85,17 @@ export default function SettingsPage() {
       link.download = `luminote_backup_${new Date().toISOString().split("T")[0]}.json`;
       link.click();
       URL.revokeObjectURL(url);
+      setExportSuccess(`Successfully exported ${notes.length} notes.`);
     } catch {
-      setExportError("Failed to export notes.");
+      setExportError("Failed to export notes backup.");
     } finally {
       setExporting(false);
     }
   };
 
-  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImporting(true);
-    setImportError(null);
-    setImportSuccess(null);
-    setImportProgress("Reading backup file...");
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const notes = JSON.parse(text);
-
-        if (!Array.isArray(notes)) {
-          throw new Error("Invalid backup format. Expected an array of notes.");
-        }
-
-        const total = notes.length;
-        if (total === 0) {
-          setImportSuccess("Backup file has 0 notes. Nothing to import.");
-          setImporting(false);
-          return;
-        }
-
-        let count = 0;
-        for (const item of notes) {
-          try {
-            await notesApi.create({
-              title: item.title || "Imported Note",
-              content: item.content || "",
-            });
-            count++;
-            setImportProgress(`Importing notes: ${count} of ${total} complete...`);
-          } catch (createErr) {
-            console.error("Failed to create note during import", createErr);
-          }
-        }
-        setImportSuccess(`Successfully imported ${count} notes.`);
-      } catch (err: any) {
-        setImportError(err.message || "Failed to parse backup JSON file.");
-      } finally {
-        setImporting(false);
-        setImportProgress("");
-        e.target.value = "";
-      }
-    };
-    reader.onerror = () => {
-      setImportError("Failed to read the file.");
-      setImporting(false);
-    };
-    reader.readAsText(file);
-  };
-
   const handleWipeNotes = async () => {
     if (wipeConfirmInput !== "DELETE ALL NOTES") {
-      setWipeError("Please type DELETE ALL NOTES to confirm.");
+      setWipeError("Please type DELETE ALL NOTES exactly to confirm.");
       return;
     }
 
@@ -150,7 +109,7 @@ export default function SettingsPage() {
       const total = notes.length;
 
       if (total === 0) {
-        setWipeSuccess("No notes to delete.");
+        setWipeSuccess("No notes found to delete.");
         setWiping(false);
         setWipeConfirmInput("");
         return;
@@ -167,16 +126,16 @@ export default function SettingsPage() {
           }
         })
       );
-      setWipeSuccess(`Successfully deleted all ${count} notes.`);
+      setWipeSuccess(`Successfully wiped all ${count} notes.`);
       setWipeConfirmInput("");
     } catch {
-      setWipeError("An error occurred during note deletion.");
+      setWipeError("An error occurred while deleting notes.");
     } finally {
       setWiping(false);
     }
   };
 
-  // ── Feature 4: Danger Zone ──────────────────────────────────────────────────
+  // ── Danger Zone Account Deletion ─────────────────────────────────────────
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -202,246 +161,377 @@ export default function SettingsPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+      <div className="min-h-screen flex items-center justify-center bg-[#030305]">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
       </div>
     );
   }
 
+  const primaryEmail = user?.primaryEmailAddress?.emailAddress || "User Account";
+  const fullName = user?.fullName || user?.firstName || "Luminote User";
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 animate-slide-up">
-      <div className="mb-8 border-b border-white/[0.06] pb-5">
-        <h1 className="text-3xl font-bold text-gradient">Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Configure your workspace preferences and backups</p>
+    <div className="max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8 animate-fade-in">
+      {/* ── TOP HERO HEADER ──────────────────────────────────────────────── */}
+      <div className="relative mb-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-neutral-900/90 via-surface-900/50 to-neutral-950/90 border border-white/[0.08] shadow-2xl backdrop-blur-xl overflow-hidden">
+        {/* Glow ambient background */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-16 w-64 h-64 bg-accent-violet/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt={fullName}
+                className="w-14 h-14 rounded-2xl border-2 border-white/10 shadow-lg object-cover"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-violet flex items-center justify-center shadow-lg text-white font-bold text-xl">
+                {fullName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">{fullName}</h1>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1 flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                {primaryEmail}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="self-start md:self-auto px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.08] hover:border-red-500/30 text-xs font-semibold text-neutral-300 hover:text-red-400 transition-all flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+
+        {/* Navigation Tabs Bar */}
+        <div className="flex items-center gap-2 mt-8 pt-6 border-t border-white/[0.06] overflow-x-auto scrollbar-none">
+          {[
+            { id: "preferences", label: "Workspace & AI", icon: Sliders },
+            { id: "data", label: "Export & Data", icon: Database },
+            { id: "account", label: "Account Security", icon: Shield },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSection(tab.id as any)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${isActive
+                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/25 border border-brand-400/40"
+                    : "bg-neutral-900/60 text-neutral-400 hover:text-white hover:bg-neutral-800/60 border border-white/[0.04]"
+                  }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-8">
-        {/* ── WORKSPACE PREFERENCES / AI SETTINGS SECTION ──────────────────── */}
-        <section className="glass p-6 flex flex-col gap-6">
-          <h2 className="text-xl font-bold text-neutral-200 border-b border-white/[0.04] pb-2">Workspace Preferences</h2>
-          
-          <div className="flex flex-col gap-6">
+      {/* ── SECTION 1: WORKSPACE & AI PREFERENCES ───────────────────────── */}
+      {activeSection === "preferences" && (
+        <div className="flex flex-col gap-6 animate-slide-up">
+          <section className="glass p-6 sm:p-8 rounded-3xl flex flex-col gap-8 border border-white/[0.06]">
             <div>
-              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">AI Summary Format</h3>
-              <p className="text-xs text-gray-500 mt-1">Select the default format used when generating automatic summaries.</p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                {(["paragraph", "bullets", "actions"] as const).map((fmt) => (
-                  <button
-                    key={fmt}
-                    onClick={() => setAiFormat(fmt)}
-                    className={`flex flex-col items-start gap-1.5 p-4 rounded-xl border transition-all text-left
-                      ${aiFormat === fmt
-                        ? "bg-brand-500/10 border-brand-500 text-white"
-                        : "bg-neutral-900 border-white/[0.04] text-neutral-400 hover:border-white/[0.08] hover:bg-neutral-900/60"
-                      }`}
-                  >
-                    <span className="font-semibold text-sm capitalize">
-                      {fmt === "paragraph" ? "Paragraph" : fmt === "bullets" ? "Bullet Points" : "Action items"}
-                    </span>
-                    <span className="text-[10px] text-gray-500">
-                      {fmt === "paragraph" && "A clean, textual overview summarizing core ideas."}
-                      {fmt === "bullets" && "Key insights broken down into scanable bullet list."}
-                      {fmt === "actions" && "Actionable items, tasks, and follow-ups extracted."}
-                    </span>
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 text-brand-400 text-xs font-bold uppercase tracking-widest mb-1">
+                <Zap className="w-4 h-4" />
+                <span>LumiAI Preferences</span>
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">AI Summary Format</h2>
+              <p className="text-xs text-neutral-400 mt-1 max-w-xl">
+                Choose the default structure and format applied when generating automated summaries for your notes.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                {[
+                  {
+                    id: "paragraph",
+                    title: "Paragraph",
+                    desc: "A clean, textual overview summarizing core ideas.",
+                    icon: FileText,
+                  },
+                  {
+                    id: "bullets",
+                    title: "Bullet Points",
+                    desc: "Key insights broken down into a scannable bullet list.",
+                    icon: ListOrdered,
+                  },
+                  {
+                    id: "actions",
+                    title: "Action Items",
+                    desc: "Actionable items, tasks, and follow-ups extracted.",
+                    icon: CheckSquare,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = aiFormat === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setAiFormat(item.id as any)}
+                      className={`relative flex flex-col items-start p-5 rounded-2xl border transition-all text-left group overflow-hidden ${isSelected
+                          ? "bg-brand-500/10 border-brand-500 shadow-glow text-white"
+                          : "bg-neutral-900/60 border-white/[0.06] text-neutral-400 hover:border-white/[0.12] hover:bg-neutral-900"
+                        }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-white">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isSelected
+                            ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
+                            : "bg-white/[0.04] text-neutral-400 group-hover:text-white"
+                          }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <span className="font-bold text-sm text-white mb-1">{item.title}</span>
+                      <span className="text-xs text-neutral-400 leading-relaxed">{item.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="h-px bg-white/[0.06]" />
 
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Extract alerts</h3>
-                <p className="text-xs text-gray-500 mt-1">Extract dates/reminders automatically and show them in your calendar.</p>
+            {/* Extract Alerts Toggle */}
+            <div className="flex items-center justify-between gap-4 py-2">
+              <div className="max-w-md">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-brand-400" />
+                  <span>Extract Alerts & Reminders</span>
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                  Automatically parse dates, deadlines, and time references in your notes and sync them to your calendar.
+                </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
                 <input
                   type="checkbox"
                   checked={aiExtractAlerts}
                   onChange={(e) => setAiExtractAlerts(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-neutral-900 rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-500 after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500 peer-checked:after:bg-white peer-checked:after:border-brand-500 border border-white/[0.06]" />
+                <div className="w-12 h-7 bg-neutral-900 rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-neutral-500 after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-500 peer-checked:after:bg-white peer-checked:after:border-brand-500 border border-white/[0.08]" />
               </label>
             </div>
 
             <div className="h-px bg-white/[0.06]" />
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onClick={handleSaveAiSettings}
-                className="btn-primary flex items-center gap-2"
+                className="btn-primary py-2.5 px-6 font-bold text-xs flex items-center gap-2 shadow-lg shadow-brand-500/20"
               >
                 <Save className="w-4 h-4" />
-                Save Preferences
+                <span>Save Preferences</span>
               </button>
+
               {aiSuccess && (
-                <span className="text-xs text-emerald-400 flex items-center gap-1 animate-fade-in">
-                  <CheckCircle className="w-3.5 h-3.5" /> Preferences saved!
+                <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5 animate-fade-in bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
+                  <CheckCircle className="w-4 h-4" /> Preferences saved!
                 </span>
               )}
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+      )}
 
-        {/* ── BACKUP & DATA SECTION ────────────────────────────────────────── */ }
-        <section className="glass p-6 flex flex-col gap-6">
-          <h2 className="text-xl font-bold text-neutral-200 border-b border-white/[0.04] pb-2">Backup & Data</h2>
-
-          <div className="flex flex-col gap-6">
+      {/* ── SECTION 2: EXPORT & DATA MANAGEMENT ────────────────────────── */}
+      {activeSection === "data" && (
+        <div className="flex flex-col gap-6 animate-slide-up">
+          <section className="glass p-6 sm:p-8 rounded-3xl flex flex-col gap-8 border border-white/[0.06]">
             <div>
-              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Export Notes</h3>
-              <p className="text-xs text-gray-500 mt-1">Download all your notes as a JSON backup file to store locally.</p>
-              
-              {exportError && <div className="text-xs text-red-400 mt-2">{exportError}</div>}
-              
+              <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-1">
+                <Database className="w-4 h-4" />
+                <span>Workspace Data</span>
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Export Notes Backup</h2>
+              <p className="text-xs text-neutral-400 mt-1 max-w-xl">
+                Download a full JSON archive containing all text notes, checklists, and metadata created in your workspace.
+              </p>
+
+              {exportError && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs mt-4">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{exportError}</span>
+                </div>
+              )}
+
+              {exportSuccess && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs mt-4">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>{exportSuccess}</span>
+                </div>
+              )}
+
               <button
                 onClick={handleExportData}
                 disabled={exporting}
-                className="btn-secondary mt-4 flex items-center gap-2"
+                className="btn-secondary mt-5 py-2.5 px-5 font-bold text-xs flex items-center gap-2 border-white/[0.1] hover:bg-white/[0.06]"
               >
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Export Notes Backup (.json)
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-indigo-400" />}
+                <span>Download Workspace Backup (.json)</span>
               </button>
             </div>
 
             <div className="h-px bg-white/[0.06]" />
 
-            <div>
-              <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Import Notes</h3>
-              <p className="text-xs text-gray-500 mt-1">Upload a previously exported JSON backup file to restore your notes.</p>
-              
-              {importError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm mt-3">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {importError}
-                </div>
-              )}
-
-              {importSuccess && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm mt-3">
-                  <CheckCircle className="w-4 h-4 shrink-0" />
-                  {importSuccess}
-                </div>
-              )}
-
-              <div className="mt-4 relative group cursor-pointer border border-dashed border-white/10 hover:border-brand-500/40 hover:bg-neutral-900/40 rounded-xl p-6 transition-all text-center flex flex-col items-center justify-center">
-                {importing ? (
-                  <>
-                    <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-2" />
-                    <span className="text-xs text-neutral-400 font-medium">{importProgress}</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-8 h-8 text-neutral-500 group-hover:text-brand-300 transition-colors mb-2" />
-                    <span className="text-xs text-neutral-300 font-medium">Click to select backup file</span>
-                    <span className="text-[10px] text-gray-500 mt-1">Support JSON format only</span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportData}
-                      disabled={importing}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                  </>
-                )}
+            {/* Wipe Notes Box */}
+            <div className="p-6 rounded-2xl bg-red-950/20 border border-red-900/30 flex flex-col gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 uppercase tracking-wider">
+                  <Trash2 className="w-4 h-4" />
+                  <span>Wipe All Workspace Notes</span>
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                  Permanently delete all notes, checklist items, and calendar alerts stored in this account. This action cannot be reversed.
+                </p>
               </div>
-            </div>
 
-            <div className="h-px bg-white/[0.06]" />
+              {wipeError && <div className="text-xs text-red-400 font-semibold">{wipeError}</div>}
+              {wipeSuccess && <div className="text-xs text-emerald-400 font-semibold">{wipeSuccess}</div>}
 
-            <div className="p-4 rounded-xl bg-red-950/10 border border-red-900/20">
-              <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">
-                <Trash2 className="w-4 h-4" /> Wipe Notes
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">This will permanently delete ALL notes and reminders in your workspace. This action cannot be undone.</p>
-              
-              {wipeError && (
-                <div className="text-xs text-red-400 mt-2 font-semibold">{wipeError}</div>
-              )}
-              {wipeSuccess && (
-                <div className="text-xs text-emerald-400 mt-2 font-semibold">{wipeSuccess}</div>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-1">
                 <input
                   type="text"
                   placeholder="Type DELETE ALL NOTES to confirm"
-                  className="input max-w-xs !py-2 border-red-900/20"
+                  className="input max-w-sm text-xs py-2 border-red-900/40 focus:border-red-500"
                   value={wipeConfirmInput}
                   onChange={(e) => setWipeConfirmInput(e.target.value)}
                 />
                 <button
                   onClick={handleWipeNotes}
-                  disabled={wiping}
-                  className="btn-danger !py-2"
+                  disabled={wiping || wipeConfirmInput !== "DELETE ALL NOTES"}
+                  className="btn-danger py-2 px-5 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shrink-0"
                 >
                   {wiping && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Wipe All Notes
+                  <span>Wipe All Notes</span>
                 </button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+      )}
 
-        {/* ── DANGER ZONE ───────────────────────────────────────────────────── */}
-        <section className="glass p-6 border-red-950/50 bg-red-950/[0.02]">
-          <h2 className="text-xl font-bold text-red-400 border-b border-red-900/20 pb-2 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 animate-pulse" /> Danger Zone
-          </h2>
-          <p className="text-xs text-gray-400 mt-3 leading-relaxed">
-            Deleting your account will permanently wipe all notes, audio records, canvas drawings, and calendars from our database. This action is final and cannot be reversed.
-          </p>
-          
-          <button
-            type="button"
-            onClick={() => setShowDeleteModal(true)}
-            className="btn-danger mt-5 inline-flex items-center gap-2 bg-transparent hover:bg-red-950/40 text-red-400 border border-red-500/20 font-semibold text-xs py-2 px-6 rounded-lg hover:border-red-500/40 shadow-sm"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete Account
-          </button>
-        </section>
-      </div>
+      {/* ── SECTION 3: ACCOUNT & DANGER ZONE ─────────────────────────────── */}
+      {activeSection === "account" && (
+        <div className="flex flex-col gap-6 animate-slide-up">
+          {/* User Profile Overview */}
+          <section className="glass p-6 sm:p-8 rounded-3xl flex flex-col gap-6 border border-white/[0.06]">
+            <div>
+              <div className="flex items-center gap-2 text-brand-400 text-xs font-bold uppercase tracking-widest mb-1">
+                <UserIcon className="w-4 h-4" />
+                <span>Identity Details</span>
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Account Overview</h2>
+            </div>
 
-      {/* ── Danger Zone Confirmation Modal ────────────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-neutral-900/60 border border-white/[0.04] flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Full Name</span>
+                <span className="text-sm font-semibold text-white">{fullName}</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-neutral-900/60 border border-white/[0.04] flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Email Address</span>
+                <span className="text-sm font-semibold text-white truncate">{primaryEmail}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Danger Zone */}
+          <section className="glass p-6 sm:p-8 rounded-3xl flex flex-col gap-6 border border-red-950/40 bg-red-950/[0.03]">
+            <div>
+              <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-widest mb-1">
+                <ShieldAlert className="w-4 h-4 animate-pulse" />
+                <span>Critical Actions</span>
+              </div>
+              <h2 className="text-xl font-bold text-red-400 tracking-tight">Danger Zone</h2>
+              <p className="text-xs text-neutral-400 mt-1 max-w-xl leading-relaxed">
+                Permanently delete your account and remove all personal notes, transcripts, audio recordings, and calendar entries from database servers.
+              </p>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="btn-danger py-2.5 px-6 font-bold text-xs inline-flex items-center gap-2 border-red-500/30 hover:border-red-500/60 shadow-lg shadow-red-950/50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Account Permanently</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ── Danger Zone Account Deletion Confirmation Modal ──────────────── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface-900 border border-border-muted rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
-            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 animate-pulse" /> Confirm Account Deletion
-            </h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              This action is final and will completely wipe all of your data. To proceed, please type <span className="font-mono text-white font-bold">DELETE</span> in the field below.
-            </p>
-            
-            <div className="flex flex-col gap-2 mt-2">
-              <label className="text-xs font-semibold text-neutral-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-[#0b0b10] border border-red-500/30 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl flex flex-col gap-5 relative">
+            <button
+              onClick={() => {
+                setShowDeleteModal(false);
+                setDeleteConfirmInput("");
+                setDeleteError(null);
+              }}
+              className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/[0.05] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+              <ShieldAlert className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-extrabold text-white">Confirm Account Deletion</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed mt-1.5">
+                This action is final and will completely wipe all of your data. To proceed, please type <span className="font-mono text-red-400 font-bold">DELETE</span> in the field below.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-neutral-300">
                 Type DELETE to confirm:
               </label>
               <input
                 type="text"
-                placeholder="Type DELETE"
-                className="input"
+                placeholder="DELETE"
+                className="input py-2.5 text-xs border-red-900/40 focus:border-red-500"
                 value={deleteConfirmInput}
                 onChange={(e) => setDeleteConfirmInput(e.target.value)}
               />
             </div>
 
             {deleteError && (
-              <div className="text-xs text-red-400 font-semibold">{deleteError}</div>
+              <div className="text-xs text-red-400 font-semibold bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                {deleteError}
+              </div>
             )}
 
-            <div className="flex justify-end gap-3 mt-4">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/[0.06]">
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeleteConfirmInput("");
                   setDeleteError(null);
                 }}
-                className="btn-secondary px-4 py-2 text-xs"
+                className="btn-secondary px-4 py-2.5 text-xs font-bold"
                 disabled={deletingAccount}
               >
                 Cancel
@@ -449,9 +539,10 @@ export default function SettingsPage() {
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmInput !== "DELETE" || deletingAccount}
-                className="btn-danger px-4 py-2 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                className="btn-danger px-5 py-2.5 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {deletingAccount ? "Deleting..." : "Permanently Delete"}
+                {deletingAccount && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{deletingAccount ? "Deleting Account..." : "Permanently Delete"}</span>
               </button>
             </div>
           </div>
