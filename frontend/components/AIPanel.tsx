@@ -20,7 +20,8 @@ import {
   CornerDownLeft,
   ChevronDown,
   CornerUpRight,
-  Maximize2
+  Maximize2,
+  ShieldAlert
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -229,7 +230,26 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
 
     try {
       const res = await notesApi.aiAction(note.id, action, textToProcess, param);
-      setAssistantOutput(res.data.result);
+      const resultText = res.data.result;
+      const lowerText = resultText.toLowerCase();
+
+      // Detect safety policy refusal keywords
+      if (
+        lowerText.includes("sorry") &&
+        (lowerText.includes("can't help") || lowerText.includes("cannot help") || lowerText.includes("can’t help"))
+      ) {
+        if (action === "translate") {
+          setAssistantError(
+            `The AI model refused to generate the translation in ${param || "the selected language"} because the note content contains sensitive terms triggering safety policy guardrails.`
+          );
+        } else {
+          setAssistantError(
+            `The AI model refused to process this writing action because the note content contains sensitive terms triggering safety policy guardrails.`
+          );
+        }
+      } else {
+        setAssistantOutput(resultText);
+      }
     } catch {
       setAssistantError("Failed to process text with AI. Please check your network and try again.");
     } finally {
@@ -729,11 +749,6 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
               </div>
             </div>
 
-            {/* Error notifications */}
-            {assistantError && (
-              <p className="text-[10px] text-red-400 font-semibold px-1 py-1 shrink-0">{assistantError}</p>
-            )}
-
             {/* Processing State & Output display */}
             <div className="flex flex-col gap-2.5 flex-1 min-h-[140px]">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-white/[0.03] pb-1">
@@ -745,6 +760,18 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
                   <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-500 gap-2">
                     <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
                     <span className="text-xs animate-pulse">LumiAI is transforming your writing...</span>
+                  </div>
+                ) : assistantError ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-6 px-4 gap-3 bg-red-950/10 border border-red-500/10 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
+                      <ShieldAlert className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div className="max-w-[280px]">
+                      <p className="text-xs font-bold text-red-400">Content Refusal</p>
+                      <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                        {assistantError}
+                      </p>
+                    </div>
                   </div>
                 ) : assistantOutput ? (
                   <>
