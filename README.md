@@ -1,6 +1,6 @@
 # Luminote
 
-Luminote is a high-fidelity, collaborative markdown workspace that connects your notes, tasks, drawings, and audio recordings using a fullscreen, interactive thought map powered by customized spring physics and advanced AI summarization, semantic search, and document Q&A.
+Luminote is a high-fidelity, collaborative markdown workspace that connects your notes, tasks, drawings, and audio recordings using a fullscreen, interactive thought map powered by customized spring physics, advanced AI summarization, semantic search, and document Q&A.
 
 ![Workspace Sandbox Overview](https://img.shields.io/badge/Luminote-Workspace-blueviolet?style=for-the-badge)
 
@@ -9,8 +9,9 @@ Luminote is a high-fidelity, collaborative markdown workspace that connects your
 ## 🚀 Key Features
 
 * **Interactive Thought Map Sandbox:** An obsidian glass node network graph visualizer simulating spring-drift physics. Includes cursor magnet attraction, orbital spinning Synapse hub rings, radar pings on node hover, permanent node tags, and animated dual-packet glowing data flow lines traversing connection tracks.
-* **Smart Auth Blending:** Beautifully blends login and registration pages using high-transparency glassmorphic containers (`bg-[#0c0c0e]/10` with `backdrop-blur-md`), user profile **Name** metadata registration database mapping, password strength check meters, and password show/hide eye toggles.
-* **Markdown Note Editor:** Dynamic note-taking environment supporting direct markdown rendering.
+* **Keyboard & Accessibility Support:** Complete keyboard navigation for note lists and popovers, standard ARIA roles, focus management, and accessibility-compliant interactive components.
+* **Smart Auth Blending:** Beautifully blends login and registration pages using high-transparency glassmorphic containers (`bg-[#0c0c0e]/10` with `backdrop-blur-md`), user profile metadata registration database mapping, password strength check meters, and password show/hide eye toggles.
+* **Markdown Note Editor:** Dynamic note-taking environment supporting direct markdown rendering and formatting.
 * **Canvas Sketching:** Integrated freehand vector canvas sketchpad inside note documents to draw diagrams or sketch layouts directly alongside text.
 * **Voice Captures:** Audio recorder with instant browser voice captures and backend-supported speech transcription.
 * **Sprint Tracks:** Interactive checkbox checklists inside note blocks with automatic timeline synchronization.
@@ -25,6 +26,7 @@ Luminote is a high-fidelity, collaborative markdown workspace that connects your
   - ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white) 16.2.9 (Turbopack)
   - ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
   - ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+  - ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat-square&logo=pnpm&logoColor=white)
 * **Backend:**
   - ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
   - ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
@@ -119,7 +121,9 @@ pnpm run dev
 
 ---
 
-## 🔒 Security Compliance
+## 🔒 Security & Accessibility Compliance
 
+* **Keyboard Accessibility:** Interactive elements and popover menus include keyboard listeners (`onKeyDown`) and accessible ARIA attributes (`role="menu"`).
 * **Cryptographic Randomness:** Node velocities and layout jitter logic are calculated using browser-native cryptographically secure random generators (`window.crypto.getRandomValues`) to ensure robust random outputs.
 * **Salted Hashes:** User password storage leverages secure hashing algorithms inside the database service layers.
+
