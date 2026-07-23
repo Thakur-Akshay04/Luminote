@@ -1268,8 +1268,10 @@ function NoteEditorContent() {
                     {/* Popover Dropdown Menu */}
                     {isMenuOpen && (
                       <div
+                        role="menu"
                         className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-[#121216] border border-white/[0.1] shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
                         onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
                       >
                         {/* Pin / Unpin option */}
                         <button
