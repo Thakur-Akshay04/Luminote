@@ -1365,7 +1365,6 @@ function NoteEditorContent() {
               >
                 {[
                   "History & Clipboard",
-                  "Font & Size",
                   "Formatting",
                   "Paragraph & Align",
                   "Lists & Indent",
@@ -1477,8 +1476,8 @@ function NoteEditorContent() {
                   </div>
                 )}
 
-                {activeToolbarTab === "Font & Size" && (
-                  <div className="flex items-center gap-2.5 animate-fade-in">
+                {activeToolbarTab === "Formatting" && (
+                  <div className="flex items-center gap-2 animate-fade-in flex-wrap">
                     {/* Font Family Dropdown */}
                     <div className="relative" ref={fontDropdownRef}>
                       <button
@@ -1538,11 +1537,8 @@ function NoteEditorContent() {
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {activeToolbarTab === "Formatting" && (
-                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <div className="h-5 w-px bg-white/10 mx-1" />
                     <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={getBtnClass(editor?.isActive("bold") || false)} title="Bold (Ctrl+B)"><Bold className="w-4 h-4" /></button>
                     <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={getBtnClass(editor?.isActive("italic") || false)} title="Italic (Ctrl+I)"><Italic className="w-4 h-4" /></button>
                     <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className={getBtnClass(editor?.isActive("underline") || false)} title="Underline (Ctrl+U)"><UnderlineIcon className="w-4 h-4" /></button>
