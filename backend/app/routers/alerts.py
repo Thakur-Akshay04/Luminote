@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status, WebSocket
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.auth.clerk import get_current_user, verify_token
 from app.models.alert import Alert
 from app.models.note import Note
@@ -81,10 +81,10 @@ async def remove(
 async def websocket_alerts(
     websocket: WebSocket,
     token: str,
-    db: AsyncSession = Depends(get_db)
 ):
     try:
-        user_id = await verify_token(token, db)
+        async with AsyncSessionLocal() as db:
+            user_id = await verify_token(token, db)
     except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
