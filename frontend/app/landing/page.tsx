@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 import {
-  Sparkles,
+  Wand2,
   Bot,
   Search,
   Bell,
@@ -753,7 +753,7 @@ export default function LandingPage() {
                 {/* Visual Mockup: AI Action Summary bubble */}
                 <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 flex flex-col gap-2.5 text-[11px] h-[106px] overflow-hidden text-neutral-300">
                   <div className="flex items-center gap-1.5 text-brand-300 font-bold uppercase tracking-wider text-[9px]">
-                    <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+                    <Wand2 className="w-3.5 h-3.5 text-brand-400" />
                     <span>Extracted Insights</span>
                   </div>
                   <div className="space-y-1.5">

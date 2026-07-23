@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { notesApi } from "@/lib/api";
 import type { ChecklistItem } from "@/types";
-import { Plus, Trash2, Sparkles, Loader2, ListTodo } from "lucide-react";
+import { Plus, Trash2, Loader2, ListTodo } from "lucide-react";
 
 interface ChecklistEditorProps {
   noteId: string;

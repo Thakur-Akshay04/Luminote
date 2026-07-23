@@ -8,7 +8,7 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  Sparkles,
+  Bot,
   Bell,
   Database,
   Lock,
@@ -88,7 +88,7 @@ export default function HelpPage() {
   const categories = [
     { id: "all", label: "All Topics", icon: Compass },
     { id: "general", label: "General", icon: HelpCircle },
-    { id: "ai", label: "AI & Search", icon: Sparkles },
+    { id: "ai", label: "AI & Search", icon: Bot },
     { id: "alerts", label: "Alerts & Calendar", icon: Bell },
     { id: "data", label: "Backup & Privacy", icon: Database },
   ] as const;

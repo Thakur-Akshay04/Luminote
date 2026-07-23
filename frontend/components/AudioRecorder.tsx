@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { notesApi } from "@/lib/api";
-import { Mic, Square, Loader2, Play, Volume2, Copy, Check, Sparkles, RefreshCw } from "lucide-react";
+import { Mic, Square, Loader2, Play, Volume2, Copy, Check, Wand2, RefreshCw } from "lucide-react";
 
 interface AudioRecorderProps {
   noteId: string;
@@ -266,7 +266,7 @@ export default function AudioRecorder({
               {transcribing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Sparkles className="w-4 h-4" />
+                <Wand2 className="w-4 h-4" />
               )}
               {transcribing ? "Transcribing Audio..." : "Transcribe Audio"}
             </button>
@@ -279,7 +279,7 @@ export default function AudioRecorder({
         <div className="glass p-5 flex flex-col gap-3">
           <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
             <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-brand-400 fill-brand-400" />
+              <Wand2 className="w-4 h-4 text-brand-400" />
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 Voice Transcript
               </span>

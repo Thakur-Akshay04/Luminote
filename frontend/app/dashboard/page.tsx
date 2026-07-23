@@ -12,7 +12,6 @@ import NoteTypeModal from "@/components/NoteTypeModal";
 import {
   StickyNote,
   Bell,
-  Sparkles,
   Tag,
   Plus,
   Search,

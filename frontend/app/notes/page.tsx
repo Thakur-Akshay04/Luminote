@@ -9,7 +9,7 @@ import type { Note } from "@/types";
 import NoteCard from "@/components/NoteCard";
 import TagFilter from "@/components/TagFilter";
 import NoteTypeModal from "@/components/NoteTypeModal";
-import { Plus, Loader2, StickyNote, Sparkles } from "lucide-react";
+import { Plus, Loader2, StickyNote, Zap } from "lucide-react";
 
 function NotesContent() {
   const router = useRouter();
@@ -146,7 +146,7 @@ function NotesContent() {
               <StickyNote className="w-9 h-9 text-gray-600" />
             </div>
             <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-accent-violet flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-white" />
+              <Zap className="w-3 h-3 text-white" />
             </div>
           </div>
           <div className="text-center">

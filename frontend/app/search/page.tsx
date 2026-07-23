@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { searchApi } from "@/lib/api";
 import type { SearchResultItem } from "@/types";
 import SearchResult from "@/components/SearchResult";
-import { Search, Loader2, Sparkles, Zap, Brain } from "lucide-react";
+import { Search, Loader2, Palette, Zap, Brain } from "lucide-react";
 
 export default function SearchPage() {
   const router = useRouter();
@@ -58,7 +58,7 @@ export default function SearchPage() {
     {
       label: "Sketches & Creative",
       example: "UI wireframes and sketch ideas for the landing page",
-      icon: Sparkles,
+      icon: Palette,
       color: "text-pink-400 border-pink-500/20 bg-pink-500/5 hover:border-pink-500/40 hover:bg-pink-500/10",
     },
   ];
