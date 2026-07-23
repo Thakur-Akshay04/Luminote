@@ -214,26 +214,14 @@ async def update_note(
     content_changed = content is not None and content != note.content
 
     import json
-    # Infer note_type from content or checklist_items if not explicitly specified as checklist
-    actual_note_type = note_type
-    if content and (not actual_note_type or actual_note_type == "text"):
-        try:
-            parsed = json.loads(content)
-            if isinstance(parsed, dict) and ("description" in parsed or "ai_context" in parsed):
-                actual_note_type = "checklist"
-        except (json.JSONDecodeError, TypeError):
-            pass
+    # Preserve original note_type if note already exists — an existing note's type is immutable
+    actual_note_type = note.note_type or note_type or "text"
 
-    if checklist_items is not None and (not actual_note_type or actual_note_type == "text"):
-        actual_note_type = "checklist"
-
-    values: dict = {"updated_at": datetime.now(timezone.utc)}
+    values: dict = {"updated_at": datetime.now(timezone.utc), "note_type": actual_note_type}
     if title is not None:
         values["title"] = title
     if content is not None:
         values["content"] = content
-    if actual_note_type is not None:
-        values["note_type"] = actual_note_type
     if checklist_items is not None:
         # Store as JSONB list — validated upstream by Pydantic
         values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]

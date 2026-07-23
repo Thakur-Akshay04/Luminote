@@ -674,12 +674,25 @@ function NoteEditorContent() {
     }
   }, [noteType, fetchSidebarNotes, isLoaded]);
 
-  // Poll for AI enrichment if not ready yet
+  // Poll for AI enrichment if not ready yet (max 5 attempts = 15 seconds)
+  const pollAttempts = useRef(0);
+
   useEffect(() => {
-    if (!note || noteType !== "text") return;
+    pollAttempts.current = 0;
+  }, [noteId]);
+
+  useEffect(() => {
+    if (!note || noteType !== "text" || noteId === "new") return;
     if (note.summary && note.tags?.length) return;
+    if (pollAttempts.current >= 5) return;
 
     const interval = setInterval(async () => {
+      pollAttempts.current += 1;
+      if (pollAttempts.current > 5) {
+        clearInterval(interval);
+        return;
+      }
+
       try {
         const res = await notesApi.get(noteId);
         if (res.data.summary || res.data.tags?.length) {
@@ -800,22 +813,12 @@ function NoteEditorContent() {
     }
   };
 
-  const handleNoteTypeChange = async (type: string) => {
-    setNoteType(type);
+  const handleNoteTypeChange = (type: string) => {
     if (noteId === "new") {
-      return;
-    }
-    try {
-      setSaving(true);
-      const res = await notesApi.update(noteId, { note_type: type });
-      setNote(res.data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error("Failed to update note type:", err);
-      setError("Failed to update note type.");
-    } finally {
-      setSaving(false);
+      setNoteType(type);
+      window.history.replaceState(null, "", `/notes/new?type=${type}`);
+    } else {
+      router.push(`/notes?type=${type}`);
     }
   };
 
@@ -1088,20 +1091,31 @@ function NoteEditorContent() {
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden animate-fade-in">
         {/* Left side-notes list navbar */}
-        <aside className="no-print w-64 border-r border-white/[0.05] bg-[#0c0c0e]/30 backdrop-blur-md flex flex-col shrink-0 select-none">
+        <aside className="no-print w-64 border-r border-white/[0.06] bg-[#0c0c0e]/60 backdrop-blur-xl flex flex-col shrink-0 select-none">
           {/* Sidebar Header */}
-          <div className="px-4.5 py-4 border-b border-white/[0.04] flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                Workspace
-              </span>
-              <span className="text-xs font-bold text-white mt-0.5">
-                {noteType === "text" && "Text Notes"}
-                {noteType === "drawing" && "Drawing Notes"}
-                {noteType === "audio" && "Voice Notes"}
-                {noteType === "checklist" && "Checklists"}
-                {!noteType && "\u00a0"}
-              </span>
+          <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
+            <div className="flex flex-col min-w-0 pr-2">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-neutral-500">
+                  Workspace
+                </span>
+                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded-full bg-white/[0.06] text-neutral-400">
+                  {sidebarNotes.filter((n) => n.note_type === noteType || n.id === noteId).length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {noteType === "text" && <FileText className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
+                {noteType === "drawing" && <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                {noteType === "audio" && <Mic className="w-3.5 h-3.5 text-pink-400 shrink-0" />}
+                {noteType === "checklist" && <ListTodo className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                <span className="text-sm font-bold text-white tracking-tight truncate">
+                  {noteType === "text" && "Text Notes"}
+                  {noteType === "drawing" && "Drawing Notes"}
+                  {noteType === "audio" && "Voice Notes"}
+                  {noteType === "checklist" && "Checklists"}
+                  {!noteType && "Notes"}
+                </span>
+              </div>
             </div>
             {/* Create new note of current type */}
             <button
@@ -1111,27 +1125,24 @@ function NoteEditorContent() {
                 router.push(`/notes/new?type=${noteType}`);
               }}
               title={`New ${noteType === "checklist" ? "checklist" : noteType + " note"}`}
-              className="w-7 h-7 rounded-lg bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all"
+              className="w-7 h-7 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-brand-500/20 hover:border-brand-500/30 hover:text-brand-300 active:scale-95 text-neutral-400 flex items-center justify-center transition-all shrink-0"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
 
           {/* Notes list items */}
-          <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1.5 scrollbar-thin">
             {(() => {
-              // sidebarNotes is already fetched for the current noteType;
-              // only keep the type-guard to defend against any residual stale
-              // entries, while always including the currently-open note.
               const filteredSidebarNotes = sidebarNotes.filter(
                 (n) => n.note_type === noteType || n.id === noteId
               );
 
               if (sidebarLoading && filteredSidebarNotes.length === 0) {
                 return (
-                  <div className="flex flex-col gap-2 p-2">
+                  <div className="flex flex-col gap-2 p-1">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-10 w-full bg-white/[0.02] border border-white/[0.04] rounded-xl animate-pulse" />
+                      <div key={i} className="h-11 w-full bg-white/[0.02] border border-white/[0.04] rounded-xl animate-pulse" />
                     ))}
                   </div>
                 );
@@ -1139,8 +1150,13 @@ function NoteEditorContent() {
 
               if (filteredSidebarNotes.length === 0) {
                 return (
-                  <div className="text-center py-8 text-[11px] text-neutral-500 italic">
-                    No {noteType === "checklist" ? "checklists" : `${noteType} notes`} yet.
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <p className="text-xs text-neutral-500 font-medium mb-1">
+                      No {noteType === "checklist" ? "checklists" : `${noteType} notes`} yet
+                    </p>
+                    <p className="text-[10px] text-neutral-600">
+                      Click the + button above to create one.
+                    </p>
                   </div>
                 );
               }
@@ -1161,7 +1177,6 @@ function NoteEditorContent() {
                     key={n.id}
                     onClick={() => {
                       if (isActive) return;
-                      // Prompt if dirty (auto-save is usually active, but let's just transition or save)
                       if (isDirty.current) {
                         saveNote().then(() => {
                           router.push(`/notes/${n.id}`);
@@ -1170,21 +1185,26 @@ function NoteEditorContent() {
                         router.push(`/notes/${n.id}`);
                       }
                     }}
-                    className={`group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left truncate relative ${
+                    className={`group w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative overflow-hidden ${
                       isActive
-                        ? "bg-gradient-to-tr from-brand-600/10 to-indigo-650/5 border-brand-500/20 text-white font-semibold shadow-sm"
-                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.02] hover:border-white/[0.04]"
+                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
+                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
                     }`}
                   >
-                    {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                    {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                    {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-red-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                    {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-green-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                    
-                    <span className="truncate pr-8 flex-1 text-[11px]">{noteTitle}</span>
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
+                    )}
+
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                      {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                      {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                      {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                      <span className="truncate text-xs font-medium tracking-tight leading-none">{noteTitle}</span>
+                    </div>
 
                     {displayDate && (
-                      <span className="absolute right-3 text-[9px] text-neutral-500 font-medium select-none group-hover:text-neutral-400 transition-colors">
+                      <span className={`text-[10px] shrink-0 font-medium select-none ${isActive ? "text-brand-300/80" : "text-neutral-500 group-hover:text-neutral-400"}`}>
                         {displayDate}
                       </span>
                     )}
