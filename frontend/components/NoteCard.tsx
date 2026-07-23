@@ -1,7 +1,7 @@
 import type { Note } from "@/types";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { FileText, Mic, Palette, ListTodo, Trash2, Clock } from "lucide-react";
+import { FileText, Mic, Palette, ListTodo, Trash2, Clock, Pin, Star } from "lucide-react";
 import clsx from "clsx";
 
 interface NoteCardProps {
@@ -328,9 +328,17 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
               <TypeIcon className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white leading-tight truncate group-hover:text-white transition-colors pr-1">
-                {note.title || "Untitled Note"}
-              </h3>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {note.is_pinned && (
+                  <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 shrink-0 transform -rotate-45" />
+                )}
+                {note.is_favorite && (
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                )}
+                <h3 className="text-sm font-bold text-white leading-tight truncate group-hover:text-white transition-colors pr-1">
+                  {note.title || "Untitled Note"}
+                </h3>
+              </div>
               <div className="flex items-center gap-1.5 mt-1 min-w-0">
                 <span
                   className={clsx(

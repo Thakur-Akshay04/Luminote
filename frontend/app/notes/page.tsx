@@ -15,6 +15,7 @@ function NotesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const noteTypeParam = searchParams.get("type") || undefined;
+  const favoriteParam = searchParams.get("favorite") === "true";
   const { isLoaded } = useAuth();
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -29,14 +30,14 @@ function NotesContent() {
     setLoading(true);
     setError(null);
     try {
-      const res = await notesApi.list(selectedTag ?? undefined, noteTypeParam);
+      const res = await notesApi.list(selectedTag ?? undefined, noteTypeParam, favoriteParam || undefined);
       setNotes(res.data);
     } catch {
       setError("Failed to load notes.");
     } finally {
       setLoading(false);
     }
-  }, [selectedTag, noteTypeParam]);
+  }, [selectedTag, noteTypeParam, favoriteParam]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -56,6 +57,7 @@ function NotesContent() {
   };
 
   const getTitle = () => {
+    if (favoriteParam) return "Favorite Notes";
     if (!noteTypeParam) return "My Notes";
     const typeMap: { [key: string]: string } = {
       text: "Text Notes",

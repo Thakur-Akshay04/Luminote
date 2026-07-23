@@ -81,11 +81,13 @@ export function useApi() {
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 export const notesApi = {
-  list: (tag?: string, noteType?: string) =>
+  list: (tag?: string, noteType?: string, isFavorite?: boolean, isPinned?: boolean) =>
     api.get<Note[]>("/notes", {
       params: {
         ...(tag ? { tag } : {}),
         ...(noteType ? { note_type: noteType } : {}),
+        ...(isFavorite ? { is_favorite: true } : {}),
+        ...(isPinned ? { is_pinned: true } : {}),
       },
     }),
   get: (id: string) => api.get<Note>(`/notes/${id}`),

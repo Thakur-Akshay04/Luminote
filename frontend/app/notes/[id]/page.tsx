@@ -94,7 +94,11 @@ import {
   Minus,
   Eraser,
   Printer,
-  Upload
+  Upload,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -250,8 +254,15 @@ function NoteEditorContent() {
   // Sidebar Notes list state for specific type
   const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
   const [sidebarLoading, setSidebarLoading] = useState(false);
+  const [openMenuNoteId, setOpenMenuNoteId] = useState<string | null>(null);
   // Tracks the last-requested type so out-of-order responses are discarded
   const sidebarFetchTypeRef = useRef<string>("");
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuNoteId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
   // Popover Refs
   const fontDropdownRef = useRef<HTMLDivElement>(null);
@@ -1164,6 +1175,7 @@ function NoteEditorContent() {
               return filteredSidebarNotes.map((n) => {
                 const isActive = n.id === noteId;
                 const noteTitle = n.id === noteId ? (title || "Untitled Note") : (n.title || "Untitled Note");
+                const isMenuOpen = openMenuNoteId === n.id;
                 
                 // Date formatting
                 let displayDate = "";
@@ -1173,42 +1185,166 @@ function NoteEditorContent() {
                 } catch {}
 
                 return (
-                  <button
-                    key={n.id}
-                    onClick={() => {
-                      if (isActive) return;
-                      if (isDirty.current) {
-                        saveNote().then(() => {
+                  <div key={n.id} className="relative group w-full">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (isActive) return;
+                        if (isDirty.current) {
+                          saveNote().then(() => {
+                            router.push(`/notes/${n.id}`);
+                          });
+                        } else {
                           router.push(`/notes/${n.id}`);
-                        });
-                      } else {
-                        router.push(`/notes/${n.id}`);
-                      }
-                    }}
-                    className={`group w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative overflow-hidden ${
-                      isActive
-                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
-                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
-                    }`}
-                  >
-                    {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
-                    )}
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${
+                        isActive
+                          ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
+                          : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
+                      }`}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
+                      )}
 
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                      {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                      {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                      {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                      <span className="truncate text-xs font-medium tracking-tight leading-none">{noteTitle}</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        
+                        {n.is_pinned && (
+                          <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 shrink-0 transform -rotate-45" />
+                        )}
+
+                        <span className="truncate text-xs font-medium tracking-tight leading-none">{noteTitle}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {n.is_favorite && (
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                        )}
+
+                        {displayDate && (
+                          <span className={`text-[10px] font-medium select-none ${isActive ? "text-brand-300/80" : "text-neutral-500 group-hover:text-neutral-400"}`}>
+                            {displayDate}
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setOpenMenuNoteId(isMenuOpen ? null : n.id);
+                          }}
+                          title="Note options"
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                            isMenuOpen
+                              ? "bg-white/10 text-white"
+                              : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
+                          }`}
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    {displayDate && (
-                      <span className={`text-[10px] shrink-0 font-medium select-none ${isActive ? "text-brand-300/80" : "text-neutral-500 group-hover:text-neutral-400"}`}>
-                        {displayDate}
-                      </span>
+                    {/* Popover Dropdown Menu */}
+                    {isMenuOpen && (
+                      <div
+                        className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-[#121216] border border-white/[0.1] shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Pin / Unpin option */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setOpenMenuNoteId(null);
+                            const newPinned = !n.is_pinned;
+                            try {
+                              setSidebarNotes((prev) =>
+                                prev.map((item) => (item.id === n.id ? { ...item, is_pinned: newPinned } : item))
+                              );
+                              if (n.id === noteId && note) {
+                                setNote({ ...note, is_pinned: newPinned });
+                              }
+                              await notesApi.update(n.id, { is_pinned: newPinned });
+                              fetchSidebarNotes(noteType);
+                            } catch {
+                              fetchSidebarNotes(noteType);
+                            }
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
+                        >
+                          {n.is_pinned ? (
+                            <>
+                              <PinOff className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Unpin note</span>
+                            </>
+                          ) : (
+                            <>
+                              <Pin className="w-3.5 h-3.5 text-neutral-400" />
+                              <span>Pin to top</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Favorite / Unfavorite option */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setOpenMenuNoteId(null);
+                            const newFav = !n.is_favorite;
+                            try {
+                              setSidebarNotes((prev) =>
+                                prev.map((item) => (item.id === n.id ? { ...item, is_favorite: newFav } : item))
+                              );
+                              if (n.id === noteId && note) {
+                                setNote({ ...note, is_favorite: newFav });
+                              }
+                              await notesApi.update(n.id, { is_favorite: newFav });
+                            } catch {
+                              fetchSidebarNotes(noteType);
+                            }
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
+                        >
+                          <Star className={`w-3.5 h-3.5 ${n.is_favorite ? "fill-amber-400 text-amber-400" : "text-neutral-400"}`} />
+                          <span>{n.is_favorite ? "Remove from Favorites" : "Add to Favorites"}</span>
+                        </button>
+
+                        <div className="h-px bg-white/[0.06] my-1" />
+
+                        {/* Delete option */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setOpenMenuNoteId(null);
+                            if (n.id === noteId) {
+                              handleDelete();
+                            } else {
+                              try {
+                                setSidebarNotes((prev) => prev.filter((item) => item.id !== n.id));
+                                await notesApi.delete(n.id);
+                              } catch {
+                                fetchSidebarNotes(noteType);
+                              }
+                            }
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors rounded-lg text-left"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          <span>Delete note</span>
+                        </button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               });
             })()}

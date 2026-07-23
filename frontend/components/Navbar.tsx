@@ -25,6 +25,7 @@ import {
   ExternalLink,
   X,
   User as UserIcon,
+  Star,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -159,6 +160,7 @@ function NavbarContent() {
     ? [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
         { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
+        { href: "/notes?favorite=true", label: "Favorites", icon: Star },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/search", label: "Search", icon: Search },
       ]

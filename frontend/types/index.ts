@@ -24,6 +24,8 @@ export interface Note {
   transcript: string | null;
   checklist_items: ChecklistItem[] | null;
   chat_history?: { role: "user" | "assistant"; content: string }[] | null;
+  is_pinned?: boolean;
+  is_favorite?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +34,8 @@ export interface NoteCreate {
   title?: string;
   content: string;
   note_type?: string;
+  is_pinned?: boolean;
+  is_favorite?: boolean;
 }
 
 export interface NoteUpdate {
@@ -39,6 +43,8 @@ export interface NoteUpdate {
   content?: string;
   note_type?: string;
   checklist_items?: ChecklistItem[];
+  is_pinned?: boolean;
+  is_favorite?: boolean;
 }
 
 export interface SearchResultItem {
