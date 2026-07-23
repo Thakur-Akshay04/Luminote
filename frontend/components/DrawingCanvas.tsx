@@ -73,10 +73,11 @@ interface DrawingCanvasProps {
   noteId: string;
   mediaUrl: string | null;
   onDrawingSave?: (mediaUrl: string) => void;
+  onSaveBeforeAction?: () => Promise<string>;
 }
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  ({ noteId, mediaUrl, onDrawingSave }, ref) => {
+  ({ noteId, mediaUrl, onDrawingSave, onSaveBeforeAction }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const contextRef = useRef<CanvasRenderingContext2D | null>(null);
     const undoStack = useRef<string[]>([]);
@@ -673,8 +674,17 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       setMessage(null);
 
       try {
+        let activeId = overrideNoteId || noteId;
+        if (activeId === "new" && onSaveBeforeAction) {
+          activeId = await onSaveBeforeAction();
+        } else if (activeId === "new") {
+          setMessage({ type: "error", text: "Please enter a title and save the note first." });
+          setSaving(false);
+          return;
+        }
+
         const dataUrl = canvas.toDataURL("image/png");
-        const res = await notesApi.saveDrawing(overrideNoteId || noteId, dataUrl);
+        const res = await notesApi.saveDrawing(activeId, dataUrl);
         setMessage({ type: "success", text: "Drawing saved successfully" });
         setTimeout(() => setMessage(null), 3000);
         if (res.data.media_url) {

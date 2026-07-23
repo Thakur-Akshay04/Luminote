@@ -9,12 +9,14 @@ interface ChecklistEditorProps {
   noteId: string;
   items: ChecklistItem[] | null;
   onItemsUpdate: (newItems: ChecklistItem[]) => void;
+  onSaveBeforeAction?: () => Promise<string>;
 }
 
 export default function ChecklistEditor({
   noteId,
   items,
   onItemsUpdate,
+  onSaveBeforeAction,
 }: ChecklistEditorProps) {
   const [newItemText, setNewItemText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,14 @@ export default function ChecklistEditor({
       updated[index] = { ...updated[index], checked };
       onItemsUpdate(updated);
 
-      await notesApi.toggleChecklistItem(noteId, index, checked);
+      let activeId = noteId;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        return;
+      }
+
+      await notesApi.toggleChecklistItem(activeId, index, checked);
     } catch (err) {
       console.error("Failed to toggle checklist item:", err);
       // Revert if API failed
@@ -54,8 +63,15 @@ export default function ChecklistEditor({
       onItemsUpdate(updated);
       setNewItemText("");
 
+      let activeId = noteId;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        return;
+      }
+
       // Update full checklist on backend by saving via note update endpoint
-      await notesApi.update(noteId, { checklist_items: updated });
+      await notesApi.update(activeId, { checklist_items: updated });
     } catch (err) {
       console.error("Failed to add item:", err);
       setError("Failed to add item to checklist.");
@@ -67,7 +83,14 @@ export default function ChecklistEditor({
       const updated = checklistItems.filter((_, i) => i !== index);
       onItemsUpdate(updated);
 
-      await notesApi.update(noteId, { checklist_items: updated });
+      let activeId = noteId;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        return;
+      }
+
+      await notesApi.update(activeId, { checklist_items: updated });
     } catch (err) {
       console.error("Failed to delete item:", err);
       setError("Failed to delete item from checklist.");

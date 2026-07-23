@@ -32,9 +32,10 @@ interface AIPanelProps {
   note: Note;
   onUpdateNote?: (note: Note) => void;
   editor?: any; // Tiptap editor instance
+  onSaveBeforeAction?: () => Promise<string>;
 }
 
-export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
+export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction }: AIPanelProps) {
   // Tabs: 'chat' | 'insights' | 'assistant'
   const [activeTab, setActiveTab] = useState<"chat" | "insights" | "assistant" | "assistant">("chat");
 
@@ -104,7 +105,15 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
     }
 
     try {
-      const res = await notesApi.ask(note.id, query);
+      let activeId = note.id;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        setChatError("Please write something and save the note first.");
+        return;
+      }
+
+      const res = await notesApi.ask(activeId, query);
       if (onUpdateNote) {
         onUpdateNote({
           ...note,
@@ -150,10 +159,18 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
     setSummarizing(true);
     setSummarizeError(null);
     try {
+      let activeId = note.id;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        setSummarizeError("Please write something and save the note first.");
+        return;
+      }
+
       const extractAlerts = typeof window !== "undefined"
         ? localStorage.getItem("luminote_ai_extract_alerts") !== "false"
         : true;
-      const res = await notesApi.summarize(note.id, format, extractAlerts);
+      const res = await notesApi.summarize(activeId, format, extractAlerts);
       if (onUpdateNote) {
         onUpdateNote(res.data.note);
       }
@@ -231,7 +248,15 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
     setTranslateDropdownOpen(false);
 
     try {
-      const res = await notesApi.aiAction(note.id, action, textToProcess, param);
+      let activeId = note.id;
+      if (activeId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      } else if (activeId === "new") {
+        setAssistantError("Please write something and save the note first.");
+        return;
+      }
+
+      const res = await notesApi.aiAction(activeId, action, textToProcess, param);
       const resultText = res.data.result;
       const lowerText = resultText.toLowerCase();
 

@@ -250,6 +250,8 @@ function NoteEditorContent() {
   // Sidebar Notes list state for specific type
   const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
   const [sidebarLoading, setSidebarLoading] = useState(false);
+  // Tracks the last-requested type so out-of-order responses are discarded
+  const sidebarFetchTypeRef = useRef<string>("");
 
   // Popover Refs
   const fontDropdownRef = useRef<HTMLDivElement>(null);
@@ -268,6 +270,55 @@ function NoteEditorContent() {
     isDirty.current = true;
     setHasUnsavedChanges(true);
   }, []);
+
+  const ensureNoteSaved = useCallback(async (): Promise<string> => {
+    if (noteId === "new") {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await notesApi.create({
+          title: titleRef.current || undefined,
+          content: contentRef.current || "",
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        window.history.replaceState(null, "", `/notes/${res.data.id}`);
+        router.replace(`/notes/${res.data.id}`);
+        return res.data.id;
+      } catch {
+        setError("Failed to create note.");
+        throw new Error("Init note failed");
+      } finally {
+        setSaving(false);
+      }
+    } else if (isDirty.current) {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await notesApi.update(noteId, {
+          title: titleRef.current || undefined,
+          content: contentRef.current,
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        return res.data.id;
+      } catch {
+        setError("Failed to save note.");
+        throw new Error("Save note failed");
+      } finally {
+        setSaving(false);
+      }
+    }
+    return noteId;
+  }, [noteId, noteType, router]);
 
   const saveNote = useCallback(async () => {
     if (!isDirty.current) return;
@@ -596,14 +647,23 @@ function NoteEditorContent() {
   }, [fetchNote, noteId, isLoaded]);
 
   const fetchSidebarNotes = useCallback(async (type: string) => {
+    // Register this as the latest request; any earlier in-flight request
+    // that resolves after us will be ignored.
+    sidebarFetchTypeRef.current = type;
+    // Clear immediately so stale notes from the previous type disappear at once
+    setSidebarNotes([]);
     setSidebarLoading(true);
     try {
       const res = await notesApi.list(undefined, type);
+      // Discard result if a newer type was requested while we were awaiting
+      if (sidebarFetchTypeRef.current !== type) return;
       setSidebarNotes(res.data);
     } catch {
       // silent fallback
     } finally {
-      setSidebarLoading(false);
+      if (sidebarFetchTypeRef.current === type) {
+        setSidebarLoading(false);
+      }
     }
   }, []);
 
@@ -1060,6 +1120,9 @@ function NoteEditorContent() {
           {/* Notes list items */}
           <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1 scrollbar-thin">
             {(() => {
+              // sidebarNotes is already fetched for the current noteType;
+              // only keep the type-guard to defend against any residual stale
+              // entries, while always including the currently-open note.
               const filteredSidebarNotes = sidebarNotes.filter(
                 (n) => n.note_type === noteType || n.id === noteId
               );
@@ -1739,6 +1802,7 @@ function NoteEditorContent() {
                         setNote({ ...note, media_url: newUrl });
                       }
                     }}
+                    onSaveBeforeAction={ensureNoteSaved}
                   />
                 </div>
               )}
@@ -1760,31 +1824,7 @@ function NoteEditorContent() {
                           setNote({ ...note, media_url: newUrl });
                         }
                       }}
-                      onSaveBeforeAction={async () => {
-                        // Save note and return new note's ID
-                        setSaving(true);
-                        setError(null);
-                        try {
-                          const res = await notesApi.create({
-                            title: titleRef.current || undefined,
-                            content: contentRef.current || "",
-                            note_type: noteType,
-                          });
-                          setNote(res.data);
-                          isDirty.current = false;
-                          setHasUnsavedChanges(false);
-                          setSaved(true);
-                          setTimeout(() => setSaved(false), 2000);
-                          window.history.replaceState(null, "", `/notes/${res.data.id}`);
-                          router.replace(`/notes/${res.data.id}`);
-                          return res.data.id;
-                        } catch {
-                          setError("Failed to create note before recording audio.");
-                          throw new Error("Init note failed");
-                        } finally {
-                          setSaving(false);
-                        }
-                      }}
+                      onSaveBeforeAction={ensureNoteSaved}
                     />
                   </div>
                 </>
@@ -1851,6 +1891,7 @@ function NoteEditorContent() {
                       noteId={noteId}
                       items={checklistItems}
                       onItemsUpdate={handleChecklistUpdate}
+                      onSaveBeforeAction={ensureNoteSaved}
                     />
                   </div>
                 </>
@@ -1945,7 +1986,7 @@ function NoteEditorContent() {
         {/* AI Panel */}
         {noteType === "text" && showAI && note && (
           <div className="hidden lg:flex flex-col w-80 xl:w-96 border-l border-white/[0.06] overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
-            <AIPanel note={note} onUpdateNote={setNote} editor={editor} />
+            <AIPanel note={note} onUpdateNote={setNote} editor={editor} onSaveBeforeAction={ensureNoteSaved} />
           </div>
         )}
       </div>
@@ -1953,7 +1994,7 @@ function NoteEditorContent() {
       {/* Mobile AI panel (bottom sheet) */}
       {noteType === "text" && showAI && note && (
         <div className="lg:hidden border-t border-white/[0.06] max-h-64 overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
-          <AIPanel note={note} onUpdateNote={setNote} editor={editor} />
+          <AIPanel note={note} onUpdateNote={setNote} editor={editor} onSaveBeforeAction={ensureNoteSaved} />
         </div>
       )}
     </div>

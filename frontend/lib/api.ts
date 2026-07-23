@@ -33,12 +33,15 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// On 401, redirect to sign-in page
+// On 401, redirect to sign-in page. On 422, log details to console.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
       window.location.href = "/sign-in";
+    }
+    if (err.response?.status === 422) {
+      console.error("[Axios 422 Validation Error]", err.config?.url, err.response?.data);
     }
     return Promise.reject(err);
   }
