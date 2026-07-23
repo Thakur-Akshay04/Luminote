@@ -44,10 +44,12 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 async def list_notes(
     tag: Optional[str] = None,
     note_type: Optional[str] = None,
+    is_favorite: Optional[bool] = None,
+    is_pinned: Optional[bool] = None,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    notes = await get_notes(uuid.UUID(user_id), tag, note_type, db)
+    notes = await get_notes(uuid.UUID(user_id), tag, note_type, db, is_favorite=is_favorite, is_pinned=is_pinned)
     return notes
 
 
@@ -65,6 +67,8 @@ async def create(
         db,
         background_tasks,
         note_type=body.note_type,
+        is_pinned=body.is_pinned,
+        is_favorite=body.is_favorite,
     )
 
 
@@ -89,6 +93,8 @@ async def update(
         note_id, uuid.UUID(user_id), body.title, body.content, db, background_tasks,
         note_type=body.note_type,
         checklist_items=body.checklist_items,
+        is_pinned=body.is_pinned,
+        is_favorite=body.is_favorite,
     )
 
 

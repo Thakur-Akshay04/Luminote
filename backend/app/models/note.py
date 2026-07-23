@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ARRAY, DateTime, ForeignKey, String, Text, text
+from sqlalchemy import ARRAY, Boolean, DateTime, ForeignKey, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,6 +33,12 @@ class Note(Base):
     transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     checklist_items: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     chat_history: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    is_pinned: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+    is_favorite: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -144,6 +144,8 @@ async def create_note(
     db: AsyncSession,
     background_tasks,
     note_type: Optional[str] = None,
+    is_pinned: Optional[bool] = False,
+    is_favorite: Optional[bool] = False,
 ) -> Note:
     import json
     if content and (not note_type or note_type == "text"):
@@ -160,6 +162,8 @@ async def create_note(
         title=title,
         content=content,
         note_type=note_type or "text",
+        is_pinned=is_pinned or False,
+        is_favorite=is_favorite or False,
     )
     db.add(note)
     await db.commit()
@@ -177,12 +181,18 @@ async def get_notes(
     tag: Optional[str],
     note_type: Optional[str],
     db: AsyncSession,
+    is_favorite: Optional[bool] = None,
+    is_pinned: Optional[bool] = None,
 ) -> list[Note]:
-    stmt = select(Note).where(Note.user_id == user_id).order_by(Note.updated_at.desc())
+    stmt = select(Note).where(Note.user_id == user_id).order_by(Note.is_pinned.desc(), Note.updated_at.desc())
     if tag:
         stmt = stmt.where(Note.tags.contains([tag]))
     if note_type:
         stmt = stmt.where(Note.note_type == note_type)
+    if is_favorite is True:
+        stmt = stmt.where(Note.is_favorite == True)
+    if is_pinned is True:
+        stmt = stmt.where(Note.is_pinned == True)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -208,6 +218,8 @@ async def update_note(
     background_tasks,
     note_type: Optional[str] = None,
     checklist_items: Optional[list] = None,
+    is_pinned: Optional[bool] = None,
+    is_favorite: Optional[bool] = None,
 ) -> Note:
     note = await get_note(note_id, user_id, db)
 
@@ -225,6 +237,10 @@ async def update_note(
     if checklist_items is not None:
         # Store as JSONB list — validated upstream by Pydantic
         values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]
+    if is_pinned is not None:
+        values["is_pinned"] = is_pinned
+    if is_favorite is not None:
+        values["is_favorite"] = is_favorite
 
     await db.execute(update(Note).where(Note.id == note_id).values(**values))
     await db.commit()

@@ -16,6 +16,8 @@ class NoteCreate(BaseModel):
     title: Optional[str] = None
     content: str
     note_type: Optional[str] = "text"
+    is_pinned: Optional[bool] = False
+    is_favorite: Optional[bool] = False
 
 
 class NoteUpdate(BaseModel):
@@ -23,6 +25,8 @@ class NoteUpdate(BaseModel):
     content: Optional[str] = None
     note_type: Optional[str] = None
     checklist_items: Optional[list[ChecklistItem]] = None
+    is_pinned: Optional[bool] = None
+    is_favorite: Optional[bool] = None
 
     @field_validator("checklist_items", mode="before")
     @classmethod
@@ -53,6 +57,8 @@ class NoteResponse(BaseModel):
     transcript: Optional[str] = None
     checklist_items: Optional[list[dict]] = None
     chat_history: Optional[list[dict]] = None
+    is_pinned: bool = False
+    is_favorite: bool = False
     created_at: datetime
     updated_at: datetime
 

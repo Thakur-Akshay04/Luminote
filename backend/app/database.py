@@ -81,7 +81,11 @@ async def init_db() -> None:
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS transcript TEXT",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS checklist_items JSONB",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS chat_history JSONB",
+            "ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false",
+            "ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false",
             "CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes (note_type)",
+            "CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes (is_pinned)",
+            "CREATE INDEX IF NOT EXISTS idx_notes_favorite ON notes (is_favorite)",
             "CREATE INDEX IF NOT EXISTS idx_notes_checklist ON notes USING GIN (checklist_items)",
             "CREATE INDEX IF NOT EXISTS idx_notes_embedding_hnsw ON notes USING hnsw (embedding vector_cosine_ops)",
             """
