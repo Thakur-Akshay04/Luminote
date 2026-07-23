@@ -36,7 +36,7 @@ export default function AlertListener() {
 
     connectingRef.current = true;
     try {
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       if (!token) return;
 
       // Double-check flags in case they changed during token fetch
@@ -140,8 +140,8 @@ export default function AlertListener() {
         }
       };
 
-      ws.onclose = () => {
-        console.log("Alerts WebSocket closed. Reconnecting in 5 seconds...");
+      ws.onclose = (event) => {
+        console.log(`Alerts WebSocket closed (code: ${event.code}, reason: ${event.reason || "none"}). Reconnecting in 5 seconds...`);
         wsRef.current = null;
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
       };

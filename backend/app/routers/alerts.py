@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status, WebSocket, WebSocketDisconnect
@@ -10,6 +11,8 @@ from app.models.alert import Alert
 from app.models.note import Note
 from app.schemas.alert import AlertCreate, AlertResponse
 from app.services.note_service import get_note
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -85,7 +88,8 @@ async def websocket_alerts(
     try:
         async with AsyncSessionLocal() as db:
             user_id = await verify_token(token, db)
-    except Exception:
+    except Exception as e:
+        logger.error(f"WebSocket auth failed: {e}", exc_info=True)
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
