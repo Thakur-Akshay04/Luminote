@@ -1199,6 +1199,19 @@ function NoteEditorContent() {
                           router.push(`/notes/${n.id}`);
                         }
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (isActive) return;
+                          if (isDirty.current) {
+                            saveNote().then(() => {
+                              router.push(`/notes/${n.id}`);
+                            });
+                          } else {
+                            router.push(`/notes/${n.id}`);
+                          }
+                        }
+                      }}
                       className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${
                         isActive
                           ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
