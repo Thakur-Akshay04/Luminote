@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { notesApi, usersApi } from "@/lib/api";
+import type { Note } from "@/types";
 import {
   Loader2,
   CheckCircle,
@@ -62,7 +63,7 @@ export default function SettingsPage() {
     setExportError(null);
     try {
       const res = await notesApi.list();
-      const notes = res.data;
+      const notes = res.data.filter((note: Note) => note.note_type === "text" || note.note_type === "checklist");
       const dataStr = JSON.stringify(notes, null, 2);
       const dataBlob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(dataBlob);

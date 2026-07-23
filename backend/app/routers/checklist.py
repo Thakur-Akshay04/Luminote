@@ -54,7 +54,7 @@ async def toggle_checklist_item(
         SET checklist_items = jsonb_set(
             checklist_items,
             ARRAY[:idx, 'checked'],
-            to_jsonb(:checked::boolean)
+            to_jsonb(CAST(:checked AS boolean))
         ),
         updated_at = NOW()
         WHERE id = :note_id AND user_id = :user_id
