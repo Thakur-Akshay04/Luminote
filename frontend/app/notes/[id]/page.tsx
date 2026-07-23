@@ -204,7 +204,7 @@ function NoteEditorContent() {
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [noteType, setNoteType] = useState<string>("text");
+  const [noteType, setNoteType] = useState<string>("");
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [checklistDescription, setChecklistDescription] = useState("");
   const [aiContext, setAiContext] = useState("");
@@ -1040,6 +1040,7 @@ function NoteEditorContent() {
                 {noteType === "drawing" && "Drawing Notes"}
                 {noteType === "audio" && "Voice Notes"}
                 {noteType === "checklist" && "Checklists"}
+                {!noteType && "\u00a0"}
               </span>
             </div>
             {/* Create new note of current type */}

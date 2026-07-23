@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 import logging
@@ -18,24 +19,48 @@ security = HTTPBearer()
 
 # Cache JWKS after first fetch — O(1) on all subsequent requests
 _jwks_cache = None
+_jwks_lock = asyncio.Lock()
 
 
 async def get_jwks():
     global _jwks_cache
+
+    # Fast path — already cached
     if _jwks_cache:
         return _jwks_cache
 
-    jwks_url = settings.clerk_jwks_url or os.getenv("CLERK_JWKS_URL")
-    if not jwks_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CLERK_JWKS_URL is not configured"
-        )
+    # Slow path — acquire lock so only ONE coroutine fetches from Clerk
+    async with _jwks_lock:
+        # Re-check inside the lock (another coroutine may have populated it)
+        if _jwks_cache:
+            return _jwks_cache
 
-    async with httpx.AsyncClient() as client:
-        res = await client.get(jwks_url)
-        res.raise_for_status()
-        _jwks_cache = res.json()
+        jwks_url = settings.clerk_jwks_url or os.getenv("CLERK_JWKS_URL")
+        if not jwks_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="CLERK_JWKS_URL is not configured"
+            )
+
+        timeout = httpx.Timeout(connect=10.0, read=10.0, write=5.0, pool=5.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                res = await client.get(jwks_url)
+                res.raise_for_status()
+                _jwks_cache = res.json()
+        except httpx.ConnectTimeout:
+            logger.error("Timed out connecting to Clerk JWKS endpoint: %s", jwks_url)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service unavailable — please try again"
+            )
+        except httpx.HTTPError as exc:
+            logger.error("Failed to fetch Clerk JWKS: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service unavailable — please try again"
+            )
+
     return _jwks_cache
 
 
