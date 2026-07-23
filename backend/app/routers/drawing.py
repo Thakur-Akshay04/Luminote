@@ -73,7 +73,7 @@ async def migrate_legacy_drawing(note_id: uuid.UUID, db: AsyncSession) -> None:
             # Update db media_url to point to the migrated file
             new_media_url = f"/media/drawings/{note_id}_v1.png"
             await db.execute(
-                update(Note).where(Note.id == note_id).values(media_url=new_media_url)
+                update(Note).where(Note.id == note_id).values(media_url=new_media_url, note_type="drawing")
             )
             await db.commit()
             
@@ -146,9 +146,9 @@ async def save_drawing(
     # Build the URL
     media_url = f"/media/drawings/{note_id}_v{next_version}.png"
 
-    # Update media_url in DB by primary key — O(log n)
+    # Update media_url and note_type in DB by primary key — O(log n)
     await db.execute(
-        update(Note).where(Note.id == note_id).values(media_url=media_url)
+        update(Note).where(Note.id == note_id).values(media_url=media_url, note_type="drawing")
     )
     await db.commit()
 
@@ -214,7 +214,7 @@ async def switch_drawing_version(
 
     # Update database
     await db.execute(
-        update(Note).where(Note.id == note_id).values(media_url=media_url)
+        update(Note).where(Note.id == note_id).values(media_url=media_url, note_type="drawing")
     )
     await db.commit()
 
@@ -300,7 +300,7 @@ async def delete_drawing_version(
 
     # Update database
     await db.execute(
-        update(Note).where(Note.id == note_id).values(media_url=new_media_url)
+        update(Note).where(Note.id == note_id).values(media_url=new_media_url, note_type="drawing")
     )
     await db.commit()
 

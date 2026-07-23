@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
@@ -14,6 +15,7 @@ function NotesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const noteTypeParam = searchParams.get("type") || undefined;
+  const { isLoaded } = useAuth();
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +39,9 @@ function NotesContent() {
   }, [selectedTag, noteTypeParam]);
 
   useEffect(() => {
+    if (!isLoaded) return;
     fetchNotes();
-  }, [fetchNotes]);
+  }, [fetchNotes, isLoaded]);
 
   const allTags = Array.from(
     new Set(notes.flatMap((n) => n.tags ?? []))
@@ -103,7 +106,7 @@ function NotesContent() {
       )}
 
       {/* Loading skeleton */}
-      {loading && (
+      {(loading || !isLoaded) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="glass p-5 flex flex-col gap-3 animate-pulse">
@@ -125,7 +128,7 @@ function NotesContent() {
       )}
 
       {/* Notes grid */}
-      {!loading && notes.length > 0 && (
+      {!loading && isLoaded && notes.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {notes.map((note) => (
             <NoteCard key={note.id} note={note} />
@@ -134,7 +137,7 @@ function NotesContent() {
       )}
 
       {/* Empty state */}
-      {!loading && notes.length === 0 && !error && (
+      {!loading && isLoaded && notes.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-24 gap-5 animate-fade-in">
           <div className="relative">
             <div className="w-20 h-20 rounded-2xl bg-surface-700/50 border border-white/[0.06] flex items-center justify-center">

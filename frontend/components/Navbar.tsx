@@ -175,6 +175,12 @@ function NavbarContent() {
     return null;
   }
 
+  // Hide global navbar when working on a single note
+  const isEditingNote = pathname.startsWith("/notes/") && pathname !== "/notes";
+  if (isEditingNote) {
+    return null;
+  }
+
   if (!isSignedIn) {
     return (
       <header

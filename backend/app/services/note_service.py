@@ -91,7 +91,7 @@ async def _run_ai_pipeline(note_id: uuid.UUID, content: str, session_factory) ->
             except Exception as parse_err:
                 logger.error("Failed to parse content as Tiptap JSON in AI pipeline: %s", parse_err)
 
-        if note_type in ("audio", "drawing"):
+        if note_type in ("audio", "drawing", "checklist"):
             logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
             embedding = await get_embedding(text_content)
             if embedding:
@@ -145,6 +145,15 @@ async def create_note(
     background_tasks,
     note_type: Optional[str] = None,
 ) -> Note:
+    import json
+    if content and (not note_type or note_type == "text"):
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict) and ("description" in parsed or "ai_context" in parsed):
+                note_type = "checklist"
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     note = Note(
         id=uuid.uuid4(),
         user_id=user_id,
@@ -204,13 +213,27 @@ async def update_note(
 
     content_changed = content is not None and content != note.content
 
+    import json
+    # Infer note_type from content or checklist_items if not explicitly specified as checklist
+    actual_note_type = note_type
+    if content and (not actual_note_type or actual_note_type == "text"):
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict) and ("description" in parsed or "ai_context" in parsed):
+                actual_note_type = "checklist"
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if checklist_items is not None and (not actual_note_type or actual_note_type == "text"):
+        actual_note_type = "checklist"
+
     values: dict = {"updated_at": datetime.now(timezone.utc)}
     if title is not None:
         values["title"] = title
     if content is not None:
         values["content"] = content
-    if note_type is not None:
-        values["note_type"] = note_type
+    if actual_note_type is not None:
+        values["note_type"] = actual_note_type
     if checklist_items is not None:
         # Store as JSONB list — validated upstream by Pydantic
         values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]

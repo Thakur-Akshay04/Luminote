@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import type { Note } from "@/types";
 import { notesApi } from "@/lib/api";
 import {
-  Sparkles,
   MessageSquare,
   SendHorizonal,
   Loader2,
@@ -21,7 +20,10 @@ import {
   ChevronDown,
   CornerUpRight,
   Maximize2,
-  ShieldAlert
+  ShieldAlert,
+  Brain,
+  SpellCheck,
+  Zap
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -272,7 +274,7 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
       <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-white/[0.06] shrink-0">
         <div className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform duration-300">
-            <Sparkles className="w-4 h-4 text-white animate-pulse" />
+            <Brain className="w-4 h-4 text-white animate-pulse" />
           </div>
           <div>
             <h3 className="font-bold text-sm text-white flex items-center gap-1.5">
@@ -565,7 +567,7 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-neutral-500 gap-2">
-                    <Sparkles className="w-7 h-7 opacity-20 animate-spin" style={{ animationDuration: '4s' }} />
+                    <Brain className="w-7 h-7 opacity-20 animate-pulse" />
                     <span className="text-xs italic">No summary generated yet.</span>
                   </div>
                 )}
@@ -584,7 +586,7 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
                 {summarizing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-400" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+                  <Zap className="w-3.5 h-3.5 text-brand-400" />
                 )}
                 {hasSummary ? "Regenerate Summary" : "Generate Summary"}
               </button>
@@ -721,7 +723,7 @@ export default function AIPanel({ note, onUpdateNote, editor }: AIPanelProps) {
                   disabled={assistantLoading}
                   className="py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-left text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 transition-all duration-200"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <SpellCheck className="w-3.5 h-3.5 text-blue-400" />
                   <span>Grammar & Polish</span>
                 </button>
 

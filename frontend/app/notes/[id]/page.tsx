@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
@@ -56,13 +57,16 @@ import {
   Loader2,
   Eye,
   Edit3,
-  Sparkles,
+  Brain,
+  Zap,
+  Wand2,
   ChevronRight,
   ChevronLeft,
   FileText,
   Palette,
   Mic,
   ListTodo,
+  Plus,
   Undo,
   Redo,
   Scissors,
@@ -195,6 +199,7 @@ function NoteEditorContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const noteId = params.id as string;
+  const { isLoaded } = useAuth();
 
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState("");
@@ -241,6 +246,10 @@ function NoteEditorContent() {
   const [hoveredGrid, setHoveredGrid] = useState<{ r: number; c: number } | null>(null);
   const [showClipboardPopover, setShowClipboardPopover] = useState(false);
   const [clipboardHistory, setClipboardHistory] = useState<{ id: string; type: "text" | "image"; content: string }[]>([]);
+  
+  // Sidebar Notes list state for specific type
+  const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
 
   // Popover Refs
   const fontDropdownRef = useRef<HTMLDivElement>(null);
@@ -457,11 +466,24 @@ function NoteEditorContent() {
   // Load content into editor on mount / when note is loaded
   useEffect(() => {
     if (!editor || !note || isEditorInitialized.current) return;
+    
+    // Do not load content into the rich text editor if the note is not a text note
+    if (noteType !== "text") {
+      isEditorInitialized.current = true;
+      return;
+    }
 
     let initialContent: any = "";
     if (note.content) {
       try {
-        initialContent = JSON.parse(note.content);
+        const parsed = JSON.parse(note.content);
+        if (parsed && typeof parsed === "object" && parsed.type === "doc") {
+          initialContent = parsed;
+        } else if (parsed && typeof parsed === "object" && ("description" in parsed || "ai_context" in parsed)) {
+          initialContent = parsed.description || "";
+        } else {
+          initialContent = note.content;
+        }
       } catch {
         initialContent = note.content; // fallback
       }
@@ -478,7 +500,7 @@ function NoteEditorContent() {
         }
       }, 0);
     }
-  }, [editor, note]);
+  }, [editor, note, noteType]);
 
   // Reset initialization ref if noteId changes
   useEffect(() => {
@@ -567,10 +589,30 @@ function NoteEditorContent() {
   }, [noteId, searchParams]);
 
   useEffect(() => {
+    if (!isLoaded) return;
     if (noteId) {
       fetchNote();
     }
-  }, [fetchNote, noteId]);
+  }, [fetchNote, noteId, isLoaded]);
+
+  const fetchSidebarNotes = useCallback(async (type: string) => {
+    setSidebarLoading(true);
+    try {
+      const res = await notesApi.list(undefined, type);
+      setSidebarNotes(res.data);
+    } catch {
+      // silent fallback
+    } finally {
+      setSidebarLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (noteType) {
+      fetchSidebarNotes(noteType);
+    }
+  }, [noteType, fetchSidebarNotes, isLoaded]);
 
   // Poll for AI enrichment if not ready yet
   useEffect(() => {
@@ -827,7 +869,7 @@ function NoteEditorContent() {
     };
   }, []);
 
-  if (loading) {
+  if (loading || !isLoaded) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
@@ -847,14 +889,14 @@ function NoteEditorContent() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Toolbar */}
-      <div className="no-print flex flex-wrap items-center gap-3 px-4 sm:px-6 py-3 border-b border-white/[0.06] bg-surface-900/60 backdrop-blur-sm">
+      <div className="no-print flex flex-wrap items-center gap-4 px-5 py-3.5 border-b border-white/[0.05] bg-[#0c0c0e]/80 backdrop-blur-xl shadow-lg relative z-30 select-none">
         <Link
           href="/notes"
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-300 transition-colors shrink-0"
+          className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 transition-all shrink-0"
           id="back-to-notes"
+          title="Back to Notes"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Notes</span>
         </Link>
 
         <div className="h-4 w-px bg-white/10 shrink-0" />
@@ -863,9 +905,9 @@ function NoteEditorContent() {
         <input
           type="text"
           id="note-title"
-          className="flex-1 bg-transparent text-gray-100 font-semibold text-sm placeholder-gray-600
-                     focus:outline-none min-w-[120px]"
-          placeholder="Note title…"
+          className="flex-1 bg-transparent text-white font-bold text-base placeholder-neutral-600
+                     focus:outline-none min-w-[140px] tracking-tight py-1 transition-all"
+          placeholder="Untitled Note…"
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
@@ -875,7 +917,7 @@ function NoteEditorContent() {
         />
 
         {/* Note Type Selector Tabs */}
-        <div className="flex bg-neutral-900 rounded-lg p-0.5 border border-neutral-800 shrink-0 select-none">
+        <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-xl p-1 shrink-0 select-none items-center gap-1">
           {[
             { id: "text", label: "Text", icon: FileText },
             { id: "drawing", label: "Drawing", icon: Palette },
@@ -889,10 +931,10 @@ function NoteEditorContent() {
                 key={type.id}
                 type="button"
                 onClick={() => handleNoteTypeChange(type.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300
                   ${isSelected
-                    ? "bg-text-primary text-text-inverse font-bold"
-                    : "text-neutral-400 hover:text-neutral-200"
+                    ? "bg-gradient-to-tr from-brand-600 to-indigo-650 text-white shadow-md shadow-brand-500/10 scale-102 border border-brand-500/20"
+                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
                   }`}
                 title={`${type.label} Note`}
                 id={`note-type-${type.id}`}
@@ -905,23 +947,38 @@ function NoteEditorContent() {
         </div>
 
         {/* Save indicator */}
-        <div className="shrink-0 flex items-center gap-1">
+        <div className="shrink-0 flex items-center">
           {hasUnsavedChanges && !saving && (
-            <span className="text-xs text-amber-500 animate-fade-in font-medium">Unsaved changes</span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Unsaved
+            </span>
           )}
-          {saving && <Loader2 className="w-3.5 h-3.5 text-gray-500 animate-spin" />}
+          {saving && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+              <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />
+              Saving
+            </span>
+          )}
           {saved && !saving && (
-            <span className="text-xs text-emerald-500 animate-fade-in font-medium">Saved ✓</span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Saved
+            </span>
           )}
-          {error && <span className="text-xs text-red-400 font-medium">{error}</span>}
+          {error && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+              Error
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 ml-auto shrink-0">
+        <div className="flex items-center gap-2.5 ml-auto shrink-0">
           {/* Preview toggle (mobile) - hidden for text notes */}
           {noteType !== "drawing" && noteType !== "text" && (
             <button
               onClick={() => setPreviewMode(!previewMode)}
-              className="sm:hidden btn-secondary px-2.5 py-1.5 text-xs"
+              className="sm:hidden w-9 h-9 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 text-gray-300 flex items-center justify-center text-xs active:scale-95 transition-all"
               id="preview-toggle"
             >
               {previewMode ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -933,7 +990,7 @@ function NoteEditorContent() {
             id="save-note-btn"
             onClick={handleManualSave}
             disabled={saving}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 hover:border-white/[0.15] text-white text-xs font-semibold shadow-md active:scale-95 transition-all"
           >
             <Save className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Save</span>
@@ -944,7 +1001,7 @@ function NoteEditorContent() {
             id="delete-note-btn"
             onClick={handleDelete}
             disabled={deleting}
-            className="btn-danger px-3 py-1.5 text-xs"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/25 text-red-400 hover:text-red-300 shadow-md active:scale-95 transition-all"
           >
             {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
           </button>
@@ -953,14 +1010,14 @@ function NoteEditorContent() {
           {noteType === "text" && (
             <button
               onClick={() => setShowAI(!showAI)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all
                 ${showAI
-                  ? "bg-brand-500/15 border border-brand-500/30 text-brand-300"
-                  : "btn-secondary"
+                  ? "bg-gradient-to-tr from-indigo-600 to-brand-500 text-white border border-indigo-500/30 shadow-lg shadow-indigo-500/15"
+                  : "bg-neutral-900 border border-indigo-500/15 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/30"
                 }`}
               id="ai-panel-toggle"
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <Brain className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">AI</span>
               {showAI ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
             </button>
@@ -969,7 +1026,111 @@ function NoteEditorContent() {
       </div>
 
       {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden animate-fade-in">
+        {/* Left side-notes list navbar */}
+        <aside className="no-print w-64 border-r border-white/[0.05] bg-[#0c0c0e]/30 backdrop-blur-md flex flex-col shrink-0 select-none">
+          {/* Sidebar Header */}
+          <div className="px-4.5 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                Workspace
+              </span>
+              <span className="text-xs font-bold text-white mt-0.5">
+                {noteType === "text" && "Text Notes"}
+                {noteType === "drawing" && "Drawing Notes"}
+                {noteType === "audio" && "Voice Notes"}
+                {noteType === "checklist" && "Checklists"}
+              </span>
+            </div>
+            {/* Create new note of current type */}
+            <button
+              onClick={() => {
+                isDirty.current = false;
+                setHasUnsavedChanges(false);
+                router.push(`/notes/new?type=${noteType}`);
+              }}
+              title={`New ${noteType === "checklist" ? "checklist" : noteType + " note"}`}
+              className="w-7 h-7 rounded-lg bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Notes list items */}
+          <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1 scrollbar-thin">
+            {(() => {
+              const filteredSidebarNotes = sidebarNotes.filter(
+                (n) => n.note_type === noteType || n.id === noteId
+              );
+
+              if (sidebarLoading && filteredSidebarNotes.length === 0) {
+                return (
+                  <div className="flex flex-col gap-2 p-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-10 w-full bg-white/[0.02] border border-white/[0.04] rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                );
+              }
+
+              if (filteredSidebarNotes.length === 0) {
+                return (
+                  <div className="text-center py-8 text-[11px] text-neutral-500 italic">
+                    No {noteType === "checklist" ? "checklists" : `${noteType} notes`} yet.
+                  </div>
+                );
+              }
+
+              return filteredSidebarNotes.map((n) => {
+                const isActive = n.id === noteId;
+                const noteTitle = n.id === noteId ? (title || "Untitled Note") : (n.title || "Untitled Note");
+                
+                // Date formatting
+                let displayDate = "";
+                try {
+                  const date = new Date(n.updated_at);
+                  displayDate = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                } catch {}
+
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => {
+                      if (isActive) return;
+                      // Prompt if dirty (auto-save is usually active, but let's just transition or save)
+                      if (isDirty.current) {
+                        saveNote().then(() => {
+                          router.push(`/notes/${n.id}`);
+                        });
+                      } else {
+                        router.push(`/notes/${n.id}`);
+                      }
+                    }}
+                    className={`group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left truncate relative ${
+                      isActive
+                        ? "bg-gradient-to-tr from-brand-600/10 to-indigo-650/5 border-brand-500/20 text-white font-semibold shadow-sm"
+                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.02] hover:border-white/[0.04]"
+                    }`}
+                  >
+                    {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                    {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                    {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-red-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                    {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-green-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                    
+                    <span className="truncate pr-8 flex-1 text-[11px]">{noteTitle}</span>
+
+                    {displayDate && (
+                      <span className="absolute right-3 text-[9px] text-neutral-500 font-medium select-none group-hover:text-neutral-400 transition-colors">
+                        {displayDate}
+                      </span>
+                    )}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </aside>
+
         {/* Editor + Preview (split) */}
         <div className="flex flex-1 overflow-hidden flex-col">
 
@@ -1727,7 +1888,7 @@ function NoteEditorContent() {
                 {noteType === "checklist" && (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04] bg-surface-900/40">
-                      <Sparkles className="w-3.5 h-3.5 text-brand-400 fill-brand-400/20" />
+                      <Brain className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
                       <span className="text-xs text-gray-200 font-semibold uppercase tracking-wider">AI Task Generator</span>
                     </div>
                     <div className="p-5 flex-1 flex flex-col gap-4">
@@ -1768,7 +1929,7 @@ function NoteEditorContent() {
                         {extractingTasks ? (
                           <Loader2 className="w-4 h-4 animate-spin text-white" />
                         ) : (
-                          <Sparkles className="w-4 h-4 text-white fill-white" />
+                          <Wand2 className="w-4 h-4 text-white" />
                         )}
                         <span>{extractingTasks ? "Extracting Tasks..." : "Generate AI Checklist Items"}</span>
                       </button>

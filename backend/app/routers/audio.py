@@ -94,9 +94,9 @@ async def upload_audio(
 
     media_url = f"/media/audio/{note_id}.mp3"
 
-    # Update media_url in DB by primary key — O(log n)
+    # Update media_url and note_type in DB by primary key — O(log n)
     await db.execute(
-        update(Note).where(Note.id == note_id).values(media_url=media_url)
+        update(Note).where(Note.id == note_id).values(media_url=media_url, note_type="audio")
     )
     await db.commit()
 
