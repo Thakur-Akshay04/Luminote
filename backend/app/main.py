@@ -82,7 +82,7 @@ async def check_alerts_loop(manager: ConnectionManager):
                 if due_rows:
                     await db.commit()
         except Exception as e:
-            logging.getLogger(__name__).error(f"Error in check_alerts_loop: {e}")
+            logging.getLogger(__name__).exception("Error in check_alerts_loop: %s", e)
 
 
 @asynccontextmanager

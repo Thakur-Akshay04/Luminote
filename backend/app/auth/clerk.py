@@ -55,7 +55,7 @@ async def get_jwks():
                 detail="Authentication service unavailable — please try again"
             )
         except httpx.HTTPError as exc:
-            logger.error("Failed to fetch Clerk JWKS: %s", exc)
+            logger.exception("Failed to fetch Clerk JWKS: %s", exc)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication service unavailable — please try again"
@@ -64,22 +64,31 @@ async def get_jwks():
     return _jwks_cache
 
 
-async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -> User:
+def _extract_user_info(payload: dict) -> tuple[str, str, str]:
     email = payload.get("email") or payload.get("email_address") or ""
     first_name = payload.get("first_name") or ""
     last_name = payload.get("last_name") or ""
     name = f"{first_name} {last_name}".strip() or (email.split("@")[0] if email else "")
     display_name = payload.get("display_name") or name
+    return email, name, display_name
 
-    # Query by clerk_user_id — O(log n) indexed lookup
+
+async def _find_existing_user(clerk_user_id: str, email: str, db: AsyncSession) -> User | None:
     result = await db.execute(select(User).where(User.clerk_user_id == clerk_user_id))
     user = result.scalar_one_or_none()
+    if user or not email:
+        return user
 
-    if not user and email:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
-        if user:
-            user.clerk_user_id = clerk_user_id
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user:
+        user.clerk_user_id = clerk_user_id
+    return user
+
+
+async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -> User:
+    email, name, display_name = _extract_user_info(payload)
+    user = await _find_existing_user(clerk_user_id, email, db)
 
     if not user:
         user = User(
@@ -92,12 +101,9 @@ async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -
         )
         db.add(user)
     else:
-        if email and not user.email:
-            user.email = email
-        if name and not user.name:
-            user.name = name
-        if not user.display_name:
-            user.display_name = display_name
+        user.email = user.email or email
+        user.name = user.name or name
+        user.display_name = user.display_name or display_name
 
     await db.commit()
     await db.refresh(user)

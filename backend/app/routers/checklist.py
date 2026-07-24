@@ -5,6 +5,7 @@ PATCH /notes/{note_id}/checklist/{item_index} â€” toggle checked via jsonb_set â
 """
 import logging
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
@@ -31,8 +32,8 @@ async def toggle_checklist_item(
     note_id: uuid.UUID,
     item_index: int,
     body: ToggleRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Toggle a single checklist item's checked state using targeted JSONB update.
 

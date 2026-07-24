@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, delete
@@ -19,8 +20,8 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 @router.get("", response_model=list[AlertResponse])
 async def list_alerts(
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     stmt = (
         select(Alert, Note.title.label("note_title"))
@@ -42,8 +43,8 @@ async def list_alerts(
 @router.post("", response_model=AlertResponse, status_code=201)
 async def create(
     body: AlertCreate,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Verify note ownership
     note = await get_note(body.note_id, uuid.UUID(user_id), db)
@@ -63,11 +64,11 @@ async def create(
     return new_alert
 
 
-@router.delete("/{alert_id}", status_code=204)
+@router.delete("/{alert_id}", status_code=204, responses={404: {"description": "Alert not found"}})
 async def remove(
     alert_id: uuid.UUID,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     stmt = select(Alert).where(Alert.id == alert_id, Alert.user_id == uuid.UUID(user_id))
     result = await db.execute(stmt)
@@ -89,7 +90,7 @@ async def websocket_alerts(
         async with AsyncSessionLocal() as db:
             user_id = await verify_token(token, db)
     except Exception as e:
-        logger.error(f"WebSocket auth failed: {e}", exc_info=True)
+        logger.exception("WebSocket auth failed: %s", e)
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

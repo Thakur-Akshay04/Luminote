@@ -31,7 +31,7 @@ MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 # Max upload size: 10 MB
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from pydantic import BaseModel
 
 class DrawingRequest(BaseModel):
@@ -62,6 +62,43 @@ def get_version_files(note_id: uuid.UUID) -> list[str]:
     return [os.path.join(MEDIA_DIR, f[1]) for f in files]
 
 
+def _renumber_drawing_versions(note_id: uuid.UUID, version_number: int) -> None:
+    prefix = f"{note_id}_v"
+    for f in sorted(os.listdir(MEDIA_DIR)):
+        if f.startswith(prefix) and f.endswith(".png"):
+            parts = f[len(prefix):-4]
+            if parts.isdigit() and int(parts) > version_number:
+                v = int(parts)
+                old_path = os.path.join(MEDIA_DIR, f)
+                new_path = os.path.join(MEDIA_DIR, f"{prefix}{v - 1}.png")
+                os.rename(old_path, new_path)
+
+
+def _calculate_new_active_version_url(media_url: str | None, version_number: int, note_id: uuid.UUID) -> str | None:
+    if not media_url:
+        return None
+    parts = media_url.split("_v")
+    if len(parts) <= 1 or not parts[-1].endswith(".png"):
+        return None
+    v_str = parts[-1][:-4]
+    if not v_str.isdigit():
+        return None
+
+    active_version = int(v_str)
+    if active_version > version_number:
+        new_active = active_version - 1
+    elif active_version == version_number:
+        test_path = os.path.join(MEDIA_DIR, f"{note_id}_v{active_version}.png")
+        if os.path.exists(test_path):
+            new_active = active_version
+        else:
+            new_active = active_version - 1 if active_version - 1 >= 1 else None
+    else:
+        new_active = active_version
+
+    return f"/media/drawings/{note_id}_v{new_active}.png" if new_active is not None else None
+
+
 async def migrate_legacy_drawing(note_id: uuid.UUID, db: AsyncSession) -> None:
     """Migrates a legacy drawing (note_id.png) to note_id_v1.png if it exists."""
     os.makedirs(MEDIA_DIR, exist_ok=True)
@@ -88,8 +125,8 @@ async def migrate_legacy_drawing(note_id: uuid.UUID, db: AsyncSession) -> None:
 async def save_drawing(
     note_id: uuid.UUID,
     body: DrawingRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Save a new version of the drawing for a note.
 
@@ -168,17 +205,14 @@ async def save_drawing(
 @router.get("/{note_id}/drawing", response_model=DrawingResponse)
 async def get_drawing(
     note_id: uuid.UUID,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get drawing versions and active URL for a note."""
-    # Validate note ownership
-    note = await get_note(note_id, uuid.UUID(user_id), db)
-
     # Migrate legacy if exists
     await migrate_legacy_drawing(note_id, db)
 
-    # Re-fetch note after possible migration to get updated media_url
+    # Validate note ownership and fetch updated note
     note = await get_note(note_id, uuid.UUID(user_id), db)
 
     # Get all version files
@@ -195,12 +229,12 @@ async def get_drawing(
 async def switch_drawing_version(
     note_id: uuid.UUID,
     body: SwitchDrawingRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Switch active drawing version."""
     # Validate note ownership
-    note = await get_note(note_id, uuid.UUID(user_id), db)
+    await get_note(note_id, uuid.UUID(user_id), db)
 
     # Migrate legacy if exists
     await migrate_legacy_drawing(note_id, db)
@@ -238,17 +272,14 @@ async def switch_drawing_version(
 async def delete_drawing_version(
     note_id: uuid.UUID,
     version_number: int,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete a specific version of the drawing and renumber subsequent versions."""
-    # Validate note ownership
-    note = await get_note(note_id, uuid.UUID(user_id), db)
-
     # Migrate legacy if exists
     await migrate_legacy_drawing(note_id, db)
 
-    # Re-fetch note to get the correct current media_url
+    # Validate note ownership
     note = await get_note(note_id, uuid.UUID(user_id), db)
 
     target_file = f"{note_id}_v{version_number}.png"
@@ -259,44 +290,9 @@ async def delete_drawing_version(
     # Delete the target file
     os.remove(target_path)
 
-    # Renumber/shift remaining versions
-    # For any version > version_number, rename to version - 1
-    for f in sorted(os.listdir(MEDIA_DIR)):
-        if f.startswith(f"{note_id}_v") and f.endswith(".png"):
-            parts = f[len(f"{note_id}_v"):-4]
-            if parts.isdigit():
-                v = int(parts)
-                if v > version_number:
-                    old_path = os.path.join(MEDIA_DIR, f)
-                    new_path = os.path.join(MEDIA_DIR, f"{note_id}_v{v-1}.png")
-                    os.rename(old_path, new_path)
-
-    # Parse currently active version number
-    active_version_number = None
-    if note.media_url:
-        parts = note.media_url.split("_v")
-        if len(parts) > 1 and parts[-1].endswith(".png"):
-            v_str = parts[-1][:-4]
-            if v_str.isdigit():
-                active_version_number = int(v_str)
-
-    # Calculate new active version url
-    new_media_url = None
-    if active_version_number is not None:
-        if active_version_number > version_number:
-            new_active_version_number = active_version_number - 1
-        elif active_version_number == version_number:
-            # Check if a shifted version occupies the same version index
-            test_path = os.path.join(MEDIA_DIR, f"{note_id}_v{active_version_number}.png")
-            if os.path.exists(test_path):
-                new_active_version_number = active_version_number
-            else:
-                new_active_version_number = active_version_number - 1 if active_version_number - 1 >= 1 else None
-        else:
-            new_active_version_number = active_version_number
-
-        if new_active_version_number is not None:
-            new_media_url = f"/media/drawings/{note_id}_v{new_active_version_number}.png"
+    # Renumber remaining versions and calculate new active media URL
+    _renumber_drawing_versions(note_id, version_number)
+    new_media_url = _calculate_new_active_version_url(note.media_url, version_number, note_id)
 
     # Update database
     await db.execute(

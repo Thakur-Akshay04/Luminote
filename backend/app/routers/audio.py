@@ -7,10 +7,10 @@ POST  /notes/{note_id}/transcribe — transcribe saved .mp3 via Groq Whisper, ca
 import logging
 import os
 import uuid
+from typing import Annotated
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,9 +49,9 @@ class TranscriptResponse(BaseModel):
 @router.post("/{note_id}/audio", response_model=AudioUploadResponse, status_code=200)
 async def upload_audio(
     note_id: uuid.UUID,
-    file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    file: Annotated[UploadFile, File(...)],
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Upload audio, save directly as .mp3 file, update media_url.
 
@@ -111,9 +111,9 @@ async def upload_audio(
 @router.post("/{note_id}/transcribe", response_model=TranscriptResponse)
 async def transcribe_audio(
     note_id: uuid.UUID,
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     force: bool = False,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """Transcribe already saved .mp3 file for a note via Groq Whisper on-demand.
 
@@ -150,7 +150,7 @@ async def transcribe_audio(
         async with aiofiles.open(file_path, "rb") as f:
             audio_bytes = await f.read()
     except Exception as e:
-        logger.error("Failed to read audio file %s: %s", file_path, e)
+        logger.exception("Failed to read audio file %s: %s", file_path, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to read audio file from disk"
@@ -165,7 +165,7 @@ async def transcribe_audio(
         )
         transcript_text = transcription.text.strip()
     except Exception as e:
-        logger.error("Groq Whisper transcription error: %s", e)
+        logger.exception("Groq Whisper transcription error: %s", e)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Transcription service unavailable — please try again"

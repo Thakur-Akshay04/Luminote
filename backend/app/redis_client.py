@@ -1,3 +1,4 @@
+import asyncio
 import redis.asyncio as aioredis
 
 from app.config import settings
@@ -14,6 +15,7 @@ async def get_redis() -> aioredis.Redis:
             encoding="utf-8",
             decode_responses=True,
         )
+    await asyncio.sleep(0)
     return _redis_pool
 
 
