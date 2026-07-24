@@ -97,7 +97,7 @@ Note content:
             result["tags"] = []
 
     except Exception as e:
-        logger.error("Groq API error: %s", e)
+        logger.exception("Groq API error: %s", e)
         result = {"summary": "", "tags": []}
 
     # Cache the result
@@ -187,7 +187,7 @@ Answer the user's questions based on the note content. Be concise and accurate. 
             return response.choices[0].message.content.strip()
         return "Sorry, I could not generate an answer at this time."
     except Exception as e:
-        logger.error("Groq Q&A error: %s", e)
+        logger.exception("Groq Q&A error: %s", e)
         return "Sorry, I could not generate an answer at this time."
 
 
