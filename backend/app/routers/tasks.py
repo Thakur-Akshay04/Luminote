@@ -5,6 +5,7 @@ POST /notes/{note_id}/extract-tasks — extract tasks from note content using AI
 """
 import logging
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,8 +23,8 @@ router = APIRouter(prefix="/notes", tags=["tasks"])
 @router.post("/{note_id}/extract-tasks")
 async def extract_note_tasks(
     note_id: uuid.UUID,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Extract action items from note content using AI.
 
@@ -50,7 +51,7 @@ async def extract_note_tasks(
         tasks = await extract_tasks(content_to_extract)
         return {"tasks": tasks}
     except Exception as e:
-        logger.error("Task extraction failed for note %s: %s", note_id, e)
+        logger.exception("Task extraction failed for note %s: %s", note_id, e)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not extract tasks — please try again"

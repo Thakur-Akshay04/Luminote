@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import text
@@ -38,8 +39,8 @@ def _validate_embedding_vector(embedding: list[float]) -> str:
 @router.post("", response_model=SearchResponse)
 async def semantic_search(
     body: SearchRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Check if query is empty or contains no alphanumeric characters
     if not body.query or not re.search(r"\w", body.query):

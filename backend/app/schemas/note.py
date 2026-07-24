@@ -52,10 +52,10 @@ class NoteUpdate(BaseModel):
 class NoteResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
-    title: Optional[str]
+    title: Optional[str] = None
     content: str
-    summary: Optional[str]
-    tags: Optional[list[str]]
+    summary: Optional[str] = None
+    tags: Optional[list[str]] = None
     note_type: Optional[str] = "text"
     media_url: Optional[str] = None
     transcript: Optional[str] = None

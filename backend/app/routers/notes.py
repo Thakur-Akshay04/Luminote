@@ -1,6 +1,6 @@
 import uuid
 import json
-from typing import Optional
+from typing import Optional, Annotated
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status, File, UploadFile
@@ -42,12 +42,12 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 
 @router.get("", response_model=list[NoteResponse])
 async def list_notes(
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
     tag: Optional[str] = None,
     note_type: Optional[str] = None,
     is_favorite: Optional[bool] = None,
     is_pinned: Optional[bool] = None,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     notes = await get_notes(uuid.UUID(user_id), tag, note_type, db, is_favorite=is_favorite, is_pinned=is_pinned)
     return notes
@@ -57,8 +57,8 @@ async def list_notes(
 async def create(
     body: NoteCreate,
     background_tasks: BackgroundTasks,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await create_note(
         uuid.UUID(user_id),
@@ -77,8 +77,8 @@ async def create(
 @router.get("/{note_id}", response_model=NoteResponse)
 async def get_one(
     note_id: uuid.UUID,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await get_note(note_id, uuid.UUID(user_id), db)
 
@@ -88,8 +88,8 @@ async def update(
     note_id: uuid.UUID,
     body: NoteUpdate,
     background_tasks: BackgroundTasks,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await update_note(
         note_id, uuid.UUID(user_id), body.title, body.content, db, background_tasks,
@@ -105,8 +105,8 @@ async def update(
 @router.delete("/{note_id}", status_code=204)
 async def remove(
     note_id: uuid.UUID,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await delete_note(note_id, uuid.UUID(user_id), db)
 
@@ -115,8 +115,8 @@ async def remove(
 async def ask(
     note_id: uuid.UUID,
     body: AskRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     from datetime import datetime, timezone
 
@@ -160,8 +160,8 @@ async def ask(
 async def summarize(
     note_id: uuid.UUID,
     body: SummarizeRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     from datetime import datetime, timezone
     
@@ -214,8 +214,8 @@ async def summarize(
 
 @router.post("/upload-image")
 async def upload_image(
-    file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user),
+    file: Annotated[UploadFile, File(...)],
+    user_id: Annotated[str, Depends(get_current_user)],
 ):
     import os
     import aiofiles
@@ -252,7 +252,7 @@ async def upload_image(
             while chunk := await file.read(1024 * 1024):
                 await buffer.write(chunk)
     except Exception as e:
-        logger.error("Failed to save uploaded image: %s", e)
+        logger.exception("Failed to save uploaded image: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save image"
@@ -265,8 +265,8 @@ async def upload_image(
 async def ai_action(
     note_id: uuid.UUID,
     body: AIActionRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Verify note existence and ownership
     await get_note(note_id, uuid.UUID(user_id), db)

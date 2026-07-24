@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,8 @@ from app.services.auth_service import verify_password, hash_password
 from app.services.email_service import send_verification_email
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+USER_NOT_FOUND_DETAIL = "User not found"
 
 
 def _safe_path(base_dir: str, filename: str) -> str:
@@ -45,11 +48,19 @@ async def invalidate_user_sessions(user_id: str, redis) -> None:
         await redis.delete(*keys_to_delete)
 
 
-@router.post("/me/avatar", status_code=200)
+@router.post(
+    "/me/avatar",
+    status_code=200,
+    responses={
+        400: {"description": "Invalid image file"},
+        404: {"description": USER_NOT_FOUND_DETAIL},
+        413: {"description": "Image must be under 5MB"},
+    },
+)
 async def upload_avatar(
-    file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    file: Annotated[UploadFile, File(...)],
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Validate file size (max 5MB)
     contents = await file.read()
@@ -86,7 +97,7 @@ async def upload_avatar(
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     avatar_url = f"/media/avatars/{user_id}.jpg"
     user.avatar_url = avatar_url
@@ -101,16 +112,20 @@ async def upload_avatar(
     return {"avatar_url": f"{avatar_url}?t={int(datetime.now(timezone.utc).timestamp())}"}
 
 
-@router.delete("/me/avatar", status_code=200)
+@router.delete(
+    "/me/avatar",
+    status_code=200,
+    responses={404: {"description": USER_NOT_FOUND_DETAIL}},
+)
 async def delete_avatar(
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Update database column
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     user.avatar_url = None
     await db.commit()
@@ -133,11 +148,20 @@ async def delete_avatar(
     return {"message": "Avatar removed"}
 
 
-@router.patch("/me/email", status_code=200)
+@router.patch(
+    "/me/email",
+    status_code=200,
+    responses={
+        400: {"description": "This is already your email"},
+        404: {"description": USER_NOT_FOUND_DETAIL},
+        409: {"description": "This email is already in use"},
+        422: {"description": "Emails do not match"},
+    },
+)
 async def change_email(
     body: ChangeEmailRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if body.new_email != body.confirm_new_email:
         raise HTTPException(status_code=422, detail="Emails do not match")
@@ -146,7 +170,7 @@ async def change_email(
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     if user.email == body.new_email:
         raise HTTPException(status_code=400, detail="This is already your email")
@@ -171,10 +195,17 @@ async def change_email(
     return {"message": "Verification email sent"}
 
 
-@router.get("/verify-email", status_code=200)
+@router.get(
+    "/verify-email",
+    status_code=200,
+    responses={
+        400: {"description": "Invalid or expired token"},
+        404: {"description": USER_NOT_FOUND_DETAIL},
+    },
+)
 async def verify_email(
     token: str,
-    db: AsyncSession = Depends(get_db)
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     import re
     try:
@@ -204,7 +235,7 @@ async def verify_email(
     result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     if user.pending_email != new_email:
         raise HTTPException(status_code=400, detail="Email verification mismatch")
@@ -223,11 +254,20 @@ async def verify_email(
     return RedirectResponse(url=f"{settings.frontend_url}/profile?email_verified=true")
 
 
-@router.patch("/me/password", status_code=200)
+@router.patch(
+    "/me/password",
+    status_code=200,
+    responses={
+        400: {"description": "New password must be different"},
+        401: {"description": "Current password is incorrect"},
+        404: {"description": USER_NOT_FOUND_DETAIL},
+        422: {"description": "Password must be at least 8 characters"},
+    },
+)
 async def change_password(
     body: ChangePasswordRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if len(body.new_password) < 8:
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
@@ -236,7 +276,7 @@ async def change_password(
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     # Verify current password hash
     if not user.password_hash or not verify_password(body.current_password, user.password_hash):
@@ -257,11 +297,18 @@ async def change_password(
     return {"message": "Password updated successfully"}
 
 
-@router.patch("/me/name", status_code=200)
+@router.patch(
+    "/me/name",
+    status_code=200,
+    responses={
+        404: {"description": USER_NOT_FOUND_DETAIL},
+        422: {"description": "Validation error for display name"},
+    },
+)
 async def change_display_name(
     body: ChangeNameRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     name = body.display_name.strip()
     if not name:
@@ -277,7 +324,7 @@ async def change_display_name(
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
         
     user.display_name = name
     await db.commit()
@@ -289,17 +336,20 @@ async def change_display_name(
     return {"display_name": name}
 
 
-
-@router.delete("/me", status_code=204)
+@router.delete(
+    "/me",
+    status_code=204,
+    responses={404: {"description": USER_NOT_FOUND_DETAIL}},
+)
 async def delete_me(
-    authorization: str = Header(...),
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    authorization: Annotated[str, Header(...)],
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
     await db.delete(user)
     await db.commit()
@@ -323,5 +373,3 @@ async def delete_me(
     # Invalidate the current session token used for request
     token = authorization.split(" ", 1)[1]
     await redis.delete(f"session:{token}")
-
-    return
