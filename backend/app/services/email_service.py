@@ -8,7 +8,6 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 async def send_verification_email(user_id: str, new_email: str) -> None:
-    await asyncio.sleep(0)
     # Generate token (expires in 24 hours)
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
     payload = {
@@ -45,7 +44,7 @@ async def send_verification_email(user_id: str, new_email: str) -> None:
                 """
             )
             sg = SendGridAPIClient(sendgrid_key)
-            sg.send(message)
+            await asyncio.to_thread(sg.send, message)
             logger.info("Verification email sent via SendGrid successfully.")
         except Exception as e:
             logger.exception("Failed to send verification email via SendGrid: %s", e)

@@ -222,7 +222,7 @@ async def verify_email(
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
     # Validate email format before touching the database
-    if not re.match(r"^[^@\s]+@[^@\s\.]+\.[^@\s\.]+$", new_email):
+    if not re.match(r"^[^@\s]+@[^@\s.]+\.[^@\s.]+$", new_email):
         raise HTTPException(status_code=400, detail="Invalid email address in token")
 
     # Parse UUID safely

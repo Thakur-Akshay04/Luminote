@@ -81,6 +81,25 @@ def _parse_note_text_content(content: str) -> str:
     return content
 
 
+async def _process_non_text_note(
+    note_id: uuid.UUID,
+    text_content: str,
+    note_type: str,
+    session_factory
+) -> None:
+    logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
+    embedding = await get_embedding(text_content)
+    if embedding:
+        async with session_factory() as db:
+            await db.execute(
+                update(Note).where(Note.id == note_id).values(
+                    embedding=embedding,
+                    updated_at=datetime.now(timezone.utc)
+                )
+            )
+            await db.commit()
+
+
 async def _run_ai_pipeline(
     note_id: uuid.UUID,
     content: str,
@@ -90,7 +109,6 @@ async def _run_ai_pipeline(
 ) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
-        # Check note_type first to avoid using model for voice (audio) and drawing features
         async with session_factory() as db:
             note = await db.get(Note, note_id)
             if not note:
@@ -102,17 +120,7 @@ async def _run_ai_pipeline(
         text_content = _parse_note_text_content(content)
 
         if note_type in ("audio", "drawing", "checklist"):
-            logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
-            embedding = await get_embedding(text_content)
-            if embedding:
-                async with session_factory() as db:
-                    await db.execute(
-                        update(Note).where(Note.id == note_id).values(
-                            embedding=embedding,
-                            updated_at=datetime.now(timezone.utc)
-                        )
-                    )
-                    await db.commit()
+            await _process_non_text_note(note_id, text_content, note_type, session_factory)
             return
 
         current_time_str = datetime.now(timezone.utc).isoformat()
@@ -141,10 +149,7 @@ async def _run_ai_pipeline(
                 values["embedding"] = embedding
 
             await db.execute(update(Note).where(Note.id == note_id).values(**values))
-
-            # Sync AI Alerts
             await sync_ai_alerts(db, user_id, note_id, enrichment.get("alerts", []))
-
             await db.commit()
 
         logger.info("AI pipeline complete for note %s", note_id)
@@ -162,41 +167,60 @@ async def _update_checklist_cache(note_id: uuid.UUID, items: list) -> None:
         logger.warning("Redis checklist cache update failed: %s", e)
 
 
+def _build_note_update_values(
+    note: Note,
+    title: Optional[str],
+    content: Optional[str],
+    note_type: Optional[str],
+    checklist_items: Optional[list],
+    is_pinned: Optional[bool],
+    is_favorite: Optional[bool],
+) -> dict:
+    actual_note_type = note.note_type or note_type or "text"
+    values: dict = {"updated_at": datetime.now(timezone.utc), "note_type": actual_note_type}
+    if title is not None:
+        values["title"] = title
+    if content is not None:
+        values["content"] = content
+    if checklist_items is not None:
+        values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]
+    if is_pinned is not None:
+        values["is_pinned"] = is_pinned
+    if is_favorite is not None:
+        values["is_favorite"] = is_favorite
+    return values
+
+
 async def create_note(
     user_id: uuid.UUID,
     title: Optional[str],
     content: str,
     db: AsyncSession,
     background_tasks,
-    note_type: Optional[str] = None,
+    note_type: Optional[str] = "text",
+    checklist_items: Optional[list] = None,
+    media_url: Optional[str] = None,
+    transcript: Optional[str] = None,
     is_pinned: Optional[bool] = False,
     is_favorite: Optional[bool] = False,
-    summary_format: Optional[str] = "paragraph",
-    extract_alerts: Optional[bool] = True,
+    summary_format: Optional[str] = None,
+    extract_alerts: Optional[bool] = None,
 ) -> Note:
-    import json
-    if content and (not note_type or note_type == "text"):
-        try:
-            parsed = json.loads(content)
-            if isinstance(parsed, dict) and ("description" in parsed or "ai_context" in parsed):
-                note_type = "checklist"
-        except (json.JSONDecodeError, TypeError):
-            pass
-
     note = Note(
-        id=uuid.uuid4(),
         user_id=user_id,
         title=title,
         content=content,
         note_type=note_type or "text",
+        media_url=media_url,
+        transcript=transcript,
         is_pinned=is_pinned or False,
         is_favorite=is_favorite or False,
+        checklist_items=[item if isinstance(item, dict) else item.model_dump() for item in checklist_items] if checklist_items else None,
     )
     db.add(note)
     await db.commit()
     await db.refresh(note)
 
-    # Schedule AI enrichment in the background
     from app.database import AsyncSessionLocal
     background_tasks.add_task(
         _run_ai_pipeline,
@@ -258,30 +282,16 @@ async def update_note(
     extract_alerts: Optional[bool] = None,
 ) -> Note:
     note = await get_note(note_id, user_id, db)
-
     content_changed = content is not None and content != note.content
 
-    # Preserve original note_type if note already exists — an existing note's type is immutable
-    actual_note_type = note.note_type or note_type or "text"
-
-    values: dict = {"updated_at": datetime.now(timezone.utc), "note_type": actual_note_type}
-    if title is not None:
-        values["title"] = title
-    if content is not None:
-        values["content"] = content
-    if checklist_items is not None:
-        # Store as JSONB list — validated upstream by Pydantic
-        values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]
-    if is_pinned is not None:
-        values["is_pinned"] = is_pinned
-    if is_favorite is not None:
-        values["is_favorite"] = is_favorite
+    values = _build_note_update_values(
+        note, title, content, note_type, checklist_items, is_pinned, is_favorite
+    )
 
     await db.execute(update(Note).where(Note.id == note_id).values(**values))
     await db.commit()
     await db.refresh(note)
 
-    # Invalidate checklist cache if items were updated — O(1)
     if checklist_items is not None:
         await _update_checklist_cache(note_id, values["checklist_items"])
 
