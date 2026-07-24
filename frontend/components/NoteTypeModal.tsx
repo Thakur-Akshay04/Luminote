@@ -16,7 +16,7 @@ interface NoteTypeModalProps {
   onClose: () => void;
 }
 
-export default function NoteTypeModal({ isOpen, onClose }: NoteTypeModalProps) {
+export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModalProps>) {
   const router = useRouter();
 
   // Close on ESC key

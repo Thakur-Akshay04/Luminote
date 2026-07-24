@@ -227,7 +227,7 @@ export default function InteractiveThoughtMap() {
             const core = prevNodes.find((n) => n.id === "core") || targetCenter;
             const dxCore = core.x - nx;
             const dyCore = core.y - ny;
-            const distCore = Math.sqrt(dxCore * dxCore + dyCore * dyCore);
+            const distCore = Math.hypot(dxCore, dyCore);
             
             // Expanded Orbit bounds to match larger sizes
             const minRadius = 160;
@@ -244,7 +244,7 @@ export default function InteractiveThoughtMap() {
           if (mouse && mouse.x < w * 0.5) {
             const dxMouse = mouse.x - nx;
             const dyMouse = mouse.y - ny;
-            const distMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse);
+            const distMouse = Math.hypot(dxMouse, dyMouse);
             if (distMouse < 180 && distMouse > 0) {
               const pull = (1.0 - distMouse / 180) * 0.06;
               nvx += (dxMouse / distMouse) * pull;

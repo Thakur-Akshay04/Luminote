@@ -35,7 +35,6 @@ function NavbarContent() {
   const activeType = searchParams.get("type");
 
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
 
   const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);

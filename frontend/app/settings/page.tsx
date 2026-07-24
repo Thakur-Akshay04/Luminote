@@ -317,8 +317,9 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <label htmlFor="settings-ai-extract-alerts" className="relative inline-flex items-center cursor-pointer shrink-0">
                 <input
+                  id="settings-ai-extract-alerts"
                   type="checkbox"
                   checked={aiExtractAlerts}
                   onChange={(e) => setAiExtractAlerts(e.target.checked)}
@@ -332,6 +333,7 @@ export default function SettingsPage() {
 
             <div className="flex items-center gap-4">
               <button
+                type="button"
                 onClick={handleSaveAiSettings}
                 className="btn-primary py-2.5 px-6 font-bold text-xs flex items-center gap-2 shadow-lg shadow-brand-500/20"
               >
@@ -378,6 +380,7 @@ export default function SettingsPage() {
               )}
 
               <button
+                type="button"
                 onClick={handleExportData}
                 disabled={exporting}
                 className="btn-secondary mt-5 py-2.5 px-5 font-bold text-xs flex items-center gap-2 border-white/[0.1] hover:bg-white/[0.06]"
@@ -413,6 +416,7 @@ export default function SettingsPage() {
                   onChange={(e) => setWipeConfirmInput(e.target.value)}
                 />
                 <button
+                  type="button"
                   onClick={handleWipeNotes}
                   disabled={wiping || wipeConfirmInput !== "DELETE ALL NOTES"}
                   className="btn-danger py-2 px-5 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shrink-0"
@@ -483,6 +487,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-[#0b0b10] border border-red-500/30 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl flex flex-col gap-5 relative">
             <button
+              type="button"
               onClick={() => {
                 setShowDeleteModal(false);
                 setDeleteConfirmInput("");
@@ -505,10 +510,11 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-neutral-300">
+              <label htmlFor="settings-confirm-delete-input" className="text-xs font-bold text-neutral-300">
                 Type DELETE to confirm:
               </label>
               <input
+                id="settings-confirm-delete-input"
                 type="text"
                 placeholder="DELETE"
                 className="input py-2.5 text-xs border-red-900/40 focus:border-red-500"
@@ -525,6 +531,7 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/[0.06]">
               <button
+                type="button"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeleteConfirmInput("");
@@ -536,6 +543,7 @@ export default function SettingsPage() {
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmInput !== "DELETE" || deletingAccount}
                 className="btn-danger px-5 py-2.5 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"

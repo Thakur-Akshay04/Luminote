@@ -79,7 +79,28 @@ function extractTextFromTiptapJson(node: any): string {
   return "";
 }
 
-export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
+function extractCleanNoteText(note: Note): string {
+  if (!note.content) return "";
+  const cleanContent = note.content.trim();
+  if (!cleanContent.startsWith("{")) return cleanContent;
+
+  try {
+    const parsed = JSON.parse(cleanContent);
+    if (parsed && typeof parsed === "object") {
+      if (parsed.type === "doc") {
+        return extractTextFromTiptapJson(parsed).trim();
+      }
+      if ("description" in parsed) {
+        return (parsed.description || "").trim();
+      }
+    }
+  } catch {
+    return cleanContent;
+  }
+  return cleanContent;
+}
+
+export default function NoteCard({ note, className, onDelete }: Readonly<NoteCardProps>) {
   // If it is an audio note but has no media file, treat it as a text note for visual layout purposes
   const isAudioWithNoMedia = note.note_type === "audio" && !note.media_url;
   const effectiveType = isAudioWithNoMedia ? "text" : note.note_type;
@@ -90,69 +111,26 @@ export default function NoteCard({ note, className, onDelete }: NoteCardProps) {
 
   const getPreview = () => {
     if (note.summary) return note.summary;
-    let text = "";
-    if (note.content) {
-      const cleanContent = note.content.trim();
-      if (cleanContent.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(cleanContent);
-          if (parsed && typeof parsed === "object") {
-            if (parsed.type === "doc") {
-              text = extractTextFromTiptapJson(parsed).trim();
-            } else if ("description" in parsed) {
-              text = (parsed.description || "").trim();
-            }
-          }
-        } catch {
-          text = cleanContent;
-        }
-      } else {
-        text = cleanContent;
-      }
-    }
-
-    const cleaned = text
-      .replace(/^(Start writing here[…\.]*|Start writing)\s*/i, "")
+    const rawText = extractCleanNoteText(note);
+    const cleaned = rawText
+      .replace(/^(Start writing here[….]*|Start writing)\s*/i, "")
       .trim();
 
     if (note.note_type === "audio") {
-      if (!cleaned) {
-        return "Start writing here...";
-      }
-      return cleaned.slice(0, 120);
+      return cleaned ? cleaned.slice(0, 120) : "Start writing here...";
     }
 
     if (!cleaned) {
-      if (effectiveType === "drawing") return "";
-      return "Start writing here...";
+      return effectiveType === "drawing" ? "" : "Start writing here...";
     }
     return cleaned.slice(0, 120);
   };
   const preview = getPreview();
 
   const getWordCount = () => {
-    let text = "";
-    if (note.content) {
-      const cleanContent = note.content.trim();
-      if (cleanContent.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(cleanContent);
-          if (parsed && typeof parsed === "object") {
-            if (parsed.type === "doc") {
-              text = extractTextFromTiptapJson(parsed).trim();
-            } else if ("description" in parsed) {
-              text = (parsed.description || "").trim();
-            }
-          }
-        } catch {
-          text = cleanContent;
-        }
-      } else {
-        text = cleanContent;
-      }
-    }
-    const cleaned = text
-      .replace(/^(Start writing here[…\.]*|Start writing|Draw here)\s*/i, "")
+    const rawText = extractCleanNoteText(note);
+    const cleaned = rawText
+      .replace(/^(Start writing here[….]*|Start writing|Draw here)\s*/i, "")
       .trim();
     return cleaned.split(/\s+/).filter(Boolean).length;
   };
