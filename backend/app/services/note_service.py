@@ -63,9 +63,22 @@ async def sync_ai_alerts(
             db.add(new_alert)
             new_alerts.append(new_alert)
         except Exception as parse_err:
-            logger.error("Failed to parse extracted alert %s: %s", alert_data, parse_err)
+            logger.exception("Failed to parse extracted alert %s: %s", alert_data, parse_err)
 
     return new_alerts
+
+
+def _parse_note_text_content(content: str) -> str:
+    if not (content.strip().startswith('{"') or content.strip().startswith('[{')):
+        return content
+    try:
+        data = json.loads(content)
+        if isinstance(data, dict) and data.get("type") == "doc":
+            extracted = extract_text_from_tiptap_json(data).strip()
+            return extracted or content
+    except Exception as parse_err:
+        logger.exception("Failed to parse content as Tiptap JSON in AI pipeline: %s", parse_err)
+    return content
 
 
 async def _run_ai_pipeline(
@@ -86,16 +99,7 @@ async def _run_ai_pipeline(
             note_type = note.note_type
             user_id = note.user_id
 
-        text_content = content
-        if content.strip().startswith('{"') or content.strip().startswith('[{'):
-            try:
-                data = json.loads(content)
-                if isinstance(data, dict) and data.get("type") == "doc":
-                    extracted = extract_text_from_tiptap_json(data).strip()
-                    if extracted:
-                        text_content = extracted
-            except Exception as parse_err:
-                logger.error("Failed to parse content as Tiptap JSON in AI pipeline: %s", parse_err)
+        text_content = _parse_note_text_content(content)
 
         if note_type in ("audio", "drawing", "checklist"):
             logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
@@ -145,7 +149,17 @@ async def _run_ai_pipeline(
 
         logger.info("AI pipeline complete for note %s", note_id)
     except Exception as e:
-        logger.error("AI pipeline failed for note %s: %s", note_id, e)
+        logger.exception("AI pipeline failed for note %s: %s", note_id, e)
+
+
+async def _update_checklist_cache(note_id: uuid.UUID, items: list) -> None:
+    try:
+        redis = await get_redis()
+        await redis.delete(f"checklist:{note_id}")
+        cache_val = json.dumps(items)
+        await redis.setex(f"checklist:{note_id}", settings.checklist_cache_ttl, cache_val)
+    except Exception as e:
+        logger.warning("Redis checklist cache update failed: %s", e)
 
 
 async def create_note(
@@ -206,7 +220,7 @@ async def get_notes(
 ) -> list[Note]:
     stmt = select(Note).where(Note.user_id == user_id).order_by(Note.is_pinned.desc(), Note.updated_at.desc())
     if tag:
-        stmt = stmt.where(Note.tags.any(tag))
+        stmt = stmt.where(Note.tags.contains([tag]))
     if note_type:
         stmt = stmt.where(Note.note_type == note_type)
     if is_favorite is True:
@@ -247,7 +261,6 @@ async def update_note(
 
     content_changed = content is not None and content != note.content
 
-    import json
     # Preserve original note_type if note already exists — an existing note's type is immutable
     actual_note_type = note.note_type or note_type or "text"
 
@@ -270,14 +283,7 @@ async def update_note(
 
     # Invalidate checklist cache if items were updated — O(1)
     if checklist_items is not None:
-        try:
-            redis = await get_redis()
-            await redis.delete(f"checklist:{note_id}")
-            # Cache new value — O(1)
-            cache_val = json.dumps(values["checklist_items"])
-            await redis.setex(f"checklist:{note_id}", settings.checklist_cache_ttl, cache_val)
-        except Exception as e:
-            logger.warning("Redis checklist cache update failed: %s", e)
+        await _update_checklist_cache(note_id, values["checklist_items"])
 
     if content_changed:
         from app.database import AsyncSessionLocal

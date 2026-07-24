@@ -132,7 +132,7 @@ async def get_embedding(text: str) -> list[float]:
             logger.error("Hugging Face API returned status code %s: %s", response.status_code, response.text)
             return []
     except Exception as e:
-        logger.error("Hugging Face embedding error: %s", e)
+        logger.exception("Hugging Face embedding error: %s", e)
         return []
 
 
@@ -260,7 +260,7 @@ Note content:
 
         return result
     except Exception as e:
-        logger.error("Error generating AI summary: %s", e)
+        logger.exception("Error generating AI summary: %s", e)
         return {"summary": "Failed to generate summary.", "tags": [], "alerts": []}
 
 
@@ -296,5 +296,5 @@ async def execute_ai_action(action: str, text: str, param: Optional[str] = None)
         )
         return (response.choices[0].message.content or "").strip()
     except Exception as e:
-        logger.error("Error executing AI writing action %s: %s", action, e)
+        logger.exception("Error executing AI writing action %s: %s", action, e)
         return "Failed to process text with AI. Please try again."

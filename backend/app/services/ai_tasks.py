@@ -66,8 +66,8 @@ async def extract_tasks(content: str) -> list[dict]:
         return validated_tasks
 
     except json.JSONDecodeError as e:
-        logger.error("Failed to parse AI task extraction response: %s", e)
+        logger.exception("Failed to parse AI task extraction response: %s", e)
         return []
     except Exception as e:
-        logger.error("Groq task extraction error: %s", e)
+        logger.exception("Groq task extraction error: %s", e)
         raise
