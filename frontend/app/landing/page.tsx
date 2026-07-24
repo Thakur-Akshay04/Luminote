@@ -304,7 +304,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#030303] text-zinc-300 relative flex flex-col font-sans">
 
       {/* Parallax animated pixel sparkle mountain background */}
-      <SparkleMountainBackground />
+      <SparkleMountainBackground densityMultiplier={2.5} />
 
       {/* Hero Header Section */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-16 relative z-10 animate-fade-in min-h-[calc(100vh-80px)] flex flex-col justify-center">

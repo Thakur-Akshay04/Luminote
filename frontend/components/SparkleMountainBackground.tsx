@@ -22,8 +22,14 @@ function getParticleBaseSize(isSlow: boolean, layerIndex: number): number {
   return 1.9;
 }
 
-// Sparkle Mountain Background — animated canvas rendering layered violet pixel sparkle mountains
-export default function SparkleMountainBackground() {
+interface SparkleMountainBackgroundProps {
+  densityMultiplier?: number;
+}
+
+// Sparkle Mountain Background — animated canvas rendering layered white pixel sparkle mountains
+export default function SparkleMountainBackground({
+  densityMultiplier = 1.0,
+}: SparkleMountainBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollYRef = useRef(0);
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -65,29 +71,29 @@ export default function SparkleMountainBackground() {
       {
         count: 90,
         parallax: 0.04,
-        colors: ["#6d28d9", "#7c3aed", "#5b21b6"],
+        colors: ["#ffffff", "#f4f4f5", "#e4e4e7"],
         isAmbient: true,
       },
       {
         count: 140,
         parallax: 0.08,
-        colors: ["#a855f7", "#c084fc", "#9333ea", "#7e22ce"],
+        colors: ["#ffffff", "#fafafa", "#f4f4f5", "#e4e4e7"],
         isTopOnly: true,
       },
       {
         count: 70,
         parallax: 0.12,
-        colors: ["#6d28d9", "#7c3aed", "#5b21b6"],
+        colors: ["#ffffff", "#f4f4f5", "#e4e4e7"],
       },
       {
         count: 85,
         parallax: 0.22,
-        colors: ["#8b5cf6", "#a855f7", "#c084fc"],
+        colors: ["#ffffff", "#fafafa", "#f4f4f5"],
       },
       {
         count: 100,
         parallax: 0.38,
-        colors: ["#c084fc", "#e9d5ff", "#d8b4fe", "#ffffff"],
+        colors: ["#ffffff", "#ffffff", "#fafafa", "#f4f4f5"],
       },
     ];
 
@@ -173,7 +179,7 @@ export default function SparkleMountainBackground() {
 
     const generateParticles = (canvasWidth: number, canvasHeight: number) => {
       const list: SparkleParticle[][] = [];
-      const totalCount = configs.reduce((sum, c) => sum + c.count, 0);
+      const totalCount = configs.reduce((sum, c) => sum + Math.round(c.count * densityMultiplier), 0);
       const valsNeeded = totalCount * 10;
       const randomValues = new Uint32Array(valsNeeded);
       window.crypto.getRandomValues(randomValues);
@@ -186,8 +192,9 @@ export default function SparkleMountainBackground() {
 
       for (let l = 0; l < configs.length; l++) {
         const conf = configs[l];
+        const count = Math.round(conf.count * densityMultiplier);
         const layerParticles: SparkleParticle[] = Array.from(
-          { length: conf.count },
+          { length: count },
           () => createParticle(conf, l, canvasWidth, canvasHeight, nextRandom)
         );
         list.push(layerParticles);
@@ -265,10 +272,12 @@ export default function SparkleMountainBackground() {
           }
 
           // 6. Draw pixel (crisp squares match pixel sparkles aesthetic)
-          ctx.fillStyle = `${p.color}${finalAlpha.toFixed(3)})`;
+          ctx.globalAlpha = finalAlpha;
+          ctx.fillStyle = p.color;
           ctx.fillRect(drawX, drawY, finalSize, finalSize);
         }
       }
+      ctx.globalAlpha = 1.0;
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -279,7 +288,7 @@ export default function SparkleMountainBackground() {
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [densityMultiplier]);
 
   return (
     <canvas

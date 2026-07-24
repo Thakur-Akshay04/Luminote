@@ -4,12 +4,16 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 
+import dynamic from "next/dynamic";
+
 import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
-import DrawingCanvas, { DrawingCanvasRef } from "@/components/DrawingCanvas";
-import AudioRecorder from "@/components/AudioRecorder";
+import type { DrawingCanvasRef } from "@/components/DrawingCanvas";
 import ChecklistEditor from "@/components/ChecklistEditor";
+
+const DrawingCanvas = dynamic(() => import("@/components/DrawingCanvas"), { ssr: false });
+const AudioRecorder = dynamic(() => import("@/components/AudioRecorder"), { ssr: false });
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";

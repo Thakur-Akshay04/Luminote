@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 
 import { notesApi, alertsApi } from "@/lib/api";
 import type { Note, Alert } from "@/types";
@@ -229,13 +229,15 @@ export default function DashboardPage() {
   // Input states
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
   useEffect(() => {
     setMounted(true);
-  }, [user]);
+  }, []);
 
   const fetchData = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
     setLoading(true);
     try {
       const [notesRes, alertsRes] = await Promise.all([
@@ -244,18 +246,18 @@ export default function DashboardPage() {
       ]);
       setNotes(notesRes.data);
       setAlerts(alertsRes.data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
-    if (mounted) {
+    if (mounted && isLoaded && isSignedIn) {
       fetchData();
     }
-  }, [mounted, fetchData]);
+  }, [mounted, isLoaded, isSignedIn, fetchData]);
 
   const handleCreateNote = () => {
     setIsNoteTypeModalOpen(true);
@@ -418,7 +420,7 @@ export default function DashboardPage() {
     );
   };
 
-  if (!mounted) {
+  if (!mounted || !isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-800">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
