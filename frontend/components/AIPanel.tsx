@@ -245,7 +245,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
 
   const handleAssistantAction = async (action: string, param?: string) => {
     // Get text to process: selection first, fallback to entire editor text
-    const textToProcess = selectedText || (editor ? editor.getText() : note.content);
+    const textToProcess = selectedText || editor?.getText() || note.content;
     if (!textToProcess || !textToProcess.trim()) {
       setAssistantError("No text found in the editor to process.");
       return;
@@ -412,7 +412,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                 const msgId = `chat-msg-${idx}`;
                 return (
                   <div
-                    key={idx}
+                    key={msgId}
                     className={`flex flex-col max-w-[88%] ${isUser ? "self-end items-end animate-slide-in-right" : "self-start items-start animate-slide-in-left"}`}
                   >
                     <div className={`p-3 rounded-2xl text-xs leading-relaxed group relative ${
@@ -534,25 +534,32 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                 
                 {/* Format buttons */}
                 <div className="flex bg-neutral-900 rounded-lg p-0.5 border border-white/[0.04]">
-                  {(["paragraph", "bullets", "actions"] as const).map((fmt) => (
-                    <button
-                      key={fmt}
-                      type="button"
-                      onClick={() => {
-                        setFormat(fmt);
-                        if (typeof window !== "undefined") {
-                          localStorage.setItem("luminote_ai_format", fmt);
-                        }
-                      }}
-                      className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all
-                        ${format === fmt
-                          ? "bg-white/[0.08] text-white shadow-glow border border-white/[0.04]"
-                          : "text-neutral-400 hover:text-neutral-200"
-                        }`}
-                    >
-                      {fmt === "paragraph" ? "Text" : fmt === "bullets" ? "Points" : "Tasks"}
-                    </button>
-                  ))}
+                  {(["paragraph", "bullets", "actions"] as const).map((fmt) => {
+                    const formatLabelMap: Record<string, string> = {
+                      paragraph: "Text",
+                      bullets: "Points",
+                      actions: "Tasks",
+                    };
+                    return (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={() => {
+                          setFormat(fmt);
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem("luminote_ai_format", fmt);
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all
+                          ${format === fmt
+                            ? "bg-white/[0.08] text-white shadow-glow border border-white/[0.04]"
+                            : "text-neutral-400 hover:text-neutral-200"
+                          }`}
+                      >
+                        {formatLabelMap[fmt] || fmt}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

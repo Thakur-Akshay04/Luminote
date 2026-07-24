@@ -20,11 +20,9 @@ function NotesContent() {
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isNoteTypeModalOpen, setIsNoteTypeModalOpen] = useState(false);
-
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);
@@ -68,6 +66,12 @@ function NotesContent() {
     return typeMap[noteTypeParam] || "My Notes";
   };
 
+  const getNotesCountText = () => {
+    if (loading) return "Loading…";
+    const count = notes.length;
+    return `${count} note${count !== 1 ? "s" : ""}`;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
@@ -75,20 +79,16 @@ function NotesContent() {
         <div>
           <h1 className="text-3xl font-bold text-gradient">{getTitle()}</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {loading ? "Loading…" : `${notes.length} note${notes.length !== 1 ? "s" : ""}`}
+            {getNotesCountText()}
           </p>
         </div>
         <button
           id="create-note-btn"
+          type="button"
           onClick={handleCreate}
-          disabled={creating}
           className="btn-primary shrink-0"
         >
-          {creating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
+          <Plus className="w-4 h-4" />
           New note
         </button>
       </div>
@@ -160,8 +160,8 @@ function NotesContent() {
           {!selectedTag && (
             <button
               id="create-first-note-btn"
+              type="button"
               onClick={handleCreate}
-              disabled={creating}
               className="btn-primary"
             >
               <Plus className="w-4 h-4" /> Create first note
