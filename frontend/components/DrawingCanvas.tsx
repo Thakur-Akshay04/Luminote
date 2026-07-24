@@ -65,6 +65,27 @@ function hexToRgbaBytes(hex: string) {
   return [r, g, b, a];
 }
 
+function isInBounds(nx: number, ny: number, width: number, height: number): boolean {
+  return nx >= 0 && nx < width && ny >= 0 && ny < height;
+}
+
+function isMatchingPixel(
+  data: Uint8ClampedArray,
+  pos: number,
+  sr: number,
+  sg: number,
+  sb: number,
+  sa: number
+): boolean {
+  return (
+    data[pos] === sr &&
+    data[pos + 1] === sg &&
+    data[pos + 2] === sb &&
+    data[pos + 3] === sa
+  );
+}
+
+
 export interface DrawingCanvasRef {
   save: (overrideNoteId?: string) => Promise<void>;
 }
@@ -306,20 +327,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         ];
 
         for (const [nx, ny] of neighbors) {
-          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-            const nidx = ny * width + nx;
-            if (!visited[nidx]) {
-              const npos = nidx * 4;
-              if (
-                data[npos] === sr &&
-                data[npos + 1] === sg &&
-                data[npos + 2] === sb &&
-                data[npos + 3] === sa
-              ) {
-                visited[nidx] = 1;
-                queue.push([nx, ny]);
-              }
-            }
+          const nidx = ny * width + nx;
+          if (!isInBounds(nx, ny, width, height) || visited[nidx]) continue;
+          if (isMatchingPixel(data, nidx * 4, sr, sg, sb, sa)) {
+            visited[nidx] = 1;
+            queue.push([nx, ny]);
           }
         }
       }
@@ -472,6 +484,25 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       }
     }, []);
 
+    type Coords = { x: number; y: number };
+
+    const pushUndoState = (canvas: HTMLCanvasElement) => {
+      if (undoStack.current.length >= 50) undoStack.current.shift();
+      undoStack.current.push(canvas.toDataURL());
+    };
+
+    const configurePenOrEraser = (ctx: CanvasRenderingContext2D, coords: Coords) => {
+      ctx.beginPath();
+      ctx.moveTo(coords.x, coords.y);
+      if (tool === "eraser") {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = strokeSize * 3;
+      } else {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeSize;
+      }
+    };
+
     // Start drawing
     const startDrawing = (
       e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
@@ -481,55 +512,27 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       const canvas = canvasRef.current;
       if (!coords || !ctx || !canvas) return;
 
-      // Handle Text tool click placement
       if (tool === "text") {
-        const hadActiveText = textInputStyleRef.current !== null;
-        if (hadActiveText) {
-          finalizeText();
-        }
-
-        // Push state before placing new text
-        if (undoStack.current.length >= 50) {
-          undoStack.current.shift();
-        }
-        undoStack.current.push(canvas.toDataURL());
-
+        if (textInputStyleRef.current !== null) finalizeText();
+        pushUndoState(canvas);
         setTextInputStyle({ x: coords.x, y: coords.y });
         textInputStyleRef.current = { x: coords.x, y: coords.y };
         setTextValue("");
         textValueRef.current = "";
-
-        setTimeout(() => {
-          textInputRef.current?.focus();
-        }, 50);
+        setTimeout(() => { textInputRef.current?.focus(); }, 50);
         return;
       }
 
-      // Handle Paint Bucket Fill tool
       if (tool === "fill") {
-        if (undoStack.current.length >= 50) {
-          undoStack.current.shift();
-        }
-        undoStack.current.push(canvas.toDataURL());
-
+        pushUndoState(canvas);
         floodFill(ctx, coords.x, coords.y, color);
         return;
       }
 
-      // Push current state to undo stack before starting the new drawing
-      if (undoStack.current.length >= 50) {
-        undoStack.current.shift(); // Limit stack size to 50
-      }
-      undoStack.current.push(canvas.toDataURL());
+      pushUndoState(canvas);
 
-      // Save canvas state for live previews
-      if (
-        tool === "line" ||
-        tool === "rect" ||
-        tool === "circle" ||
-        tool === "marker" ||
-        tool === "highlighter"
-      ) {
+      const needsSavedState = ["line", "rect", "circle", "marker", "highlighter"].includes(tool);
+      if (needsSavedState) {
         savedCanvasStateRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
       }
 
@@ -537,16 +540,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       setIsDrawing(true);
 
       if (tool === "pen" || tool === "eraser") {
-        ctx.beginPath();
-        ctx.moveTo(coords.x, coords.y);
-
-        if (tool === "eraser") {
-          ctx.strokeStyle = "#ffffff"; // matches background color (white)
-          ctx.lineWidth = strokeSize * 3;
-        } else {
-          ctx.strokeStyle = color;
-          ctx.lineWidth = strokeSize;
-        }
+        configurePenOrEraser(ctx, coords);
       } else if (tool === "marker" || tool === "highlighter") {
         strokePointsRef.current = [coords];
       } else if (tool === "spray") {
@@ -566,18 +560,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       if (!coords || !ctx) return;
 
       const start = dragStartCoordsRef.current;
+      const needsRestore = ["line", "rect", "circle", "marker", "highlighter"].includes(tool);
 
-      // Restore saved canvas state for tools with live preview to clear previous preview frame
-      if (
-        tool === "line" ||
-        tool === "rect" ||
-        tool === "circle" ||
-        tool === "marker" ||
-        tool === "highlighter"
-      ) {
-        if (savedCanvasStateRef.current) {
-          ctx.putImageData(savedCanvasStateRef.current, 0, 0);
-        }
+      if (needsRestore && savedCanvasStateRef.current) {
+        ctx.putImageData(savedCanvasStateRef.current, 0, 0);
       }
 
       if (tool === "pen" || tool === "eraser") {

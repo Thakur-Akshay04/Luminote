@@ -44,7 +44,7 @@ function NotesContent() {
 
   const allTags = Array.from(
     new Set(notes.flatMap((n) => n.tags ?? []))
-  ).sort();
+  ).sort((a, b) => a.localeCompare(b));
 
   const handleCreate = () => {
     if (noteTypeParam) {

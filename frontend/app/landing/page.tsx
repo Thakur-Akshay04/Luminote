@@ -239,50 +239,43 @@ export default function LandingPage() {
 
   // AI Typing simulation effect
   useEffect(() => {
-    if (activeTab === "summarize") {
-      setTypedSummary("");
-      let i = 0;
-      const interval = setInterval(() => {
-        setTypedSummary(fullSummary.slice(0, i));
-        i += 3;
-        if (i >= fullSummary.length) {
-          setTypedSummary(fullSummary);
-          clearInterval(interval);
-        }
-      }, 25);
-      return () => clearInterval(interval);
-    } else if (activeTab === "ask") {
-      setTypedChat("");
-      let i = 0;
-      const interval = setInterval(() => {
-        setTypedChat(fullChat.slice(0, i));
-        i += 3;
-        if (i >= fullChat.length) {
-          setTypedChat(fullChat);
-          clearInterval(interval);
-        }
-      }, 25);
-      return () => clearInterval(interval);
-    }
+    if (activeTab !== "summarize" && activeTab !== "ask") return;
+
+    const fullText = activeTab === "summarize" ? fullSummary : fullChat;
+    const setter = activeTab === "summarize" ? setTypedSummary : setTypedChat;
+    setter("");
+    let i = 0;
+    let done = false;
+
+    const tid = setInterval(() => {
+      i += 3;
+      if (i >= fullText.length || done) {
+        setter(fullText);
+        clearInterval(tid);
+        done = true;
+      } else {
+        setter(fullText.slice(0, i));
+      }
+    }, 25);
+
+    return () => { done = true; clearInterval(tid); };
   }, [activeTab]);
+
+  const getNextTab = (prev: "capture" | "summarize" | "ask"): "capture" | "summarize" | "ask" => {
+    if (prev === "capture") return "summarize";
+    if (prev === "summarize") return "ask";
+    return "capture";
+  };
 
   // Auto-rotate tabs every 8 seconds unless user interacts
   useEffect(() => {
     if (!mounted) return;
 
-    const startRotation = () => {
-      autoRotateRef.current = setInterval(() => {
-        if (!userInteracted.current) {
-          setActiveTab((prev) => {
-            if (prev === "capture") return "summarize";
-            if (prev === "summarize") return "ask";
-            return "capture";
-          });
-        }
-      }, 8000);
-    };
-
-    startRotation();
+    autoRotateRef.current = setInterval(() => {
+      if (!userInteracted.current) {
+        setActiveTab(getNextTab);
+      }
+    }, 8000);
 
     return () => {
       if (autoRotateRef.current) clearInterval(autoRotateRef.current);

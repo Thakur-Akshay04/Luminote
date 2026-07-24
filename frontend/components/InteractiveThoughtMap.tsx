@@ -29,6 +29,77 @@ const getRandom = (): number => {
   return 0.5;
 };
 
+function repositionNode(
+  node: Node,
+  positions: Record<string, { x: number; y: number }>
+): Node {
+  const pos = positions[node.id];
+  if (!pos) return node;
+  return { ...node, x: pos.x, y: pos.y, vx: 0, vy: 0 };
+}
+
+function applyPhysicsToNode(
+  node: Node,
+  mouse: { x: number; y: number } | null,
+  dimensions: { width: number; height: number },
+  prevNodes: Node[]
+): Node {
+  const { width: w, height: h } = dimensions;
+  const targetCenter = { x: w * 0.3, y: h * 0.5 };
+  const margin = 50;
+
+  let nx = node.x;
+  let ny = node.y;
+  let nvx = node.vx;
+  let nvy = node.vy;
+
+  if (node.id === "core") {
+    nvx += (targetCenter.x - nx) * 0.03;
+    nvy += (targetCenter.y - ny) * 0.03;
+  } else {
+    nvx += (getRandom() - 0.5) * 0.12;
+    nvy += (getRandom() - 0.5) * 0.12;
+
+    const core = prevNodes.find((n) => n.id === "core") || targetCenter;
+    const dxCore = core.x - nx;
+    const dyCore = core.y - ny;
+    const distCore = Math.hypot(dxCore, dyCore);
+    const minRadius = 160;
+    const maxRadius = 260;
+
+    if (distCore > maxRadius) {
+      nvx += (dxCore / distCore) * 0.02;
+      nvy += (dyCore / distCore) * 0.02;
+    } else if (distCore < minRadius) {
+      nvx -= (dxCore / distCore) * 0.02;
+      nvy -= (dyCore / distCore) * 0.02;
+    }
+  }
+
+  if (mouse && mouse.x < w * 0.5) {
+    const dxMouse = mouse.x - nx;
+    const dyMouse = mouse.y - ny;
+    const distMouse = Math.hypot(dxMouse, dyMouse);
+    if (distMouse < 180 && distMouse > 0) {
+      const pull = (1.0 - distMouse / 180) * 0.06;
+      nvx += (dxMouse / distMouse) * pull;
+      nvy += (dyMouse / distMouse) * pull;
+    }
+  }
+
+  nx += nvx;
+  ny += nvy;
+  nvx *= 0.95;
+  nvy *= 0.95;
+
+  if (nx < margin) { nx = margin; nvx *= -0.5; }
+  if (nx > w - margin) { nx = w - margin; nvx *= -0.5; }
+  if (ny < margin) { ny = margin; nvy *= -0.5; }
+  if (ny > h - margin) { ny = h - margin; nvy *= -0.5; }
+
+  return { ...node, x: nx, y: ny, vx: nvx, vy: nvy };
+}
+
 export default function InteractiveThoughtMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -153,39 +224,24 @@ export default function InteractiveThoughtMap() {
     if (typeof window === "undefined" || !containerRef.current) return;
     
     const updateDimensions = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const w = rect.width || window.innerWidth;
-        const h = rect.height || window.innerHeight;
-        setDimensions({ width: w, height: h });
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const w = rect.width || window.innerWidth;
+      const h = rect.height || window.innerHeight;
+      setDimensions({ width: w, height: h });
 
-        setNodes((prev) => {
-          const center = { x: w * 0.3, y: h * 0.5 };
-          const positions: Record<string, { x: number; y: number }> = {
-            core: { x: center.x, y: center.y },
-            voice: { x: center.x - 180, y: center.y - 140 },
-            sketch: { x: center.x + 180, y: center.y - 130 },
-            editor: { x: center.x - 190, y: center.y + 150 },
-            tasks: { x: center.x + 190, y: center.y + 140 },
-            calendar: { x: center.x, y: center.y - 210 },
-            agent: { x: center.x, y: center.y + 210 },
-          };
+      const center = { x: w * 0.3, y: h * 0.5 };
+      const positions: Record<string, { x: number; y: number }> = {
+        core: { x: center.x, y: center.y },
+        voice: { x: center.x - 180, y: center.y - 140 },
+        sketch: { x: center.x + 180, y: center.y - 130 },
+        editor: { x: center.x - 190, y: center.y + 150 },
+        tasks: { x: center.x + 190, y: center.y + 140 },
+        calendar: { x: center.x, y: center.y - 210 },
+        agent: { x: center.x, y: center.y + 210 },
+      };
 
-          return prev.map((node) => {
-            const pos = positions[node.id];
-            if (pos) {
-              return {
-                ...node,
-                x: pos.x,
-                y: pos.y,
-                vx: 0,
-                vy: 0,
-              };
-            }
-            return node;
-          });
-        });
-      }
+      setNodes((prev) => prev.map((node) => repositionNode(node, positions)));
     };
 
     updateDimensions();
@@ -207,64 +263,9 @@ export default function InteractiveThoughtMap() {
     const updatePhysics = () => {
       setNodes((prevNodes) => {
         const mouse = mouseRef.current;
-        const w = dimensions.width;
-        const h = dimensions.height;
-        const targetCenter = { x: w * 0.3, y: h * 0.5 };
-
-        return prevNodes.map((node) => {
-          let nx = node.x;
-          let ny = node.y;
-          let nvx = node.vx;
-          let nvy = node.vy;
-
-          if (node.id === "core") {
-            nvx += (targetCenter.x - nx) * 0.03;
-            nvy += (targetCenter.y - ny) * 0.03;
-          } else {
-            nvx += (getRandom() - 0.5) * 0.12;
-            nvy += (getRandom() - 0.5) * 0.12;
-
-            const core = prevNodes.find((n) => n.id === "core") || targetCenter;
-            const dxCore = core.x - nx;
-            const dyCore = core.y - ny;
-            const distCore = Math.hypot(dxCore, dyCore);
-            
-            // Expanded Orbit bounds to match larger sizes
-            const minRadius = 160;
-            const maxRadius = 260;
-            if (distCore > maxRadius) {
-              nvx += (dxCore / distCore) * 0.02;
-              nvy += (dyCore / distCore) * 0.02;
-            } else if (distCore < minRadius) {
-              nvx -= (dxCore / distCore) * 0.02;
-              nvy -= (dyCore / distCore) * 0.02;
-            }
-          }
-
-          if (mouse && mouse.x < w * 0.5) {
-            const dxMouse = mouse.x - nx;
-            const dyMouse = mouse.y - ny;
-            const distMouse = Math.hypot(dxMouse, dyMouse);
-            if (distMouse < 180 && distMouse > 0) {
-              const pull = (1.0 - distMouse / 180) * 0.06;
-              nvx += (dxMouse / distMouse) * pull;
-              nvy += (dyMouse / distMouse) * pull;
-            }
-          }
-
-          nx += nvx;
-          ny += nvy;
-          nvx *= 0.95;
-          nvy *= 0.95;
-
-          const margin = 50;
-          if (nx < margin) { nx = margin; nvx *= -0.5; }
-          if (nx > w - margin) { nx = w - margin; nvx *= -0.5; }
-          if (ny < margin) { ny = margin; nvy *= -0.5; }
-          if (ny > h - margin) { ny = h - margin; nvy *= -0.5; }
-
-          return { ...node, x: nx, y: ny, vx: nvx, vy: nvy };
-        });
+        return prevNodes.map((node) =>
+          applyPhysicsToNode(node, mouse, dimensions, prevNodes)
+        );
       });
 
       frameId = requestAnimationFrame(updatePhysics);

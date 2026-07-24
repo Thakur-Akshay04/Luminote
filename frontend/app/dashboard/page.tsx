@@ -140,6 +140,81 @@ function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
 }
 
 
+// ── Helper sub-components ────────────────────────────────────────────────────
+
+interface NoteGroupProps {
+  dayLabel: string;
+  groupNotes: Note[];
+  onDelete: (id: string, e: React.MouseEvent) => void;
+}
+
+function NoteGroup({ dayLabel, groupNotes, onDelete }: Readonly<NoteGroupProps>) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 bg-surface-700 py-1.5 px-3 rounded-lg border border-surface-600/30 text-neutral-300">
+        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+        <span className="text-xs font-semibold tracking-wide uppercase">{dayLabel}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {groupNotes.map((note) => (
+          <NoteCard
+            key={note.id}
+            note={note}
+            onDelete={(e) => onDelete(note.id, e)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface AlertItemProps {
+  alert: Alert;
+  onDelete: (id: string) => void;
+}
+
+function AlertItem({ alert, onDelete }: Readonly<AlertItemProps>) {
+  const alertDate = new Date(alert.alert_time);
+  const dayName = format(alertDate, "EEE").toUpperCase();
+  const dayNum = format(alertDate, "d");
+
+  return (
+    <div className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative">
+      <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
+        <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
+        <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
+          {alert.title}
+        </h4>
+        <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
+          <Clock className="w-3 h-3 text-neutral-600" />
+          <span>{format(alertDate, "h:mm a")}</span>
+          {alert.note_title && (
+            <Link
+              href={`/notes/${alert.note_id}`}
+              className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
+            >
+              • {alert.note_title}
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onDelete(alert.id)}
+        className="text-neutral-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
+        title="Delete Alert"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ── Main Dashboard Component ─────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -292,22 +367,12 @@ export default function DashboardPage() {
     return (
       <div className="space-y-8">
         {Object.entries(groupedNotes).map(([dayLabel, groupNotes]) => (
-          <div key={dayLabel} className="space-y-3">
-            <div className="flex items-center gap-2 bg-surface-700 py-1.5 px-3 rounded-lg border border-surface-600/30 text-neutral-300">
-              <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="text-xs font-semibold tracking-wide uppercase">{dayLabel}</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {groupNotes.map((note) => (
-                <NoteCard
-                  key={note.id}
-                  note={note}
-                  onDelete={(e) => handleDeleteNote(note.id, e)}
-                />
-              ))}
-            </div>
-          </div>
+          <NoteGroup
+            key={dayLabel}
+            dayLabel={dayLabel}
+            groupNotes={groupNotes}
+            onDelete={handleDeleteNote}
+          />
         ))}
       </div>
     );
@@ -342,50 +407,13 @@ export default function DashboardPage() {
 
     return (
       <div className="flex flex-col gap-3">
-        {upcomingAlerts.slice(0, 5).map((alert) => {
-          const alertDate = new Date(alert.alert_time);
-          const dayName = format(alertDate, "EEE").toUpperCase();
-          const dayNum = format(alertDate, "d");
-
-          return (
-            <div
-              key={alert.id}
-              className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative"
-            >
-              <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
-                <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
-                <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
-                  {alert.title}
-                </h4>
-                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
-                  <Clock className="w-3 h-3 text-neutral-600" />
-                  <span>{format(alertDate, "h:mm a")}</span>
-                  {alert.note_title && (
-                    <Link
-                      href={`/notes/${alert.note_id}`}
-                      className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
-                    >
-                      • {alert.note_title}
-                    </Link>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleDeleteAlert(alert.id)}
-                className="text-neutral-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
-                title="Delete Alert"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          );
-        })}
+        {upcomingAlerts.slice(0, 5).map((alert) => (
+          <AlertItem
+            key={alert.id}
+            alert={alert}
+            onDelete={handleDeleteAlert}
+          />
+        ))}
       </div>
     );
   };

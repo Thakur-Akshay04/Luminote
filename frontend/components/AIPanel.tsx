@@ -35,6 +35,33 @@ interface AIPanelProps {
   onSaveBeforeAction?: () => Promise<string>;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Resolves the note ID, saving first if needed. Returns null if save fails. */
+async function resolveActiveId(
+  noteId: string,
+  onSaveBeforeAction?: () => Promise<string>
+): Promise<string | null> {
+  if (noteId !== "new") return noteId;
+  if (onSaveBeforeAction) return await onSaveBeforeAction();
+  return null;
+}
+
+/** Returns a user-facing refusal message if the model refused the request, else null. */
+function checkSafetyRefusal(resultText: string, action: string, param?: string): string | null {
+  const lower = resultText.toLowerCase();
+  const isRefusal =
+    lower.includes("sorry") &&
+    (lower.includes("can't help") || lower.includes("cannot help"));
+  if (!isRefusal) return null;
+  if (action === "translate") {
+    return `The AI model refused to generate the translation in ${
+      param || "the selected language"
+    } because the note content contains sensitive terms triggering safety policy guardrails.`;
+  }
+  return `The AI model refused to process this writing action because the note content contains sensitive terms triggering safety policy guardrails.`;
+}
+
 export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction }: Readonly<AIPanelProps>) {
   // Tabs: 'chat' | 'insights' | 'assistant'
   const [activeTab, setActiveTab] = useState<"chat" | "insights" | "assistant">("chat");
@@ -244,9 +271,8 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
   const languages = ["Spanish", "French", "German", "Japanese", "Chinese", "Hindi"];
 
   const handleAssistantAction = async (action: string, param?: string) => {
-    // Get text to process: selection first, fallback to entire editor text
     const textToProcess = selectedText || editor?.getText() || note.content;
-    if (!textToProcess || !textToProcess.trim()) {
+    if (!textToProcess?.trim()) {
       setAssistantError("No text found in the editor to process.");
       return;
     }
@@ -258,32 +284,17 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
     setTranslateDropdownOpen(false);
 
     try {
-      let activeId = note.id;
-      if (activeId === "new" && onSaveBeforeAction) {
-        activeId = await onSaveBeforeAction();
-      } else if (activeId === "new") {
+      const activeId = await resolveActiveId(note.id, onSaveBeforeAction);
+      if (!activeId) {
         setAssistantError("Please write something and save the note first.");
         return;
       }
 
       const res = await notesApi.aiAction(activeId, action, textToProcess, param);
       const resultText = res.data.result;
-      const lowerText = resultText.toLowerCase();
-
-      // Detect safety policy refusal keywords
-      if (
-        lowerText.includes("sorry") &&
-        (lowerText.includes("can't help") || lowerText.includes("cannot help") || lowerText.includes("can’t help"))
-      ) {
-        if (action === "translate") {
-          setAssistantError(
-            `The AI model refused to generate the translation in ${param || "the selected language"} because the note content contains sensitive terms triggering safety policy guardrails.`
-          );
-        } else {
-          setAssistantError(
-            `The AI model refused to process this writing action because the note content contains sensitive terms triggering safety policy guardrails.`
-          );
-        }
+      const refusal = checkSafetyRefusal(resultText, action, param);
+      if (refusal) {
+        setAssistantError(refusal);
       } else {
         setAssistantOutput(resultText);
       }

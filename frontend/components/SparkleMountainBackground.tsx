@@ -125,12 +125,55 @@ export default function SparkleMountainBackground() {
       }
     };
 
+    interface ParticleConfig {
+      count: number;
+      parallax: number;
+      colors: string[];
+      isAmbient?: boolean;
+      isTopOnly?: boolean;
+    }
+
+    function createParticle(
+      conf: ParticleConfig,
+      layerIndex: number,
+      canvasWidth: number,
+      canvasHeight: number,
+      nextRandom: () => number
+    ): SparkleParticle {
+      const isSlow = Boolean(conf.isAmbient || conf.isTopOnly);
+      const x = nextRandom() * canvasWidth;
+      let y = 0;
+      let depthOffset = 0;
+
+      if (conf.isAmbient) {
+        y = nextRandom() * canvasHeight;
+      } else if (conf.isTopOnly) {
+        const maxTopHeight = canvasHeight * 0.48;
+        y = Math.pow(nextRandom(), 1.4) * maxTopHeight;
+      } else {
+        const mountainY = getMountainCurve(x, layerIndex, canvasHeight);
+        y = mountainY;
+        depthOffset = nextRandom() * (canvasHeight - mountainY);
+      }
+
+      const baseSize = getParticleBaseSize(isSlow, layerIndex);
+      return {
+        x,
+        y,
+        depthOffset,
+        size: baseSize + nextRandom() * 0.8,
+        color: conf.colors[Math.floor(nextRandom() * conf.colors.length)],
+        alpha: nextRandom() * 0.5 + 0.1,
+        targetAlpha: nextRandom() * (isSlow ? 0.55 : 0.7) + 0.2,
+        twinkleSpeed: (isSlow ? 0.004 : 0.007) + nextRandom() * 0.012,
+        phase: nextRandom() * Math.PI * 2,
+        driftX: (nextRandom() - 0.5) * (isSlow ? 0.02 : 0.04),
+      };
+    }
+
     const generateParticles = (canvasWidth: number, canvasHeight: number) => {
       const list: SparkleParticle[][] = [];
-      let totalCount = 0;
-      for (const conf of configs) {
-        totalCount += conf.count;
-      }
+      const totalCount = configs.reduce((sum, c) => sum + c.count, 0);
       const valsNeeded = totalCount * 10;
       const randomValues = new Uint32Array(valsNeeded);
       window.crypto.getRandomValues(randomValues);
@@ -142,47 +185,11 @@ export default function SparkleMountainBackground() {
       };
 
       for (let l = 0; l < configs.length; l++) {
-        const layerParticles: SparkleParticle[] = [];
         const conf = configs[l];
-        const isSlow = Boolean(conf.isAmbient || conf.isTopOnly);
-
-        for (let i = 0; i < conf.count; i++) {
-          const x = nextRandom() * canvasWidth;
-          let y = 0;
-          let depthOffset = 0;
-
-          if (conf.isAmbient) {
-            y = nextRandom() * canvasHeight;
-          } else if (conf.isTopOnly) {
-            const maxTopHeight = canvasHeight * 0.48;
-            y = Math.pow(nextRandom(), 1.4) * maxTopHeight;
-          } else {
-            const mountainY = getMountainCurve(x, l, canvasHeight);
-            y = mountainY;
-            const maxDepth = canvasHeight - mountainY;
-            depthOffset = nextRandom() * maxDepth;
-          }
-
-          const baseSize = getParticleBaseSize(isSlow, l);
-          const size = baseSize + nextRandom() * 0.8;
-          const colorBase = conf.colors[Math.floor(nextRandom() * conf.colors.length)];
-          const twinkleSpeed = (isSlow ? 0.004 : 0.007) + nextRandom() * 0.012;
-          const phase = nextRandom() * Math.PI * 2;
-          const driftX = (nextRandom() - 0.5) * (isSlow ? 0.02 : 0.04);
-
-          layerParticles.push({
-            x,
-            y,
-            depthOffset,
-            size,
-            color: colorBase,
-            alpha: nextRandom() * 0.5 + 0.1,
-            targetAlpha: nextRandom() * (isSlow ? 0.55 : 0.7) + 0.2,
-            twinkleSpeed,
-            phase,
-            driftX,
-          });
-        }
+        const layerParticles: SparkleParticle[] = Array.from(
+          { length: conf.count },
+          () => createParticle(conf, l, canvasWidth, canvasHeight, nextRandom)
+        );
         list.push(layerParticles);
       }
       return list;

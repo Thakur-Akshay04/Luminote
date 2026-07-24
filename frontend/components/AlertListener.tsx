@@ -70,6 +70,26 @@ function startNotificationChime(
   }
 }
 
+function buildToastAlert(data: any): ToastAlert {
+  return {
+    id: data.id,
+    title: data.title,
+    note_id: data.note_id,
+    note_title: data.note_title,
+    alert_time: data.alert_time,
+  };
+}
+
+function addUniqueToast(prev: ToastAlert[], newAlert: ToastAlert): ToastAlert[] {
+  if (prev.some((t) => t.id === newAlert.id)) return prev;
+  return [...prev, newAlert];
+}
+
+function stopAudio(active: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number }) {
+  if (active.intervalId) clearInterval(active.intervalId);
+  active.audioCtx.close().catch(() => {});
+}
+
 export default function AlertListener() {
   const { getToken, isSignedIn } = useAuth();
   const [toasts, setToasts] = useState<ToastAlert[]>([]);
@@ -115,29 +135,17 @@ export default function AlertListener() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "alert") {
-            const newAlert: ToastAlert = {
-              id: data.id,
-              title: data.title,
-              note_id: data.note_id,
-              note_title: data.note_title,
-              alert_time: data.alert_time,
-            };
+          if (data.type !== "alert") return;
 
-            startNotificationChime(newAlert.id, activeAudios);
+          const newAlert = buildToastAlert(data);
+          startNotificationChime(newAlert.id, activeAudios);
 
-            // Add to active toast list
-            setToasts((prev) => {
-              // Avoid duplicate toasts for the same alert
-              if (prev.some((t) => t.id === newAlert.id)) return prev;
-              return [...prev, newAlert];
-            });
+          setToasts((prev) => addUniqueToast(prev, newAlert));
 
-            // Auto-remove toast after 10 seconds
-            setTimeout(() => {
-              removeToast(newAlert.id);
-            }, 10000);
-          }
+          // Auto-remove toast after 10 seconds
+          setTimeout(() => {
+            removeToast(newAlert.id);
+          }, 10000);
         } catch (err) {
           console.error("Error parsing WebSocket message:", err);
         }
@@ -177,10 +185,7 @@ export default function AlertListener() {
         clearTimeout(reconnectTimeoutRef.current);
       }
       // Stop and clean up any playing audios on unmount
-      Object.values(activeAudios.current).forEach((active) => {
-        if (active.intervalId) clearInterval(active.intervalId);
-        active.audioCtx.close().catch(() => {});
-      });
+      Object.values(activeAudios.current).forEach(stopAudio);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn]);
