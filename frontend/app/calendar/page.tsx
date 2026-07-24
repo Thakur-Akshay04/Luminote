@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 
 import { alertsApi, notesApi } from "@/lib/api";
 import type { Alert, Note } from "@/types";
@@ -10,7 +9,6 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  Bell,
   CalendarDays,
   Loader2,
   Clock,
@@ -26,8 +24,6 @@ import {
 import { useCalendar } from "@/hooks/useCalendar";
 
 export default function CalendarPage() {
-  const router = useRouter();
-
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +46,6 @@ export default function CalendarPage() {
   const [alertDate, setAlertDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [alertTime, setAlertTime] = useState("09:00");
   const [creatingAlert, setCreatingAlert] = useState(false);
-
-
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -115,9 +109,6 @@ export default function CalendarPage() {
   };
 
   const selectedDayAlerts = getAlertsForDay(selectedDate);
-  const upcomingAlerts = alerts
-    .filter((a) => new Date(a.alert_time).getTime() >= Date.now())
-    .slice(0, 5);
 
   if (loading) {
     return (
@@ -158,12 +149,14 @@ export default function CalendarPage() {
             </h2>
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={handlePrevMonth}
                 className="p-1.5 rounded-lg border border-white/[0.06] hover:bg-surface-700 text-gray-400 hover:text-white transition-all"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
+                type="button"
                 onClick={handleNextMonth}
                 className="p-1.5 rounded-lg border border-white/[0.06] hover:bg-surface-700 text-gray-400 hover:text-white transition-all"
               >
@@ -183,7 +176,7 @@ export default function CalendarPage() {
 
           {/* Days Grid */}
           <div className="grid grid-cols-7 gap-2">
-            {daysGrid.map((day, idx) => {
+            {daysGrid.map((day) => {
               const isCurrentMonthDay = day.getMonth() === currentMonth.getMonth();
               const isSel = isSameDay(day, selectedDate);
               const dayAlerts = getAlertsForDay(day);
@@ -191,7 +184,8 @@ export default function CalendarPage() {
 
               return (
                 <button
-                  key={idx}
+                  type="button"
+                  key={day.toISOString()}
                   onClick={() => {
                     setSelectedDate(day);
                     setAlertDate(format(day, "yyyy-MM-dd"));
@@ -252,6 +246,7 @@ export default function CalendarPage() {
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => handleDeleteAlert(alert.id)}
                     className="text-gray-600 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
                     title="Delete alert"
@@ -278,8 +273,9 @@ export default function CalendarPage() {
             <form onSubmit={handleCreateAlert} className="flex flex-col gap-3">
               {/* Select Note */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500 font-medium">Select Note</label>
+                <label htmlFor="alert-select-note" className="text-xs text-gray-500 font-medium">Select Note</label>
                 <select
+                  id="alert-select-note"
                   className="input py-2 text-xs"
                   value={noteId}
                   onChange={(e) => setNoteId(e.target.value)}
@@ -295,8 +291,9 @@ export default function CalendarPage() {
 
               {/* Title */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500 font-medium">Alert Title</label>
+                <label htmlFor="alert-title" className="text-xs text-gray-500 font-medium">Alert Title</label>
                 <input
+                  id="alert-title"
                   type="text"
                   className="input py-2 text-xs"
                   placeholder="e.g. Call client, review notes"
@@ -309,8 +306,9 @@ export default function CalendarPage() {
               {/* Date & Time Grid */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500 font-medium">Date</label>
+                  <label htmlFor="alert-date" className="text-xs text-gray-500 font-medium">Date</label>
                   <input
+                    id="alert-date"
                     type="date"
                     className="input py-2 text-xs"
                     value={alertDate}
@@ -319,8 +317,9 @@ export default function CalendarPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500 font-medium">Time</label>
+                  <label htmlFor="alert-time" className="text-xs text-gray-500 font-medium">Time</label>
                   <input
+                    id="alert-time"
                     type="time"
                     className="input py-2 text-xs"
                     value={alertTime}

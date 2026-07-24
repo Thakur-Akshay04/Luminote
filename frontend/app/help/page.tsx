@@ -1,21 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   HelpCircle,
   Search,
   ChevronDown,
   ChevronUp,
-  ChevronRight,
   Bot,
   Bell,
   Database,
   Compass,
   BookOpen,
   X,
-  Zap,
   Lock,
   Shield,
   Check,
@@ -75,7 +72,6 @@ const FAQS: FAQItem[] = [
 ];
 
 export default function HelpPage() {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<"all" | "general" | "ai" | "alerts" | "data">("all");
@@ -148,6 +144,7 @@ export default function HelpPage() {
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-1 rounded-lg"
             >
@@ -162,6 +159,7 @@ export default function HelpPage() {
             const isActive = activeCategory === id;
             return (
               <button
+                type="button"
                 key={id}
                 onClick={() => {
                   setActiveCategory(id);
@@ -235,6 +233,7 @@ export default function HelpPage() {
                     }`}
                   >
                     <button
+                      type="button"
                       onClick={() => toggleExpand(faq.id)}
                       className="w-full p-5 sm:p-6 flex items-center justify-between text-left transition-colors group"
                     >
@@ -290,6 +289,7 @@ export default function HelpPage() {
                   We couldn't find any articles matching "{searchQuery}". Try clearing your search query or selecting another category tab above.
                 </p>
                 <button
+                  type="button"
                   onClick={() => {
                     setSearchQuery("");
                     setActiveCategory("all");

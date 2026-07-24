@@ -12,19 +12,15 @@ import NoteTypeModal from "@/components/NoteTypeModal";
 import {
   StickyNote,
   Bell,
-  Tag,
   Plus,
   Search,
   Calendar,
   Clock,
-  Bot,
   Trash2,
-  MoreVertical,
   Loader2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import clsx from "clsx";
 import {
   format,
   isSameDay,
@@ -34,7 +30,7 @@ import { useCalendar } from "@/hooks/useCalendar";
 
 // ── Mini Calendar Component ──────────────────────────────────────────────────
 
-function MiniCalendar({ alerts }: { alerts: Alert[] }) {
+function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
   const {
     currentMonth,
     handlePrevMonth,
@@ -54,6 +50,7 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
         </span>
         <div className="flex gap-1.5">
           <button
+            type="button"
             onClick={handlePrevMonth}
             className="p-1.5 hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.1] rounded-lg text-neutral-400 hover:text-white transition-all active:scale-90"
             aria-label="Previous month"
@@ -61,6 +58,7 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onClick={handleNextMonth}
             className="p-1.5 hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.1] rounded-lg text-neutral-400 hover:text-white transition-all active:scale-90"
             aria-label="Next month"
@@ -79,7 +77,7 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
 
       {/* Days Grid */}
       <div className="grid grid-cols-7 gap-1">
-        {daysGrid.map((day, idx) => {
+        {daysGrid.map((day) => {
           const isCurrentMonthDay = day.getMonth() === currentMonth.getMonth();
           const dayAlerts = getAlertsForDay(day);
           const hasAlerts = dayAlerts.length > 0;
@@ -90,7 +88,7 @@ function MiniCalendar({ alerts }: { alerts: Alert[] }) {
 
           return (
             <div
-              key={idx}
+              key={day.toISOString()}
               className={`
                 relative aspect-square flex flex-col items-center justify-center text-xs rounded-full select-none transition-all duration-150 group/day
                 ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600/40"}
@@ -150,9 +148,7 @@ export default function DashboardPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [firstName, setFirstName] = useState("there");
   const [isNoteTypeModalOpen, setIsNoteTypeModalOpen] = useState(false);
 
   // Input states
@@ -161,8 +157,6 @@ export default function DashboardPage() {
   const { user } = useUser();
 
   useEffect(() => {
-    const name = user?.firstName || user?.username || user?.primaryEmailAddress?.emailAddress?.split("@")[0];
-    setFirstName(name ?? "there");
     setMounted(true);
   }, [user]);
 
@@ -261,6 +255,141 @@ export default function DashboardPage() {
     .filter((a) => isUpcoming(a.alert_time))
     .sort((a, b) => new Date(a.alert_time).getTime() - new Date(b.alert_time).getTime());
 
+  const renderNotesList = () => {
+    if (loading) {
+      return (
+        <div className="space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="skeleton h-6 w-32" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="skeleton h-24 rounded-xl" />
+                <div className="skeleton h-24 rounded-xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (Object.keys(groupedNotes).length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-surface-900 flex items-center justify-center shadow-sm border border-surface-600">
+            <StickyNote className="w-8 h-8 text-neutral-500" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-neutral-300">No notes yet</h3>
+            <p className="text-xs text-neutral-500 mt-1">Click "New Note" to get started.</p>
+          </div>
+          <button type="button" onClick={handleCreateNote} className="btn-primary text-xs py-1.5 px-3">
+            <Plus className="w-3.5 h-3.5" /> Create a Note
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        {Object.entries(groupedNotes).map(([dayLabel, groupNotes]) => (
+          <div key={dayLabel} className="space-y-3">
+            <div className="flex items-center gap-2 bg-surface-700 py-1.5 px-3 rounded-lg border border-surface-600/30 text-neutral-300">
+              <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+              <span className="text-xs font-semibold tracking-wide uppercase">{dayLabel}</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {groupNotes.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onDelete={(e) => handleDeleteNote(note.id, e)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderUpcomingAlerts = () => {
+    if (loading) {
+      return (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex gap-3 animate-pulse">
+              <div className="skeleton w-12 h-12 rounded-xl" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="skeleton h-3.5 w-3/4 rounded" />
+                <div className="skeleton h-2.5 w-1/2 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (upcomingAlerts.length === 0) {
+      return (
+        <div className="text-center rounded-xl border border-dashed border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col items-center justify-center gap-2">
+          <Bell className="w-6 h-6 text-neutral-600 animate-bounce" style={{ animationDuration: '3s' }} />
+          <p className="text-neutral-400 font-medium text-xs">No upcoming alerts scheduled</p>
+          <p className="text-neutral-600 text-[10px]">Create an alert inside any note to stay notified</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-3">
+        {upcomingAlerts.slice(0, 5).map((alert) => {
+          const alertDate = new Date(alert.alert_time);
+          const dayName = format(alertDate, "EEE").toUpperCase();
+          const dayNum = format(alertDate, "d");
+
+          return (
+            <div
+              key={alert.id}
+              className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative"
+            >
+              <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
+                <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
+                <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
+                  {alert.title}
+                </h4>
+                <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
+                  <Clock className="w-3 h-3 text-neutral-600" />
+                  <span>{format(alertDate, "h:mm a")}</span>
+                  {alert.note_title && (
+                    <Link
+                      href={`/notes/${alert.note_id}`}
+                      className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
+                    >
+                      • {alert.note_title}
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleDeleteAlert(alert.id)}
+                className="text-neutral-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
+                title="Delete Alert"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-800">
@@ -310,72 +439,18 @@ export default function DashboardPage() {
               </form>
 
               <button 
+                type="button"
                 onClick={handleCreateNote} 
-                disabled={creating}
                 className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5 shrink-0"
               >
-                {creating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5" />
-                    New Note
-                  </>
-                )}
+                <Plus className="w-3.5 h-3.5" />
+                New Note
               </button>
             </div>
           </div>
 
           {/* Notes grouped by day */}
-          {loading ? (
-            <div className="space-y-6">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="space-y-3">
-                  <div className="skeleton h-6 w-32" />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="skeleton h-24 rounded-xl" />
-                    <div className="skeleton h-24 rounded-xl" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : Object.keys(groupedNotes).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-              <div className="w-16 h-16 rounded-full bg-surface-900 flex items-center justify-center shadow-sm border border-surface-600">
-              <StickyNote className="w-8 h-8 text-neutral-500" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-neutral-300">No notes yet</h3>
-                <p className="text-xs text-neutral-500 mt-1">Click "New Note" to get started.</p>
-              </div>
-              <button onClick={handleCreateNote} className="btn-primary text-xs py-1.5 px-3">
-                <Plus className="w-3.5 h-3.5" /> Create a Note
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {Object.entries(groupedNotes).map(([dayLabel, groupNotes]) => (
-                <div key={dayLabel} className="space-y-3">
-                  {/* Day Header Bar */}
-                  <div className="flex items-center gap-2 bg-surface-700 py-1.5 px-3 rounded-lg border border-surface-600/30 text-neutral-300">
-                    <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                    <span className="text-xs font-semibold tracking-wide uppercase">{dayLabel}</span>
-                  </div>
-
-                  {/* Notes Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {groupNotes.map((note) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        onDelete={(e) => handleDeleteNote(note.id, e)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderNotesList()}
         </div>
 
       </div>
@@ -404,74 +479,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Upcoming Alerts List */}
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex gap-3 animate-pulse">
-                  <div className="skeleton w-12 h-12 rounded-xl" />
-                  <div className="flex-1 space-y-2 py-1">
-                    <div className="skeleton h-3.5 w-3/4 rounded" />
-                    <div className="skeleton h-2.5 w-1/2 rounded" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : upcomingAlerts.length === 0 ? (
-            <div className="text-center rounded-xl border border-dashed border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col items-center justify-center gap-2">
-              <Bell className="w-6 h-6 text-neutral-600 animate-bounce" style={{ animationDuration: '3s' }} />
-              <p className="text-neutral-400 font-medium text-xs">No upcoming alerts scheduled</p>
-              <p className="text-neutral-600 text-[10px]">Create an alert inside any note to stay notified</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {upcomingAlerts.slice(0, 5).map((alert) => {
-                const alertDate = new Date(alert.alert_time);
-                const dayName = format(alertDate, "EEE").toUpperCase();
-                const dayNum = format(alertDate, "d");
-
-                return (
-                  <div
-                    key={alert.id}
-                    className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative"
-                  >
-                    {/* Pink date badge */}
-                    <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
-                      <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
-                      <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
-                    </div>
-
-                    {/* Alert Info */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
-                        {alert.title}
-                      </h4>
-                      <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
-                        <Clock className="w-3 h-3 text-neutral-600" />
-                        <span>{format(alertDate, "h:mm a")}</span>
-                        {alert.note_title && (
-                          <Link
-                            href={`/notes/${alert.note_id}`}
-                            className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
-                          >
-                            • {alert.note_title}
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Delete */}
-                    <button
-                      onClick={() => handleDeleteAlert(alert.id)}
-                      className="text-neutral-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Delete Alert"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {renderUpcomingAlerts()}
         </div>
       </div>
       <NoteTypeModal

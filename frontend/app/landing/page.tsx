@@ -19,12 +19,6 @@ import {
   CheckCircle2,
   Workflow,
   Pencil,
-
-  Zap,
-  Globe,
-  Layers,
-  Lock,
-  Play
 } from "lucide-react";
 import SparkleMountainBackground from "@/components/SparkleMountainBackground";
 
@@ -388,6 +382,7 @@ export default function LandingPage() {
             <div className="flex justify-center w-full mb-1">
               <div className="inline-flex gap-1 p-1 bg-[#0c0c0f]/60 border border-white/[0.06] rounded-full backdrop-blur-xl shadow-xl">
                 <button
+                  type="button"
                   onClick={() => handleTabClick("capture")}
                   className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "capture"
                     ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
@@ -398,6 +393,7 @@ export default function LandingPage() {
                   <span>1. Capture</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleTabClick("summarize")}
                   className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "summarize"
                     ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
@@ -408,6 +404,7 @@ export default function LandingPage() {
                   <span>2. Summarize</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleTabClick("ask")}
                   className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all duration-300 ${activeTab === "ask"
                     ? "bg-white text-black shadow-[0_4px_12px_rgba(255,255,255,0.15)]"
@@ -625,7 +622,7 @@ export default function LandingPage() {
                           <div className="flex-1 bg-[#121217]/60 border border-white/[0.06] rounded-xl px-3 py-2 text-[10px] sm:text-xs text-neutral-500 text-left select-none cursor-text">
                             Ask follow-up question...
                           </div>
-                          <button className="bg-white hover:bg-neutral-200 text-black rounded-xl p-2 transition-colors shrink-0 shadow-[0_4px_12px_rgba(255,255,255,0.15)]">
+                          <button type="button" className="bg-white hover:bg-neutral-200 text-black rounded-xl p-2 transition-colors shrink-0 shadow-[0_4px_12px_rgba(255,255,255,0.15)]">
                             <ArrowRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -636,7 +633,6 @@ export default function LandingPage() {
               </TiltMockup>
             </div>
           </div>
-
         </div>
       </section>
 
