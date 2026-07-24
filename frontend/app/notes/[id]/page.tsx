@@ -151,11 +151,10 @@ const ResizableImageNodeView = (props: NodeViewProps) => {
             display: "block",
             maxWidth: "100%",
           }}
-          className={`rounded-lg transition-all duration-200 border-2 ${
-            selected
-              ? "border-brand-500 shadow-lg ring-2 ring-brand-500/20"
-              : "border-transparent"
-          }`}
+          className={`rounded-lg transition-all duration-200 border-2 ${selected
+            ? "border-brand-500 shadow-lg ring-2 ring-brand-500/20"
+            : "border-transparent"
+            }`}
         />
         {/* Resizer Handle at bottom-right edge */}
         <div
@@ -250,7 +249,7 @@ function NoteEditorContent() {
   const [hoveredGrid, setHoveredGrid] = useState<{ r: number; c: number } | null>(null);
   const [showClipboardPopover, setShowClipboardPopover] = useState(false);
   const [clipboardHistory, setClipboardHistory] = useState<{ id: string; type: "text" | "image"; content: string }[]>([]);
-  
+
   // Sidebar Notes list state for specific type
   const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
   const [sidebarLoading, setSidebarLoading] = useState(false);
@@ -528,7 +527,7 @@ function NoteEditorContent() {
   // Load content into editor on mount / when note is loaded
   useEffect(() => {
     if (!editor || !note || isEditorInitialized.current) return;
-    
+
     // Do not load content into the rich text editor if the note is not a text note
     if (noteType !== "text") {
       isEditorInitialized.current = true;
@@ -1176,13 +1175,13 @@ function NoteEditorContent() {
                 const isActive = n.id === noteId;
                 const noteTitle = n.id === noteId ? (title || "Untitled Note") : (n.title || "Untitled Note");
                 const isMenuOpen = openMenuNoteId === n.id;
-                
+
                 // Date formatting
                 let displayDate = "";
                 try {
                   const date = new Date(n.updated_at);
                   displayDate = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-                } catch {}
+                } catch { }
 
                 return (
                   <div key={n.id} className="relative group w-full">
@@ -1212,11 +1211,10 @@ function NoteEditorContent() {
                           }
                         }
                       }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${
-                        isActive
-                          ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
-                          : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
-                      }`}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${isActive
+                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
+                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
+                        }`}
                     >
                       {isActive && (
                         <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
@@ -1227,7 +1225,7 @@ function NoteEditorContent() {
                         {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
                         {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
                         {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        
+
                         {n.is_pinned && (
                           <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 shrink-0 transform -rotate-45" />
                         )}
@@ -1254,11 +1252,10 @@ function NoteEditorContent() {
                             setOpenMenuNoteId(isMenuOpen ? null : n.id);
                           }}
                           title="Note options"
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
-                            isMenuOpen
-                              ? "bg-white/10 text-white"
-                              : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
-                          }`}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isMenuOpen
+                            ? "bg-white/10 text-white"
+                            : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
+                            }`}
                         >
                           <MoreVertical className="w-3.5 h-3.5" />
                         </button>
@@ -1269,6 +1266,7 @@ function NoteEditorContent() {
                     {isMenuOpen && (
                       <div
                         role="menu"
+                        tabIndex={-1}
                         className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-[#121216] border border-white/[0.1] shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
