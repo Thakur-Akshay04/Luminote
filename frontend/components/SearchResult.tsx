@@ -1,14 +1,14 @@
 import type { SearchResultItem } from "@/types";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Zap, Calendar, CheckCircle, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight } from "lucide-react";
 
 interface SearchResultProps {
   item: SearchResultItem;
   rank: number;
 }
 
-export default function SearchResult({ item, rank }: SearchResultProps) {
+export default function SearchResult({ item, rank }: Readonly<SearchResultProps>) {
   const similarityPct = Math.round(item.similarity * 100);
   const timeAgo = formatDistanceToNow(new Date(item.updated_at), { addSuffix: true });
 

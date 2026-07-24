@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface SparkleParticle {
   x: number;
@@ -13,6 +13,13 @@ interface SparkleParticle {
   twinkleSpeed: number;
   phase: number;
   driftX: number;
+}
+
+function getParticleBaseSize(isSlow: boolean, layerIndex: number): number {
+  if (isSlow) return 0.6;
+  if (layerIndex === 0) return 0.9;
+  if (layerIndex === 1) return 1.4;
+  return 1.9;
 }
 
 // Sparkle Mountain Background — animated canvas rendering layered violet pixel sparkle mountains
@@ -30,7 +37,13 @@ export default function SparkleMountainBackground() {
     window.addEventListener("scroll", onScroll, { passive: true });
 
     const onMouseMove = (e: MouseEvent) => {
-      mouseRef.current = { x: e.clientX, y: e.clientY };
+      const canvasEl = canvasRef.current;
+      if (!canvasEl) return;
+      const rect = canvasEl.getBoundingClientRect();
+      mouseRef.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
     };
     const onMouseLeave = () => {
       mouseRef.current = null;
@@ -38,105 +51,72 @@ export default function SparkleMountainBackground() {
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     window.addEventListener("mouseleave", onMouseLeave, { passive: true });
 
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseleave", onMouseLeave);
-    };
-  }, []);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    let animationFrameId: number;
     let width = 0;
     let height = 0;
     let particlesList: SparkleParticle[][] = [];
-    let animationFrameId: number;
 
     const configs = [
       {
-        count: 180,
-        baseHeightRatio: 0.45,
-        peakHeight: 90,
-        speedFactor: 0.06,
-        colors: [
-          "rgba(255, 255, 255, ",
-        ],
-        isAmbient: false,
-        isTopOnly: false
+        count: 90,
+        parallax: 0.04,
+        colors: ["#6d28d9", "#7c3aed", "#5b21b6"],
+        isAmbient: true,
       },
       {
         count: 140,
-        baseHeightRatio: 0.60,
-        peakHeight: 65,
-        speedFactor: 0.12,
-        colors: [
-          "rgba(255, 255, 255, ",
-        ],
-        isAmbient: false,
-        isTopOnly: false
+        parallax: 0.08,
+        colors: ["#a855f7", "#c084fc", "#9333ea", "#7e22ce"],
+        isTopOnly: true,
       },
       {
-        count: 90,
-        baseHeightRatio: 0.74,
-        peakHeight: 45,
-        speedFactor: 0.20,
-        colors: [
-          "rgba(255, 255, 255, ",
-        ],
-        isAmbient: false,
-        isTopOnly: false
+        count: 70,
+        parallax: 0.12,
+        colors: ["#6d28d9", "#7c3aed", "#5b21b6"],
       },
       {
-        count: 330, // ambient stars spread across the screen
-        baseHeightRatio: 0,
-        peakHeight: 0,
-        speedFactor: 0.04,
-        colors: [
-          "rgba(255, 255, 255, ",
-        ],
-        isAmbient: true,
-        isTopOnly: false
+        count: 85,
+        parallax: 0.22,
+        colors: ["#8b5cf6", "#a855f7", "#c084fc"],
       },
       {
-        count: 300, // dense starfield specifically for the top fold
-        baseHeightRatio: 0,
-        peakHeight: 0,
-        speedFactor: 0.05,
-        colors: [
-          "rgba(255, 255, 255, ",
-        ],
-        isAmbient: false,
-        isTopOnly: true
-      }
+        count: 100,
+        parallax: 0.38,
+        colors: ["#c084fc", "#e9d5ff", "#d8b4fe", "#ffffff"],
+      },
     ];
 
-    const getMountainCurve = (x: number, layerIdx: number, canvasHeight: number) => {
-      const baseH = canvasHeight * configs[layerIdx].baseHeightRatio;
-      const peak = configs[layerIdx].peakHeight;
-      if (layerIdx === 0) {
+    const getMountainCurve = (x: number, layerIndex: number, h: number): number => {
+      if (layerIndex === 2) {
+        const peak = h * 0.42;
+        const baseline = h * 0.76;
         return (
-          baseH -
+          baseline -
           peak *
-          (Math.sin(x * 0.0012) * 0.5 +
-            Math.sin(x * 0.003 + 1.2) * 0.35 +
-            Math.cos(x * 0.007 + 0.5) * 0.15)
+          (Math.sin(x * 0.0018 + 0.5) * 0.65 +
+            Math.cos(x * 0.0042 + 1.2) * 0.25 +
+            Math.sin(x * 0.009 - 0.3) * 0.1)
         );
-      } else if (layerIdx === 1) {
+      } else if (layerIndex === 3) {
+        const peak = h * 0.46;
+        const baseline = h * 0.79;
         return (
-          baseH -
+          baseline -
           peak *
-          (Math.sin(x * 0.002 - 0.8) * 0.55 +
-            Math.cos(x * 0.005 + 1.8) * 0.3 +
-            Math.sin(x * 0.01 - 0.4) * 0.15)
+          (Math.sin(x * 0.0022 - 1.1) * 0.6 +
+            Math.cos(x * 0.0051 + 0.4) * 0.3 +
+            Math.sin(x * 0.012 + 1.8) * 0.1)
         );
       } else {
+        const peak = h * 0.52;
+        const baseline = h * 0.82;
         return (
-          baseH -
+          baseline -
           peak *
           (Math.sin(x * 0.0028 + 2.0) * 0.6 +
             Math.sin(x * 0.006 - 0.9) * 0.3 +
@@ -147,20 +127,13 @@ export default function SparkleMountainBackground() {
 
     const generateParticles = (canvasWidth: number, canvasHeight: number) => {
       const list: SparkleParticle[][] = [];
-
-      // Calculate total count of particles to pre-allocate random values
       let totalCount = 0;
-      for (let l = 0; l < configs.length; l++) {
-        totalCount += configs[l].count;
+      for (const conf of configs) {
+        totalCount += conf.count;
       }
-
-      // Max 10 random numbers per particle are consumed
       const valsNeeded = totalCount * 10;
       const randomValues = new Uint32Array(valsNeeded);
-
-      // This runs inside useEffect (client-only), so window.crypto is always available
       window.crypto.getRandomValues(randomValues);
-
       let randIdx = 0;
       const nextRandom = (): number => {
         const val = randomValues[randIdx] / 4294967296;
@@ -171,21 +144,18 @@ export default function SparkleMountainBackground() {
       for (let l = 0; l < configs.length; l++) {
         const layerParticles: SparkleParticle[] = [];
         const conf = configs[l];
+        const isSlow = Boolean(conf.isAmbient || conf.isTopOnly);
 
         for (let i = 0; i < conf.count; i++) {
           const x = nextRandom() * canvasWidth;
-
           let y = 0;
           let depthOffset = 0;
 
           if (conf.isAmbient) {
             y = nextRandom() * canvasHeight;
-            depthOffset = 0;
           } else if (conf.isTopOnly) {
-            // Concentrated density in the top areas of the screen using exponential bias
             const maxTopHeight = canvasHeight * 0.48;
             y = Math.pow(nextRandom(), 1.4) * maxTopHeight;
-            depthOffset = 0;
           } else {
             const mountainY = getMountainCurve(x, l, canvasHeight);
             y = mountainY;
@@ -193,12 +163,9 @@ export default function SparkleMountainBackground() {
             depthOffset = nextRandom() * maxDepth;
           }
 
-          // Back/ambient/top sparkles are tiny, front are slightly larger
-          const baseSize = (conf.isAmbient || conf.isTopOnly) ? 0.6 : l === 0 ? 0.9 : l === 1 ? 1.4 : 1.9;
+          const baseSize = getParticleBaseSize(isSlow, l);
           const size = baseSize + nextRandom() * 0.8;
-
           const colorBase = conf.colors[Math.floor(nextRandom() * conf.colors.length)];
-          const isSlow = conf.isAmbient || conf.isTopOnly;
           const twinkleSpeed = (isSlow ? 0.004 : 0.007) + nextRandom() * 0.012;
           const phase = nextRandom() * Math.PI * 2;
           const driftX = (nextRandom() - 0.5) * (isSlow ? 0.02 : 0.04);
@@ -225,12 +192,10 @@ export default function SparkleMountainBackground() {
       const rect = canvas.getBoundingClientRect();
       width = rect.width;
       height = rect.height;
-
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
-
       particlesList = generateParticles(width, height);
     };
 
@@ -238,10 +203,7 @@ export default function SparkleMountainBackground() {
     window.addEventListener("resize", handleResize);
 
     const render = () => {
-      if (!ctx || particlesList.length === 0) return;
-
       ctx.clearRect(0, 0, width, height);
-
       const currentScrollY = scrollYRef.current;
       const mouse = mouseRef.current;
 
@@ -249,26 +211,20 @@ export default function SparkleMountainBackground() {
         const layer = particlesList[l];
         const conf = configs[l];
 
-        for (let i = 0; i < layer.length; i++) {
-          const p = layer[i];
-
-          // 1. Update twinkling phase & alpha opacity
+        for (const p of layer) {
           p.phase += p.twinkleSpeed;
           p.alpha = (Math.sin(p.phase) * 0.5 + 0.5) * p.targetAlpha;
-
-          // 2. Wrap/drift X position
           p.x += p.driftX;
           if (p.x < 0) p.x += width;
           if (p.x > width) p.x -= width;
 
-          // 3. Compute dynamic drawn Y position (ambient wraps, mountains and top stars culled)
           let drawY = 0;
           if (conf.isAmbient) {
-            drawY = p.y - currentScrollY * conf.speedFactor;
+            drawY = p.y - currentScrollY * conf.parallax;
             drawY = ((drawY % height) + height) % height;
           } else {
             // For both mountains and Top Starfield:
-            drawY = (p.y + p.depthOffset) - currentScrollY * conf.speedFactor;
+            drawY = (p.y + p.depthOffset) - currentScrollY * conf.parallax;
 
             // Performance optimization: cull particles that are off-screen
             if (drawY < -10 || drawY > height + 10) {

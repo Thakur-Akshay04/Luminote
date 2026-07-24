@@ -24,5 +24,9 @@ export function getUser(): StoredUser | null {
   return null;
 }
 
-export function setAuth(): void {}
-export function clearAuth(): void {}
+export function setAuth(): void {
+  // No-op: Auth is managed by Clerk
+}
+export function clearAuth(): void {
+  // No-op: Auth is managed by Clerk
+}
