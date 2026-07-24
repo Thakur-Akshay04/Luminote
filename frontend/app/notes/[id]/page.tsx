@@ -452,9 +452,8 @@ function NoteEditorContent() {
     const handleGlobalPaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.indexOf("image") !== -1) {
+      for (const item of Array.from(items)) {
+        if (item.type.includes("image")) {
           const file = item.getAsFile();
           if (file) {
             const reader = new FileReader();
@@ -889,22 +888,32 @@ function NoteEditorContent() {
   };
 
   const handleCut = () => {
-    editor?.commands.focus();
-    document.execCommand("cut");
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ");
+    if (selectedText) {
+      navigator.clipboard.writeText(selectedText);
+      editor.commands.deleteSelection();
+    }
   };
 
   const handleCopy = () => {
-    editor?.commands.focus();
-    document.execCommand("copy");
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ");
+    if (selectedText) {
+      navigator.clipboard.writeText(selectedText);
+    }
   };
 
   const handlePaste = () => {
-    editor?.commands.focus();
-    navigator.clipboard.readText().then(text => {
-      editor?.commands.insertContent(text);
-    }).catch(() => {
-      document.execCommand("paste");
-    });
+    if (!editor) return;
+    editor.commands.focus();
+    navigator.clipboard.readText().then((text) => {
+      if (text) {
+        editor.commands.insertContent(text);
+      }
+    }).catch(() => {});
   };
 
   const COLORS = [

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { notesApi, usersApi } from "@/lib/api";
 import type { Note } from "@/types";
@@ -28,8 +27,7 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoaded } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
 
@@ -203,6 +201,7 @@ export default function SettingsPage() {
           </div>
 
           <button
+            type="button"
             onClick={() => signOut({ redirectUrl: "/" })}
             className="self-start md:self-auto px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.08] hover:border-red-500/30 text-xs font-semibold text-neutral-300 hover:text-red-400 transition-all flex items-center gap-2"
           >

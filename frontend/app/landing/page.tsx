@@ -66,7 +66,7 @@ function useScrollReveal() {
 }
 
 // 3D Physics Mouse-Tilt wrapper for browser mockup
-function TiltMockup({ children }: { children: React.ReactNode }) {
+function TiltMockup({ children }: Readonly<{ children: React.ReactNode }>) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -113,7 +113,7 @@ function TiltMockup({ children }: { children: React.ReactNode }) {
 }
 
 // Spotlight Card component that tracks mouse position for an elegant radial glow effect
-function SpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function SpotlightCard({ children, className = "" }: Readonly<{ children: React.ReactNode; className?: string }>) {
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
 
@@ -155,11 +155,11 @@ function FadeUp({
   children,
   delay = 0,
   className = "",
-}: {
+}: Readonly<{
   children: React.ReactNode;
   delay?: number;
   className?: string;
-}) {
+}>) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 

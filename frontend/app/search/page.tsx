@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 import { searchApi } from "@/lib/api";
 import type { SearchResultItem } from "@/types";
@@ -10,12 +8,10 @@ import SearchResult from "@/components/SearchResult";
 import { Search, Loader2, Palette, Zap, Brain } from "lucide-react";
 
 export default function SearchPage() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [cached, setCached] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +29,6 @@ export default function SearchPage() {
     try {
       const res = await searchApi.semantic(q);
       setResults(res.data.results);
-      setCached(res.data.cached);
       setSearched(true);
     } catch {
       setError("Search failed. Make sure you have notes with AI embeddings.");
