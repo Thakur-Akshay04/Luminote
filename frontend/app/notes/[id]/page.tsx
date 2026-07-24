@@ -58,7 +58,6 @@ import {
   Eye,
   Edit3,
   Brain,
-  Zap,
   Wand2,
   ChevronRight,
   ChevronLeft,
@@ -103,8 +102,8 @@ import {
 import Link from "next/link";
 
 const generateSecureId = (): string => {
-  const cryptoObj = typeof window !== "undefined" ? (window.crypto || (window as any).msCrypto) : null;
-  if (cryptoObj && cryptoObj.getRandomValues) {
+  const cryptoObj = typeof window !== "undefined" ? (window.crypto || (window as any)?.msCrypto) : null;
+  if (cryptoObj?.getRandomValues) {
     const array = new Uint32Array(1);
     cryptoObj.getRandomValues(array);
     return array[0].toString();
@@ -157,8 +156,10 @@ const ResizableImageNodeView = (props: NodeViewProps) => {
             }`}
         />
         {/* Resizer Handle at bottom-right edge */}
-        <div
+        <button
+          type="button"
           onMouseDown={onMouseDown}
+          aria-label="Resize image"
           className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 bg-brand-500 hover:bg-brand-400 rounded flex items-center justify-center cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-md border border-white/20 select-none"
         >
           <svg
@@ -171,7 +172,7 @@ const ResizableImageNodeView = (props: NodeViewProps) => {
             <line x1="22" y1="6" x2="6" y2="22" />
             <line x1="22" y1="14" x2="14" y2="22" />
           </svg>
-        </div>
+        </button>
       </div>
     </NodeViewWrapper>
   );
@@ -196,6 +197,14 @@ const ResizableImage = ImageExtension.extend({
     return ReactNodeViewRenderer(ResizableImageNodeView);
   },
 });
+
+function getEditorPanelClass(noteType: string, previewMode: boolean): string {
+  const display = previewMode ? "hidden sm:flex" : "flex";
+  if (noteType === "drawing") return `flex flex-col ${display} w-full overflow-hidden h-full`;
+  if (noteType === "checklist") return `flex flex-col ${display} w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto`;
+  if (noteType === "text") return `flex flex-col ${display} w-full overflow-y-auto`;
+  return `flex flex-col ${display} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`;
+}
 
 function NoteEditorContent() {
   const router = useRouter();
@@ -405,31 +414,23 @@ function NoteEditorContent() {
 
   // Click Outside Popovers handler
   useEffect(() => {
+    const refs = [
+      [fontDropdownRef, setShowFontDropdown],
+      [sizeDropdownRef, setShowSizeDropdown],
+      [colorPickerRef, setShowColorPicker],
+      [highlightPickerRef, setShowHighlightPicker],
+      [linkPopoverRef, setShowLinkPopover],
+      [imagePopoverRef, setShowImagePopover],
+      [tablePopoverRef, setShowTablePopover],
+      [clipboardPopoverRef, setShowClipboardPopover],
+    ] as const;
+
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (fontDropdownRef.current && !fontDropdownRef.current.contains(target)) {
-        setShowFontDropdown(false);
-      }
-      if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(target)) {
-        setShowSizeDropdown(false);
-      }
-      if (colorPickerRef.current && !colorPickerRef.current.contains(target)) {
-        setShowColorPicker(false);
-      }
-      if (highlightPickerRef.current && !highlightPickerRef.current.contains(target)) {
-        setShowHighlightPicker(false);
-      }
-      if (linkPopoverRef.current && !linkPopoverRef.current.contains(target)) {
-        setShowLinkPopover(false);
-      }
-      if (imagePopoverRef.current && !imagePopoverRef.current.contains(target)) {
-        setShowImagePopover(false);
-      }
-      if (tablePopoverRef.current && !tablePopoverRef.current.contains(target)) {
-        setShowTablePopover(false);
-      }
-      if (clipboardPopoverRef.current && !clipboardPopoverRef.current.contains(target)) {
-        setShowClipboardPopover(false);
+      for (const [r, setter] of refs) {
+        if (r.current && !r.current.contains(target)) {
+          setter(false);
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -438,15 +439,18 @@ function NoteEditorContent() {
 
   // Listen for copy, cut, paste events to build custom clipboard history
   useEffect(() => {
-    const handleGlobalCopy = (e: ClipboardEvent) => {
+    const addClipboardItem = (text: string, isImage = false) => {
+      if (!text || !text.trim()) return;
+      setClipboardHistory((prev) => {
+        if (prev.some((x) => x.content === text)) return prev;
+        const isImg = isImage || text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
+        return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
+      });
+    };
+
+    const handleGlobalCopy = () => {
       const text = window.getSelection()?.toString();
-      if (text && text.trim()) {
-        setClipboardHistory((prev) => {
-          if (prev.some(item => item.content === text)) return prev;
-          const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-          return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
-        });
-      }
+      if (text) addClipboardItem(text);
     };
 
     const handleGlobalPaste = (e: ClipboardEvent) => {
@@ -457,27 +461,14 @@ function NoteEditorContent() {
           const file = item.getAsFile();
           if (file) {
             const reader = new FileReader();
-            reader.onload = (event) => {
-              const base64 = event.target?.result as string;
-              if (base64) {
-                setClipboardHistory((prev) => {
-                  if (prev.some(x => x.content === base64)) return prev;
-                  return [{ id: generateSecureId(), type: "image" as const, content: base64 }, ...prev].slice(0, 10);
-                });
-              }
+            reader.onload = (ev) => {
+              const base64 = ev.target?.result as string;
+              if (base64) addClipboardItem(base64, true);
             };
             reader.readAsDataURL(file);
           }
         } else if (item.type === "text/plain") {
-          item.getAsString((text) => {
-            if (text && text.trim()) {
-              setClipboardHistory((prev) => {
-                if (prev.some(x => x.content === text)) return prev;
-                const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-                return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
-              });
-            }
-          });
+          item.getAsString(addClipboardItem);
         }
       }
     };
@@ -1033,19 +1024,19 @@ function NoteEditorContent() {
           {hasUnsavedChanges && !saving && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Unsaved
+              {" "}Unsaved
             </span>
           )}
           {saving && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
               <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />
-              Saving
+              {" "}Saving
             </span>
           )}
           {saved && !saving && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Saved
+              {" "}Saved
             </span>
           )}
           {error && (
@@ -1138,6 +1129,7 @@ function NoteEditorContent() {
             </div>
             {/* Create new note of current type */}
             <button
+              type="button"
               onClick={() => {
                 isDirty.current = false;
                 setHasUnsavedChanges(false);
@@ -1937,14 +1929,7 @@ function NoteEditorContent() {
           <div className="flex flex-1 overflow-hidden">
 
             {/* EDITOR PANEL (LEFT) */}
-            <div className={`flex flex-col ${previewMode ? "hidden sm:flex" : "flex"} ${noteType === "drawing"
-              ? "w-full overflow-hidden h-full"
-              : noteType === "checklist"
-                ? "w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto"
-                : noteType === "text"
-                  ? "w-full overflow-y-auto"
-                  : "w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto"
-              }`}>
+            <div className={getEditorPanelClass(noteType, previewMode)}>
 
               {noteType === "text" && (
                 <div
@@ -2138,6 +2123,7 @@ function NoteEditorContent() {
                       )}
 
                       <button
+                        type="button"
                         onClick={handleExtractTasks}
                         disabled={extractingTasks || !aiContext.trim()}
                         className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 transition-all font-semibold"

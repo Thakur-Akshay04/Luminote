@@ -336,6 +336,7 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
           {/* Delete Button (renders if onDelete is passed) */}
           {onDelete && (
             <button
+              type="button"
               onClick={handleDelete}
               className="text-neutral-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-surface-700/60 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200"
               title="Delete Note"

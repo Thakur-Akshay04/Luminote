@@ -191,10 +191,12 @@ function FadeUp({
   );
 }
 
+type LandingTab = "capture" | "summarize" | "ask";
+
 export default function LandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"capture" | "summarize" | "ask">("capture");
+  const [activeTab, setActiveTab] = useState<LandingTab>("capture");
   const [waveformHeights, setWaveformHeights] = useState([8, 16, 24, 12, 18, 14, 22, 10, 16, 20]);
   const autoRotateRef = useRef<NodeJS.Timeout | null>(null);
   const userInteracted = useRef(false);
@@ -261,7 +263,7 @@ export default function LandingPage() {
     return () => { done = true; clearInterval(tid); };
   }, [activeTab]);
 
-  const getNextTab = (prev: "capture" | "summarize" | "ask"): "capture" | "summarize" | "ask" => {
+  const getNextTab = (prev: LandingTab): LandingTab => {
     if (prev === "capture") return "summarize";
     if (prev === "summarize") return "ask";
     return "capture";
@@ -507,7 +509,7 @@ export default function LandingPage() {
                                 <div className="flex items-end gap-[2px] h-6 mt-1 overflow-hidden">
                                   {waveformHeights.map((h, i) => (
                                     <div
-                                      key={i}
+                                      key={`wave-bar-bento-${i}`}
                                       className="flex-1 bg-gradient-to-t from-brand-600 to-brand-400 rounded-sm transition-all duration-150"
                                       style={{ height: `${h}px` }}
                                     />
@@ -716,7 +718,7 @@ export default function LandingPage() {
                   <div className="flex items-end gap-[3px] h-9 overflow-hidden">
                     {waveformHeights.map((h, i) => (
                       <div
-                        key={i}
+                        key={`wave-bar-dictation-${i}`}
                         className="flex-1 bg-brand-500/40 rounded-sm transition-all duration-150"
                         style={{ height: `${h * 1.2}px` }}
                       />

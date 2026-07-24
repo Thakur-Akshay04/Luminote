@@ -82,13 +82,6 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
       <div 
         className="fixed inset-0 bg-black/70 backdrop-blur-md transition-opacity duration-300 animate-fade-in cursor-default"
         onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            onClose();
-          }
-        }}
-        role="button"
-        tabIndex={-1}
         aria-hidden="true"
       />
 
@@ -106,6 +99,7 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
             </div>
           </div>
           <button 
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-surface-strong transition-colors"
             aria-label="Close modal"
@@ -120,6 +114,7 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
             const Icon = type.icon;
             return (
               <button
+                type="button"
                 key={type.id}
                 onClick={() => handleSelect(type.id)}
                 className={`flex flex-col items-start p-4 rounded-lg border border-border-muted bg-surface-base hover:bg-surface-strong text-left transition-all duration-300 hover:-translate-y-1 group ${type.hoverClass}`}

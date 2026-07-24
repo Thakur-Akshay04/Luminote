@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useUser, useClerk, UserButton } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import { alertsApi } from "@/lib/api";
 import type { Alert } from "@/types";
 import {
@@ -95,7 +95,7 @@ function NavbarContent() {
     else if (activeSection === "features") targetRef = featuresRef;
     else if (activeSection === "security") targetRef = securityRef;
 
-    if (targetRef && targetRef.current && navRef.current) {
+    if (targetRef?.current && navRef.current) {
       const navRect = navRef.current.getBoundingClientRect();
       const targetRect = targetRef.current.getBoundingClientRect();
       setPillStyle({
@@ -390,6 +390,7 @@ function NavbarContent() {
       <div className="flex flex-col gap-2.5">
         <div className="relative">
           <button
+            type="button"
             onClick={() => {
               setNotificationsOpen(!notificationsOpen);
               if (!notificationsOpen) {
@@ -413,6 +414,7 @@ function NavbarContent() {
               <div className="flex items-center justify-between border-b border-border-muted pb-2">
                 <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
                 <button
+                  type="button"
                   onClick={() => setNotificationsOpen(false)}
                   className="p-1 hover:bg-surface-strong rounded text-neutral-500 hover:text-white transition-colors"
                 >
@@ -466,6 +468,7 @@ function NavbarContent() {
                           </div>
 
                           <button
+                            type="button"
                             onClick={(e) => handleDeleteAlert(alert.id, e)}
                             className="absolute top-2 right-2 text-neutral-500 hover:text-red-400 p-1 rounded hover:bg-red-950/20 transition-colors opacity-0 group-hover:opacity-100"
                             title="Delete Alert"
@@ -482,6 +485,7 @@ function NavbarContent() {
         </div>
 
         <button
+          type="button"
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors"
           onClick={() => router.push("/settings")}
         >
@@ -489,6 +493,7 @@ function NavbarContent() {
           Settings
         </button>
         <button
+          type="button"
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.02] w-full text-left transition-colors"
           onClick={() => router.push("/help")}
         >

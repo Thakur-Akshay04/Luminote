@@ -221,6 +221,7 @@ export default function SettingsPage() {
             const isActive = activeSection === tab.id;
             return (
               <button
+                type="button"
                 key={tab.id}
                 onClick={() => setActiveSection(tab.id as any)}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${isActive
@@ -275,6 +276,7 @@ export default function SettingsPage() {
                   const isSelected = aiFormat === item.id;
                   return (
                     <button
+                      type="button"
                       key={item.id}
                       onClick={() => setAiFormat(item.id as any)}
                       className={`relative flex flex-col items-start p-5 rounded-2xl border transition-all text-left group overflow-hidden ${isSelected
@@ -318,6 +320,7 @@ export default function SettingsPage() {
               </div>
 
               <label htmlFor="settings-ai-extract-alerts" className="relative inline-flex items-center cursor-pointer shrink-0">
+                <span className="sr-only">Extract Alerts & Reminders</span>
                 <input
                   id="settings-ai-extract-alerts"
                   type="checkbox"
