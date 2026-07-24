@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Copy dependency manifests first for better layer caching
 COPY .npmrc package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code and build production bundle
 COPY . .
