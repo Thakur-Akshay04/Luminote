@@ -35,9 +35,9 @@ interface AIPanelProps {
   onSaveBeforeAction?: () => Promise<string>;
 }
 
-export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction }: AIPanelProps) {
+export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction }: Readonly<AIPanelProps>) {
   // Tabs: 'chat' | 'insights' | 'assistant'
-  const [activeTab, setActiveTab] = useState<"chat" | "insights" | "assistant" | "assistant">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "insights" | "assistant">("chat");
 
   // Selection detection
   const [selectedText, setSelectedText] = useState("");

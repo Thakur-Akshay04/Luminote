@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { notesApi } from "@/lib/api";
-import { Mic, Square, Loader2, Play, Volume2, Copy, Check, Wand2, RefreshCw } from "lucide-react";
+import { Mic, Square, Loader2, Volume2, Copy, Check, Wand2, RefreshCw } from "lucide-react";
 
 interface AudioRecorderProps {
   noteId: string;
@@ -20,7 +20,7 @@ export default function AudioRecorder({
   onTranscriptUpdate,
   onMediaUrlUpdate,
   onSaveBeforeAction,
-}: AudioRecorderProps) {
+}: Readonly<AudioRecorderProps>) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -210,6 +210,7 @@ export default function AudioRecorder({
         <div className="flex items-center gap-3">
           {isRecording ? (
             <button
+              type="button"
               onClick={stopRecording}
               className="btn-danger flex items-center gap-2 px-6 py-2.5 rounded-xs"
               id="stop-recording-btn"
@@ -219,6 +220,7 @@ export default function AudioRecorder({
             </button>
           ) : (
             <button
+              type="button"
               onClick={startRecording}
               disabled={loading || transcribing}
               className="btn-primary flex items-center gap-2 px-6 py-2.5 rounded-xs"
@@ -254,10 +256,13 @@ export default function AudioRecorder({
             </div>
           </div>
           
-          <audio src={audioUrl} controls className="w-full" id="voice-note-audio-player" />
+          <audio src={audioUrl} controls className="w-full" id="voice-note-audio-player">
+            <track kind="captions" />
+          </audio>
 
           {!transcript && (
             <button
+              type="button"
               onClick={() => handleTranscribe(false)}
               disabled={transcribing}
               className="btn-primary w-full py-2 flex items-center justify-center gap-2"
@@ -286,6 +291,7 @@ export default function AudioRecorder({
             </div>
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={() => handleTranscribe(true)}
                 disabled={transcribing}
                 className="text-neutral-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1 text-xs"
@@ -296,6 +302,7 @@ export default function AudioRecorder({
                 <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
               </button>
               <button
+                type="button"
                 onClick={copyToClipboard}
                 className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1 text-xs"
                 title="Copy to clipboard"

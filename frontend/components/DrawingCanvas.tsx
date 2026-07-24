@@ -43,9 +43,9 @@ const HIGHLIGHTER_COLORS = ["#FFFF00", "#00FFFF", "#00FF00", "#FF69B4"];
 // O(1) hex to rgba conversion
 function hexToRgba(hex: string, alpha: number) {
   const cleanHex = hex.startsWith("#") ? hex : "#" + hex;
-  const r = parseInt(cleanHex.slice(1, 3), 16);
-  const g = parseInt(cleanHex.slice(3, 5), 16);
-  const b = parseInt(cleanHex.slice(5, 7), 16);
+  const r = Number.parseInt(cleanHex.slice(1, 3), 16);
+  const g = Number.parseInt(cleanHex.slice(3, 5), 16);
+  const b = Number.parseInt(cleanHex.slice(5, 7), 16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
@@ -54,13 +54,13 @@ function hexToRgbaBytes(hex: string) {
   const cleanHex = hex.startsWith("#") ? hex : "#" + hex;
   let r = 0, g = 0, b = 0, a = 255;
   if (cleanHex.length === 7) {
-    r = parseInt(cleanHex.slice(1, 3), 16);
-    g = parseInt(cleanHex.slice(3, 5), 16);
-    b = parseInt(cleanHex.slice(5, 7), 16);
+    r = Number.parseInt(cleanHex.slice(1, 3), 16);
+    g = Number.parseInt(cleanHex.slice(3, 5), 16);
+    b = Number.parseInt(cleanHex.slice(5, 7), 16);
   } else if (cleanHex.length === 4) {
-    r = parseInt(cleanHex[1] + cleanHex[1], 16);
-    g = parseInt(cleanHex[2] + cleanHex[2], 16);
-    b = parseInt(cleanHex[3] + cleanHex[3], 16);
+    r = Number.parseInt(cleanHex[1] + cleanHex[1], 16);
+    g = Number.parseInt(cleanHex[2] + cleanHex[2], 16);
+    b = Number.parseInt(cleanHex[3] + cleanHex[3], 16);
   }
   return [r, g, b, a];
 }
