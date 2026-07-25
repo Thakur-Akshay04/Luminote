@@ -19,12 +19,16 @@ interface Node {
   glowColor: string;
 }
 
-// Cryptographically secure random float generator [0, 1)
+// Pre-allocated static buffer to satisfy crypto linter rules with zero heap allocation overhead in 60fps loop
+const STATIC_RANDOM_BUFFER = new Uint32Array(1);
+
 const getRandom = (): number => {
-  if (typeof window !== "undefined" && window.crypto) {
-    const array = new Uint32Array(1);
-    window.crypto.getRandomValues(array);
-    return array[0] / 4294967296;
+  if (typeof window !== "undefined") {
+    const cryptoObj = window.crypto || (window as any).msCrypto;
+    if (cryptoObj) {
+      cryptoObj.getRandomValues(STATIC_RANDOM_BUFFER);
+      return STATIC_RANDOM_BUFFER[0] / 4294967296;
+    }
   }
   return 0.5;
 };
@@ -56,8 +60,8 @@ function applyPhysicsToNode(
     node.vx += (targetCenter.x - node.x) * 0.03;
     node.vy += (targetCenter.y - node.y) * 0.03;
   } else {
-    node.vx += (Math.random() - 0.5) * 0.12;
-    node.vy += (Math.random() - 0.5) * 0.12;
+    node.vx += (getRandom() - 0.5) * 0.12;
+    node.vy += (getRandom() - 0.5) * 0.12;
 
     const core = nodes.find((n) => n.id === "core") || targetCenter;
     const dxCore = core.x - node.x;
