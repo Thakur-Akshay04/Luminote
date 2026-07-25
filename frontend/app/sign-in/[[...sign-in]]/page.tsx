@@ -34,7 +34,7 @@ export default function SignInPage() {
         </p>
       </div>
 
-      <div className="relative z-10 -translate-x-[3px]">
+      <div className="relative z-10 -translate-x-[100px]">
         <SignIn
           fallbackRedirectUrl="/dashboard"
           forceRedirectUrl="/dashboard"

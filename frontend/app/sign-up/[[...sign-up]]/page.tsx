@@ -26,15 +26,17 @@ export default function SignUpPage() {
           </span>
         </Link>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-          Create your account
-        </h1>
-        <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
-          Join Luminote to structure, index, and connect your thoughts effortlessly.
-        </p>
+        <div className="group/header pointer-events-auto cursor-default flex flex-col gap-1.5 w-fit">
+          <h1 className="text-2xl sm:text-3xl font-black text-white group-hover/header:bg-gradient-to-r group-hover/header:from-brand-300 group-hover/header:via-purple-400 group-hover/header:to-indigo-400 group-hover/header:bg-clip-text group-hover/header:text-transparent transition-all duration-300 tracking-tight leading-tight">
+            Create your account
+          </h1>
+          <p className="text-zinc-400 group-hover/header:text-zinc-200 transition-colors duration-300 text-xs sm:text-sm leading-relaxed">
+            Join Luminote to structure, index, and connect your thoughts effortlessly.
+          </p>
+        </div>
       </div>
 
-      <div className="relative z-10">
+      <div className="relative z-10 -translate-x-[100px]">
         <SignUp
           fallbackRedirectUrl="/dashboard"
           forceRedirectUrl="/dashboard"
