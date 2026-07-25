@@ -313,16 +313,6 @@ export default function LandingPage() {
           {/* Left Column: Headline and CTAs */}
           <div className="lg:col-span-5 flex flex-col items-start text-left gap-6 animate-slide-up">
 
-            {/* Live Announcement Badge */}
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-neutral-300 text-xs font-semibold hover:border-brand-500/40 hover:bg-brand-500/5 transition-all duration-300 group cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.02)]">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-brand-400 relative shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-400"></span>
-              </span>
-              <span>Introducing the personal Notes</span>
-              <ArrowRight className="w-3 h-3 text-neutral-500 group-hover:text-brand-400 group-hover:translate-x-0.5 transition-all" />
-            </div>
-
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08] text-wrap-balance">
               Notes that <br />
