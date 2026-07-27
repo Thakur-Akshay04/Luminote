@@ -165,12 +165,12 @@ function NavbarContent() {
 
   const navLinks = isSignedIn
     ? [
-        { href: "/notes?favorite=true", label: "Favorites", icon: Star },
-        { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-        { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
-        { href: "/calendar", label: "Calendar", icon: Calendar },
-        { href: "/search", label: "Search", icon: Search },
-      ]
+      { href: "/notes?favorite=true", label: "Favorites", icon: Star },
+      { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+      { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
+      { href: "/calendar", label: "Calendar", icon: Calendar },
+      { href: "/search", label: "Search", icon: Search },
+    ]
     : [];
 
   const dropdownOptions = [
@@ -201,13 +201,12 @@ function NavbarContent() {
         )}
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/landing" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-neutral-900/60 border border-white/[0.08] flex items-center justify-center text-white shrink-0 group-hover:scale-105 group-hover:border-brand-500/30 transition-all duration-300">
-              <Notebook className="w-4.5 h-4.5 fill-white/10" />
-            </div>
-            <span className="font-bold text-lg text-white tracking-tight group-hover:text-neutral-200 transition-colors">
-              Luminote
-            </span>
+          <Link href="/landing" className="flex items-center group shrink-0 relative top-[10px]">
+            <img
+              src="/webLogo.png"
+              alt="Luminote Logo"
+              className="h-12 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-md"
+            />
           </Link>
 
           {/* Landing Navigation Links */}

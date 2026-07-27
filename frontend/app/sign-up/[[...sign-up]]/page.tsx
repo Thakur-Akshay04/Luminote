@@ -16,14 +16,13 @@ export default function SignUpPage() {
       <div className="w-full max-w-md mb-6 lg:mb-0 lg:absolute lg:top-10 lg:left-10 z-20 flex flex-col gap-1.5 pointer-events-none text-left">
         <Link
           href="/landing"
-          className="inline-flex items-center gap-2.5 group pointer-events-auto w-fit mb-1"
+          className="inline-flex items-center group pointer-events-auto w-fit mb-1"
         >
-          <div className="w-9 h-9 rounded-xl bg-neutral-900/80 border border-white/[0.1] flex items-center justify-center text-white shrink-0 group-hover:scale-105 group-hover:border-brand-500/40 backdrop-blur-md transition-all duration-300 shadow-md">
-            <Notebook className="w-4.5 h-4.5 fill-white/10 text-white" />
-          </div>
-          <span className="font-bold text-lg text-white tracking-tight group-hover:text-neutral-200 transition-colors">
-            Luminote
-          </span>
+          <img
+            src="/webLogo.png"
+            alt="Luminote Logo"
+            className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-md"
+          />
         </Link>
 
         <div className="group/header pointer-events-auto cursor-default flex flex-col gap-1.5 w-fit">
