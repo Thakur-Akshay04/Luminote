@@ -35,22 +35,39 @@ export default function SignInPage() {
         </div>
       </div>
 
-      <div className="relative z-10 -translate-x-[100px]">
+      <div className="relative z-10 my-auto py-8">
         <SignIn
           fallbackRedirectUrl="/dashboard"
           forceRedirectUrl="/dashboard"
           appearance={{
             variables: {
-              colorPrimary: "#6366f1",
-              colorBackground: "#18181b",
-              borderRadius: "8px",
+              colorPrimary: "#8b5cf6",
+              colorBackground: "#0c0c0e",
+              borderRadius: "16px",
             },
+
             elements: {
-              card: "border border-surface-border shadow-2xl bg-[#18181b]",
+              cardBox: "shadow-none",
+              card: "border border-white/[0.08] bg-[#0c0c0e]/90 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_40px_rgba(139,92,246,0.15)] p-2 rounded-2xl",
+              headerTitle: "text-white font-extrabold tracking-tight text-xl",
+              headerSubtitle: "text-zinc-400 text-xs",
+              socialButtonsBlockButton: "bg-[#141419] border border-white/[0.08] text-white hover:bg-white/[0.06] hover:border-white/20 transition-all rounded-xl",
+              socialButtonsBlockButtonText: "text-white font-semibold text-xs",
+              dividerLine: "bg-white/[0.08]",
+              dividerText: "text-zinc-500 text-xs font-semibold uppercase tracking-wider",
+              formFieldLabel: "text-zinc-300 font-semibold text-xs",
+              formFieldInput: "bg-[#121217] border border-white/[0.08] text-white rounded-xl focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 transition-all text-sm px-3.5 py-2.5",
+              formButtonPrimary: "bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-all py-3 text-sm",
+              footerActionLink: "text-brand-400 hover:text-brand-300 font-semibold transition-colors",
+              footerActionText: "text-zinc-400 text-xs",
+              identityPreviewText: "text-white font-semibold",
+              identityPreviewEditButtonIcon: "text-brand-400",
             },
           }}
         />
+
       </div>
+
     </main>
   );
 }
