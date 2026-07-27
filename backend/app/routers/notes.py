@@ -43,7 +43,7 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 
 
 @router.get("", response_model=list[NoteResponse])
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 async def list_notes(
     request: Request,
     user_id: Annotated[str, Depends(get_current_user)],

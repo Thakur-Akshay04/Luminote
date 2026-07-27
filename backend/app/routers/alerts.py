@@ -21,7 +21,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 @router.get("", response_model=list[AlertResponse])
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 async def list_alerts(
     request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
@@ -102,6 +102,26 @@ async def clear_all(
     await db.commit()
 
 
+@router.patch("/{alert_id}/notified", status_code=200)
+@limiter.limit("60/minute")
+async def mark_notified(
+    request: Request,
+    alert_id: uuid.UUID,
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    stmt = select(Alert).where(Alert.id == alert_id, Alert.user_id == uuid.UUID(user_id))
+    result = await db.execute(stmt)
+    alert = result.scalar_one_or_none()
+
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    alert.is_notified = True
+    await db.commit()
+    return {"status": "ok"}
+
+
 
 @router.websocket("/ws")
 async def websocket_alerts(
@@ -121,8 +141,49 @@ async def websocket_alerts(
     await manager.connect(user_uuid, websocket)
 
     try:
+        # Deliver any pending due alerts immediately upon connection
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            stmt = (
+                select(Alert, Note.title)
+                .outerjoin(Note, Alert.note_id == Note.id)
+                .where(
+                    Alert.user_id == user_uuid,
+                    Alert.alert_time <= now,
+                    Alert.is_notified == False,
+                )
+            )
+            result = await db.execute(stmt)
+            due_rows = result.all()
+
+            notified_count = 0
+            for row in due_rows:
+                alert, note_title = row
+                payload = {
+                    "type": "alert",
+                    "id": str(alert.id),
+                    "title": alert.title,
+                    "note_id": str(alert.note_id),
+                    "note_title": note_title,
+                    "alert_time": alert.alert_time.isoformat(),
+                }
+                try:
+                    await websocket.send_json(payload)
+                    alert.is_notified = True
+                    notified_count += 1
+                except Exception as send_err:
+                    logger.warning("Failed to send initial alert to user %s: %s", user_uuid, send_err)
+
+            if notified_count > 0:
+                await db.commit()
+
         while True:
             # Keep WebSocket open, wait for any message (ping/heartbeat) from client
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    except Exception as err:
+        logger.warning("Alerts WebSocket closed for user %s: %s", user_uuid, err)
+    finally:
         manager.disconnect(user_uuid, websocket)

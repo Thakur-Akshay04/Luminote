@@ -49,13 +49,17 @@ class ConnectionManager:
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
 
-    async def broadcast_to_user(self, user_id: uuid.UUID, message: dict):
-        if user_id in self.active_connections:
+    async def broadcast_to_user(self, user_id: uuid.UUID, message: dict) -> bool:
+        if user_id in self.active_connections and self.active_connections[user_id]:
+            sent = False
             for connection in self.active_connections[user_id]:
                 try:
                     await connection.send_json(message)
+                    sent = True
                 except Exception:
                     pass
+            return sent
+        return False
 
 
 async def check_alerts_loop(manager: ConnectionManager):
@@ -73,6 +77,7 @@ async def check_alerts_loop(manager: ConnectionManager):
                 result = await db.execute(stmt)
                 due_rows = result.all()
 
+                notified_count = 0
                 for row in due_rows:
                     alert, note_title = row
                     payload = {
@@ -83,10 +88,12 @@ async def check_alerts_loop(manager: ConnectionManager):
                         "note_title": note_title,
                         "alert_time": alert.alert_time.isoformat(),
                     }
-                    await manager.broadcast_to_user(alert.user_id, payload)
-                    alert.is_notified = True
+                    sent = await manager.broadcast_to_user(alert.user_id, payload)
+                    if sent:
+                        alert.is_notified = True
+                        notified_count += 1
 
-                if due_rows:
+                if notified_count > 0:
                     await db.commit()
         except Exception as e:
             logger.exception("Error in check_alerts_loop: %s", e)
@@ -127,9 +134,11 @@ app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
 async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    response = _rate_limit_exceeded_handler(request, exc)
-    response.headers["Retry-After"] = "60"
-    return response
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": "Rate limit exceeded. Please slow down."},
+        headers={"Retry-After": "60"}
+    )
 
 
 # ── Middleware Security Pipeline (strict execution order) ───────────────────
