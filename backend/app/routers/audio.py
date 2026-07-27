@@ -32,7 +32,9 @@ MAX_AUDIO_SIZE = 10 * 1024 * 1024
 ALLOWED_AUDIO_TYPES = {
     "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
     "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
-    "video/webm",  # some browsers report webm audio as video/webm
+    "video/webm", "video/x-matroska", "audio/x-matroska",
+    "application/octet-stream", "audio/opus", "audio/aac",
+    "audio/x-m4a", "audio/m4a", "video/mp4"
 }
 
 

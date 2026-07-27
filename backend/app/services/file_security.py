@@ -7,7 +7,9 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_AUDIO_TYPES = {
     "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
     "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
-    "video/webm"
+    "video/webm", "video/x-matroska", "audio/x-matroska",
+    "application/octet-stream", "audio/opus", "audio/aac",
+    "audio/x-m4a", "audio/m4a", "video/mp4"
 }
 
 
