@@ -143,30 +143,12 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # ── Middleware Security Pipeline (strict execution order) ───────────────────
 
-# 1. CORS Middleware — explicit origin whitelist
-allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://luminote.yourdomain.com",
-]
-if settings.frontend_url and settings.frontend_url not in allowed_origins:
-    allowed_origins.append(settings.frontend_url)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 2. HTTPS Redirect Middleware (production only)
+# 1. HTTPS Redirect Middleware (production only)
 if os.getenv("ENV") == "production":
     app.add_middleware(HTTPSRedirectMiddleware)
 
 
-# 3. Request Size Limit Middleware (DDoS protection — reject > 10MB)
+# 2. Request Size Limit Middleware (DDoS protection — reject > 10MB)
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
@@ -177,7 +159,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestSizeLimitMiddleware)
 
 
-# 4. HTTP Security Headers Middleware (HSTS, nosniff, frame protection)
+# 3. HTTP Security Headers Middleware (HSTS, nosniff, frame protection)
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -193,7 +175,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
-# 5. Timeout Middleware (30s global request timeout protection)
+# 4. Timeout Middleware (30s global request timeout protection)
 class TimeoutMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
@@ -207,7 +189,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 app.add_middleware(TimeoutMiddleware)
 
 
-# 6. IP Throttling Middleware (200 requests/min connection ceiling via Redis)
+# 5. IP Throttling Middleware (200 requests/min connection ceiling via Redis)
 class ConnectionThrottlingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Exclude static files and health checks from heavy IP throttling
@@ -235,7 +217,7 @@ class ConnectionThrottlingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(ConnectionThrottlingMiddleware)
 
 
-# 7. Request Logging & Audit Middleware (Scrubs authorization/tokens/passwords/keys)
+# 6. Request Logging & Audit Middleware (Scrubs authorization/tokens/passwords/keys)
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request_id = str(uuid.uuid4())[:8]
@@ -252,6 +234,25 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(RequestLoggingMiddleware)
+
+
+# 7. CORS Middleware (Added last so it is the outermost middleware on incoming requests)
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://luminote.yourdomain.com",
+]
+if settings.frontend_url and settings.frontend_url not in allowed_origins:
+    allowed_origins.append(settings.frontend_url)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── Global Exception Handlers (Prevent raw database error disclosure) ─────
