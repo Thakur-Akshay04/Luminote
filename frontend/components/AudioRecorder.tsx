@@ -13,6 +13,35 @@ interface AudioRecorderProps {
   onSaveBeforeAction?: () => Promise<string>;
 }
 
+function getSupportedMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/aac",
+    "audio/wav",
+  ];
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) {
+      return t;
+    }
+  }
+  return "";
+}
+
+function formatAudioUrl(url: string | null, base: string): string | null {
+  if (!url) return null;
+  let fullUrl = url;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    const cleanBase = base.replace(/\/+$/, "");
+    const cleanPath = url.startsWith("/") ? url : `/${url}`;
+    fullUrl = `${cleanBase}${cleanPath}`;
+  }
+  return fullUrl.includes("?") ? `${fullUrl}&t=${Date.now()}` : `${fullUrl}?t=${Date.now()}`;
+}
+
 export default function AudioRecorder({
   noteId,
   mediaUrl,
@@ -44,24 +73,6 @@ export default function AudioRecorder({
     };
   }, []);
 
-function getSupportedAudioMimeType(): string {
-  if (typeof MediaRecorder === "undefined") return "";
-  const candidateTypes = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/ogg;codecs=opus",
-    "audio/ogg",
-    "audio/wav",
-  ];
-  for (const t of candidateTypes) {
-    if (MediaRecorder.isTypeSupported(t)) {
-      return t;
-    }
-  }
-  return "";
-}
-
   const startRecording = async () => {
     setError(null);
     audioChunksRef.current = [];
@@ -71,9 +82,9 @@ function getSupportedAudioMimeType(): string {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const mimeType = getSupportedAudioMimeType();
+      const mimeType = getSupportedMimeType();
       const options = mimeType ? { mimeType } : undefined;
-
+      
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
@@ -84,21 +95,23 @@ function getSupportedAudioMimeType(): string {
       };
 
       mediaRecorder.onstop = async () => {
+        // Stop audio tracks after recorder has finished receiving data
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
 
-        const blobType = mediaRecorder.mimeType || mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
-        if (audioBlob.size > 0) {
-          await handleUpload(audioBlob);
-        } else {
-          setError("Recorded audio was empty. Please try recording again.");
+        if (audioChunksRef.current.length === 0) {
+          setError("No audio data recorded. Please try again.");
+          return;
         }
+
+        const recordingMime = mediaRecorder.mimeType || mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: recordingMime });
+        await handleUpload(audioBlob, recordingMime);
       };
 
-      mediaRecorder.start(250); // Slice every 250ms
+      mediaRecorder.start(250); // Slice data every 250ms
       setIsRecording(true);
 
       timerRef.current = setInterval(() => {
@@ -116,29 +129,36 @@ function getSupportedAudioMimeType(): string {
 
   const stopRecording = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
-
+    
+    setIsRecording(false);
+    
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    setIsRecording(false);
     if (mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch (e) {
+        console.warn("requestData warning:", e);
+      }
       mediaRecorderRef.current.stop();
     }
   };
 
-  const handleUpload = async (audioBlob: Blob) => {
+  const handleUpload = async (audioBlob: Blob, mimeType?: string) => {
     setLoading(true);
     setError(null);
     try {
       let activeId = noteId;
-      if ((noteId === "new" || !noteId) && onSaveBeforeAction) {
+      if (noteId === "new" && onSaveBeforeAction) {
         activeId = await onSaveBeforeAction();
       }
-      const res = await notesApi.uploadAudio(activeId, audioBlob);
+      const ext = mimeType?.includes("mp4") ? "mp4" : mimeType?.includes("ogg") ? "ogg" : mimeType?.includes("wav") ? "wav" : "webm";
+      const filename = `recording.${ext}`;
+      const res = await notesApi.uploadAudio(activeId, audioBlob, filename);
       onMediaUrlUpdate(res.data.media_url);
-      await handleTranscribeForId(activeId, false);
     } catch (err: any) {
       console.error("Audio upload error:", err);
       setError(
@@ -149,11 +169,15 @@ function getSupportedAudioMimeType(): string {
     }
   };
 
-  const handleTranscribeForId = async (targetNoteId: string, force: boolean = false) => {
+  const handleTranscribe = async (force: boolean = false) => {
     setTranscribing(true);
     setError(null);
     try {
-      const res = await notesApi.transcribeAudio(targetNoteId, force);
+      let activeId = noteId;
+      if (noteId === "new" && onSaveBeforeAction) {
+        activeId = await onSaveBeforeAction();
+      }
+      const res = await notesApi.transcribeAudio(activeId, force);
       onTranscriptUpdate(res.data.transcript);
     } catch (err: any) {
       console.error("Audio transcription error:", err);
@@ -163,14 +187,6 @@ function getSupportedAudioMimeType(): string {
     } finally {
       setTranscribing(false);
     }
-  };
-
-  const handleTranscribe = async (force: boolean = false) => {
-    let activeId = noteId;
-    if ((noteId === "new" || !noteId) && onSaveBeforeAction) {
-      activeId = await onSaveBeforeAction();
-    }
-    await handleTranscribeForId(activeId, force);
   };
 
   const copyToClipboard = () => {
@@ -187,7 +203,7 @@ function getSupportedAudioMimeType(): string {
   };
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const audioUrl = mediaUrl ? `${baseUrl}${mediaUrl}?t=${Date.now()}` : null;
+  const audioUrl = formatAudioUrl(mediaUrl, baseUrl);
 
   return (
     <div className="flex flex-col gap-4">

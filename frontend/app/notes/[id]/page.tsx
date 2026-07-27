@@ -1988,7 +1988,9 @@ function NoteEditorContent() {
                       transcript={note?.transcript || null}
                       onTranscriptUpdate={handleTranscriptUpdate}
                       onMediaUrlUpdate={(newUrl) => {
-                        setNote((prev) => (prev ? { ...prev, media_url: newUrl } : prev));
+                        if (note) {
+                          setNote({ ...note, media_url: newUrl });
+                        }
                       }}
                       onSaveBeforeAction={ensureNoteSaved}
                     />

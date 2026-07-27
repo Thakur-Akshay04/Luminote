@@ -126,9 +126,9 @@ export const notesApi = {
     api.delete<DrawingResponse>(`/notes/${id}/drawing/version/${version}`),
 
   // Audio Recording & Transcription
-  uploadAudio: (id: string, audioBlob: Blob) => {
+  uploadAudio: (id: string, audioBlob: Blob, filename: string = "recording.webm") => {
     const formData = new FormData();
-    formData.append("file", audioBlob, "recording.mp3");
+    formData.append("file", audioBlob, filename);
     return api.post<AudioUploadResponse>(`/notes/${id}/audio`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
