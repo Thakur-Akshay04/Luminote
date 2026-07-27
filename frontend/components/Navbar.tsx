@@ -142,6 +142,19 @@ function NavbarContent() {
     }
   };
 
+  const handleClearAllAlerts = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await alertsApi.clearAll();
+      setAlerts([]);
+      setReadAlertIds([]);
+      localStorage.removeItem("read_alerts");
+    } catch {
+      alert("Failed to clear notifications.");
+    }
+  };
+
   const hasUnread = alerts.some((a) => !readAlertIds.includes(a.id));
 
   useEffect(() => {
@@ -413,13 +426,27 @@ function NavbarContent() {
             <div className="absolute bottom-full left-0 mb-3 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
               <div className="flex items-center justify-between border-b border-border-muted pb-2">
                 <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
-                <button
-                  type="button"
-                  onClick={() => setNotificationsOpen(false)}
-                  className="p-1 hover:bg-surface-strong rounded text-neutral-500 hover:text-white transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {alerts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllAlerts}
+                      className="text-[11px] font-medium text-neutral-400 hover:text-red-400 hover:bg-red-950/20 px-2 py-0.5 rounded transition-colors flex items-center gap-1"
+                      title="Permanently delete all notifications"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Clear all</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="p-1 hover:bg-surface-strong rounded text-neutral-500 hover:text-white transition-colors"
+                    title="Close"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-0.5">

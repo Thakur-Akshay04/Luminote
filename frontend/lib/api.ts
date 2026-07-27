@@ -158,6 +158,7 @@ export const alertsApi = {
   create: (data: { note_id: string; title: string; alert_time: string }) =>
     api.post<Alert>("/alerts", data),
   delete: (id: string) => api.delete(`/alerts/${id}`),
+  clearAll: () => api.delete("/alerts"),
 };
 
 // ── Search ────────────────────────────────────────────────────────────────────

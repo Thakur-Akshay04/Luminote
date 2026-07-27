@@ -81,6 +81,17 @@ async def remove(
     await db.commit()
 
 
+@router.delete("", status_code=204)
+async def clear_all(
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    stmt = delete(Alert).where(Alert.user_id == uuid.UUID(user_id))
+    await db.execute(stmt)
+    await db.commit()
+
+
+
 @router.websocket("/ws")
 async def websocket_alerts(
     websocket: WebSocket,
