@@ -32,9 +32,9 @@ MAX_AUDIO_SIZE = 10 * 1024 * 1024
 ALLOWED_AUDIO_TYPES = {
     "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
     "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
-    "video/webm", "video/x-matroska", "audio/x-matroska",
-    "application/octet-stream", "audio/opus", "audio/aac",
-    "audio/x-m4a", "audio/m4a", "video/mp4"
+    "audio/aac", "audio/m4a", "audio/x-m4a", "audio/x-matroska",
+    "video/webm", "video/mp4", "video/x-matroska",
+    "application/octet-stream", "application/x-matroska",
 }
 
 

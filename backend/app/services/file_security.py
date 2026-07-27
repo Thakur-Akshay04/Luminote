@@ -7,9 +7,9 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_AUDIO_TYPES = {
     "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
     "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
-    "video/webm", "video/x-matroska", "audio/x-matroska",
-    "application/octet-stream", "audio/opus", "audio/aac",
-    "audio/x-m4a", "audio/m4a", "video/mp4"
+    "audio/aac", "audio/m4a", "audio/x-m4a", "audio/x-matroska",
+    "video/webm", "video/mp4", "video/x-matroska",
+    "application/octet-stream", "application/x-matroska",
 }
 
 
@@ -34,7 +34,15 @@ async def validate_file(file: UploadFile, allowed_types: set, max_size: int = MA
 
     # Validate MIME type from file content
     mime = magic.from_buffer(contents, mime=True)
-    if mime not in allowed_types:
+    is_audio_allowed = (
+        mime in allowed_types or
+        (allowed_types == ALLOWED_AUDIO_TYPES and (
+            mime.startswith("audio/") or
+            mime.startswith("video/") or
+            mime in {"application/octet-stream", "application/x-matroska"}
+        ))
+    )
+    if not is_audio_allowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid file type: {mime}"
