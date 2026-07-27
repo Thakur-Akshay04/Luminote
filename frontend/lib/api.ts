@@ -159,6 +159,7 @@ export const alertsApi = {
     api.post<Alert>("/alerts", data),
   delete: (id: string) => api.delete(`/alerts/${id}`),
   clearAll: () => api.delete("/alerts"),
+  markNotified: (id: string) => api.patch<{ status: string }>(`/alerts/${id}/notified`),
 };
 
 // ── Search ────────────────────────────────────────────────────────────────────

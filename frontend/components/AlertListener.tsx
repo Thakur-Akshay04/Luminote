@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Bell, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { alertsApi } from "@/lib/api";
 
 interface ToastAlert {
   id: string;
@@ -24,10 +25,10 @@ function playChime(audioCtx: AudioContext) {
   osc1.type = "triangle";
   osc1.frequency.setValueAtTime(523.25, startTime);
   gain1.gain.setValueAtTime(0, startTime);
-  gain1.gain.linearRampToValueAtTime(0.08, startTime + 0.04);
-  gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.4);
+  gain1.gain.linearRampToValueAtTime(0.12, startTime + 0.04);
+  gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.45);
   osc1.start(startTime);
-  osc1.stop(startTime + 0.45);
+  osc1.stop(startTime + 0.5);
 
   // Second note: E5 (659.25 Hz)
   const osc2 = audioCtx.createOscillator();
@@ -35,30 +36,36 @@ function playChime(audioCtx: AudioContext) {
   osc2.connect(gain2);
   gain2.connect(audioCtx.destination);
   osc2.type = "sine";
-  osc2.frequency.setValueAtTime(659.25, startTime + 0.1);
-  gain2.gain.setValueAtTime(0, startTime + 0.1);
-  gain2.gain.linearRampToValueAtTime(0.08, startTime + 0.14);
-  gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.65);
-  osc2.start(startTime + 0.1);
-  osc2.stop(startTime + 0.7);
+  osc2.frequency.setValueAtTime(659.25, startTime + 0.12);
+  gain2.gain.setValueAtTime(0, startTime + 0.12);
+  gain2.gain.linearRampToValueAtTime(0.12, startTime + 0.16);
+  gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.7);
+  osc2.start(startTime + 0.12);
+  osc2.stop(startTime + 0.75);
 }
 
-function startNotificationChime(
+async function startNotificationChime(
   alertId: string,
   activeAudios: React.MutableRefObject<{ [id: string]: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number } }>
 ) {
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     const audioCtx = new AudioContextClass();
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume().catch(() => {});
+    }
     playChime(audioCtx);
 
     let playCount = 1;
-    const intervalId = setInterval(() => {
-      if (playCount >= 5) {
+    const intervalId = setInterval(async () => {
+      if (playCount >= 9) {
         clearInterval(intervalId);
         audioCtx.close().catch(() => {});
         delete activeAudios.current[alertId];
       } else {
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume().catch(() => {});
+        }
         playChime(audioCtx);
         playCount++;
       }
@@ -95,8 +102,36 @@ export default function AlertListener() {
   const [toasts, setToasts] = useState<ToastAlert[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeAudios = useRef<{ [id: string]: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number } }>({});
   const connectingRef = useRef(false);
+  const notifiedAlertIdsRef = useRef<Set<string>>(new Set());
+
+  // Unlock AudioContext on first user interaction anywhere on page
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          const dummyCtx = new AudioContextClass();
+          if (dummyCtx.state === "suspended") {
+            dummyCtx.resume().catch(() => {});
+          }
+          setTimeout(() => dummyCtx.close().catch(() => {}), 100);
+        }
+      } catch {}
+    };
+
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+    };
+  }, []);
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -108,88 +143,129 @@ export default function AlertListener() {
     }
   };
 
-  const connectWebSocket = async () => {
+  const triggerAlertNotification = useCallback((data: any) => {
+    const alertId = data.id;
+    if (notifiedAlertIdsRef.current.has(alertId)) return;
+    notifiedAlertIdsRef.current.add(alertId);
+
+    const newAlert = buildToastAlert(data);
+    startNotificationChime(newAlert.id, activeAudios);
+
+    setToasts((prev) => addUniqueToast(prev, newAlert));
+
+    // Auto-remove toast after 22 seconds (extended by 10s)
+    setTimeout(() => {
+      removeToast(newAlert.id);
+    }, 22000);
+  }, []);
+
+  const connectWebSocket = useCallback(async () => {
     if (wsRef.current || connectingRef.current || !isSignedIn) return;
 
     connectingRef.current = true;
     try {
-      const token = await getToken({ skipCache: true });
-      if (!token) return;
+      let token: string | null = null;
+      try {
+        token = await getToken({ skipCache: true });
+      } catch {}
 
-      // Double-check flags in case they changed during token fetch
+      if (!token && typeof window !== "undefined" && (window as any).Clerk?.session) {
+        try {
+          token = await (window as any).Clerk.session.getToken();
+        } catch {}
+      }
+
+      if (!token) {
+        // Retry connection in 3s if token isn't ready yet
+        connectingRef.current = false;
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+        return;
+      }
+
       if (wsRef.current || !isSignedIn) return;
 
-      // Convert http(s) API URL to ws(s)
       const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const wsBase = baseApiUrl.replace(/^http/, "ws");
       const wsUrl = `${wsBase}/alerts/ws?token=${token}`;
 
-      console.log("Connecting to Alerts WebSocket:", wsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("Alerts WebSocket connected.");
+        // Heartbeat ping every 25s to prevent disconnection
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "ping" }));
+          }
+        }, 25000);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type !== "alert") return;
-
-          const newAlert = buildToastAlert(data);
-          startNotificationChime(newAlert.id, activeAudios);
-
-          setToasts((prev) => addUniqueToast(prev, newAlert));
-
-          // Auto-remove toast after 10 seconds
-          setTimeout(() => {
-            removeToast(newAlert.id);
-          }, 10000);
+          triggerAlertNotification(data);
         } catch (err) {
           console.error("Error parsing WebSocket message:", err);
         }
       };
 
-      ws.onclose = (event) => {
-        console.log(`Alerts WebSocket closed (code: ${event.code}, reason: ${event.reason || "none"}). Reconnecting in 5 seconds...`);
+      ws.onclose = () => {
         wsRef.current = null;
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 4000);
       };
 
-      ws.onerror = (err) => {
-        console.warn("Alerts WebSocket error:", err);
+      ws.onerror = () => {
         ws.close();
       };
-    } catch (err) {
-      console.error("Error setting up WebSocket:", err);
+    } catch {
+      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 4000);
     } finally {
       connectingRef.current = false;
     }
-  };
+  }, [getToken, isSignedIn, triggerAlertNotification]);
+
+  // HTTP Fallback Polling (polls every 8s to guarantee delivery if WS drops)
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const checkDueAlertsFallback = async () => {
+      try {
+        const res = await alertsApi.list();
+        const now = Date.now();
+        for (const alert of res.data) {
+          const alertTimeMs = new Date(alert.alert_time).getTime();
+          if (!alert.is_notified && alertTimeMs <= now + 2000) {
+            triggerAlertNotification(alert);
+            alertsApi.markNotified(alert.id).catch(() => {});
+          }
+        }
+      } catch {}
+    };
+
+    checkDueAlertsFallback();
+    const fallbackInterval = setInterval(checkDueAlertsFallback, 8000);
+
+    return () => clearInterval(fallbackInterval);
+  }, [isSignedIn, triggerAlertNotification]);
 
   useEffect(() => {
-    // Start connection if authenticated
     if (isSignedIn) {
       connectWebSocket();
     }
 
     return () => {
       if (wsRef.current) {
-        // Remove close listener to prevent loop reconnections during unmount
         wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      // Stop and clean up any playing audios on unmount
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       Object.values(activeAudios.current).forEach(stopAudio);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn]);
-
+  }, [isSignedIn, connectWebSocket]);
 
   if (toasts.length === 0) return null;
 
