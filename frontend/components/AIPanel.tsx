@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import DOMPurify from "dompurify";
+
 
 interface AIPanelProps {
   note: Note;
@@ -432,8 +434,9 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                         : "bg-white/[0.03] border border-white/[0.06] text-gray-200 rounded-tl-none shadow-sm"
                     }`}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {msg.content}
+                        {DOMPurify.sanitize(msg.content)}
                       </ReactMarkdown>
+
 
                       {/* Message actions for AI replies */}
                       {!isUser && (

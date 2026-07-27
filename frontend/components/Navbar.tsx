@@ -51,7 +51,8 @@ function NavbarContent() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string>("showcase");
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
 
   const navRef = useRef<HTMLDivElement>(null);
@@ -62,51 +63,80 @@ function NavbarContent() {
   useEffect(() => {
     if (isSignedIn) return;
 
-    const sections = ["showcase", "features", "security"];
-    const observerOptions = {
-      root: null,
-      rootMargin: "-40% 0px -50% 0px",
-      threshold: 0,
+    const handleScroll = () => {
+      const showcaseEl = document.getElementById("showcase");
+      const featuresEl = document.getElementById("features");
+      const securityEl = document.getElementById("security");
+
+      if (!showcaseEl || !featuresEl || !securityEl) return;
+
+      const viewportHeight = window.innerHeight;
+      const scrollY = window.scrollY;
+      const scrollBottom = scrollY + viewportHeight;
+      const docHeight = document.documentElement.scrollHeight;
+
+      // If scrolled near bottom of page (within 100px of bottom), security is active
+      if (scrollBottom >= docHeight - 100) {
+        setActiveSection("security");
+        return;
+      }
+
+      // Check element bounding boxes relative to viewport
+      const featuresRect = featuresEl.getBoundingClientRect();
+      const securityRect = securityEl.getBoundingClientRect();
+
+      const triggerPoint = viewportHeight * 0.45;
+
+      if (securityRect.top <= triggerPoint) {
+        setActiveSection("security");
+      } else if (featuresRect.top <= triggerPoint) {
+        setActiveSection("features");
+      } else {
+        setActiveSection("showcase");
+      }
     };
 
-    const observerCallback: IntersectionObserverCallback = (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
-        }
-      });
-    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
 
-    const observer = new IntersectionObserver(observerCallback, observerOptions);
-
-    sections.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [isSignedIn]);
 
   useEffect(() => {
     if (isSignedIn) return;
 
+    const currentSection = hoveredSection !== null ? hoveredSection : activeSection;
     let targetRef: React.RefObject<HTMLAnchorElement | null> | null = null;
-    if (activeSection === "showcase") targetRef = showcaseRef;
-    else if (activeSection === "features") targetRef = featuresRef;
-    else if (activeSection === "security") targetRef = securityRef;
 
-    if (targetRef?.current && navRef.current) {
-      const navRect = navRef.current.getBoundingClientRect();
-      const targetRect = targetRef.current.getBoundingClientRect();
-      setPillStyle({
-        left: targetRect.left - navRect.left,
-        width: targetRect.width,
-        opacity: 1,
-      });
-    } else {
-      setPillStyle((prev) => ({ ...prev, opacity: 0 }));
-    }
-  }, [activeSection, isSignedIn]);
+    if (currentSection === "showcase") targetRef = showcaseRef;
+    else if (currentSection === "features") targetRef = featuresRef;
+    else if (currentSection === "security") targetRef = securityRef;
+
+    const updatePill = () => {
+      if (targetRef?.current && navRef.current) {
+        const navRect = navRef.current.getBoundingClientRect();
+        const targetRect = targetRef.current.getBoundingClientRect();
+        setPillStyle({
+          left: targetRect.left - navRect.left,
+          width: targetRect.width,
+          opacity: 1,
+        });
+      } else {
+        setPillStyle((prev) => ({ ...prev, opacity: 0 }));
+      }
+    };
+
+    updatePill();
+    const timer = setTimeout(updatePill, 50);
+    window.addEventListener("resize", updatePill);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updatePill);
+    };
+  }, [activeSection, hoveredSection, isSignedIn]);
+
+
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -210,14 +240,19 @@ function NavbarContent() {
           </Link>
 
           {/* Landing Navigation Links */}
-          <nav className="hidden md:flex items-center gap-2 relative" ref={navRef}>
+          <nav
+            className="hidden md:flex items-center gap-1 p-1 bg-[#0c0c0e]/80 border border-white/[0.08] rounded-full backdrop-blur-xl relative shadow-lg shadow-black/50"
+            ref={navRef}
+            onMouseLeave={() => setHoveredSection(null)}
+          >
+            {/* Animated Capsule Pill */}
             <div
-              className="absolute bg-white/[0.06] border border-white/[0.05] rounded-full transition-all duration-300 ease-out pointer-events-none"
+              className="absolute bg-white/[0.12] border border-white/20 rounded-full backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.12)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
               style={{
                 left: `${pillStyle.left}px`,
                 width: `${pillStyle.width}px`,
                 opacity: pillStyle.opacity,
-                height: "30px",
+                height: "32px",
                 top: "50%",
                 transform: "translateY(-50%)",
               }}
@@ -225,9 +260,17 @@ function NavbarContent() {
             <a
               href="#showcase"
               ref={showcaseRef}
+              onMouseEnter={() => setHoveredSection("showcase")}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveSection("showcase");
+                document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth" });
+              }}
               className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
-                activeSection === "showcase" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
+                (hoveredSection || activeSection) === "showcase"
+                  ? "text-white font-bold tracking-wide"
+                  : "text-neutral-400 hover:text-white"
               )}
             >
               Showcase
@@ -235,9 +278,17 @@ function NavbarContent() {
             <a
               href="#features"
               ref={featuresRef}
+              onMouseEnter={() => setHoveredSection("features")}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveSection("features");
+                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+              }}
               className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
-                activeSection === "features" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
+                (hoveredSection || activeSection) === "features"
+                  ? "text-white font-bold tracking-wide"
+                  : "text-neutral-400 hover:text-white"
               )}
             >
               Features
@@ -245,14 +296,23 @@ function NavbarContent() {
             <a
               href="#security"
               ref={securityRef}
+              onMouseEnter={() => setHoveredSection("security")}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveSection("security");
+                document.getElementById("security")?.scrollIntoView({ behavior: "smooth" });
+              }}
               className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10",
-                activeSection === "security" ? "text-white font-semibold" : "text-neutral-400 hover:text-white"
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
+                (hoveredSection || activeSection) === "security"
+                  ? "text-white font-bold tracking-wide"
+                  : "text-neutral-400 hover:text-white"
               )}
             >
               Security
             </a>
           </nav>
+
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
