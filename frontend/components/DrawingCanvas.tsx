@@ -86,6 +86,97 @@ function isMatchingPixel(
 }
 
 
+function formatMediaUrl(url: string | null | undefined, base: string): string {
+  if (!url) return "";
+  let fullUrl = url;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    const cleanBase = base.replace(/\/+$/, "");
+    const cleanPath = url.startsWith("/") ? url : `/${url}`;
+    fullUrl = `${cleanBase}${cleanPath}`;
+  }
+  return fullUrl.includes("?") ? `${fullUrl}&t=${Date.now()}` : `${fullUrl}?t=${Date.now()}`;
+}
+
+function VersionThumbnail({
+  versionUrl,
+  versionNum,
+  baseUrl,
+}: {
+  versionUrl: string;
+  versionNum: number;
+  baseUrl: string;
+}) {
+  const [src, setSrc] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    let createdObjUrl = "";
+
+    async function loadThumbnail() {
+      if (!versionUrl) return;
+      setLoading(true);
+      setHasError(false);
+
+      const targetUrl = formatMediaUrl(versionUrl, baseUrl);
+
+      try {
+        const res = await fetch(targetUrl, { mode: "cors", cache: "no-cache" });
+        if (res.ok && isMounted) {
+          const blob = await res.blob();
+          createdObjUrl = URL.createObjectURL(blob);
+          setSrc(createdObjUrl);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Fallback to direct URL if blob fetch fails
+      }
+
+      if (isMounted) {
+        setSrc(targetUrl);
+        setLoading(false);
+      }
+    }
+
+    loadThumbnail();
+
+    return () => {
+      isMounted = false;
+      if (createdObjUrl) {
+        URL.revokeObjectURL(createdObjUrl);
+      }
+    };
+  }, [versionUrl, baseUrl]);
+
+  if (hasError) {
+    return (
+      <div className="w-full h-full bg-[#18181b] flex flex-col items-center justify-center p-2 text-neutral-500">
+        <Palette className="w-4 h-4 opacity-40 mb-1 text-purple-400" />
+        <span className="text-[9px] font-semibold text-neutral-400">V{versionNum}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative bg-[#18181b]">
+      {loading ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-500" />
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={`Version ${versionNum}`}
+          onError={() => setHasError(true)}
+          className="w-full h-full object-cover bg-[#18181b] transition-opacity duration-300"
+        />
+      )}
+    </div>
+  );
+}
+
 export interface DrawingCanvasRef {
   save: (overrideNoteId?: string) => Promise<void>;
 }
@@ -1226,10 +1317,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                       }
                     }}
                   >
-                    <img
-                      src={`${baseUrl}${versionUrl}?t=${Date.now()}`}
-                      alt={`Version ${versionNum}`}
-                      className="w-full h-full object-cover bg-[#18181b]"
+                    <VersionThumbnail
+                      versionUrl={versionUrl}
+                      versionNum={versionNum}
+                      baseUrl={baseUrl}
                     />
                     <div className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1 flex justify-between items-center text-[10px] text-gray-300">
                       <span className="font-semibold">V{versionNum}</span>
