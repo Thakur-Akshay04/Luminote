@@ -41,14 +41,24 @@ export default function ConfirmModal({
 
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
       onClick={() => {
         if (!loading) onCancel();
       }}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !loading) {
+          onCancel();
+        }
+      }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
         className="w-full max-w-[420px] bg-[#0f0f12]/95 border border-white/[0.08] rounded-2xl p-6 shadow-2xl shadow-black/80 flex flex-col gap-6 animate-scale-in relative overflow-hidden select-none"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Subtle Ambient Accent Header Line */}
         <div
@@ -74,7 +84,7 @@ export default function ConfirmModal({
           </div>
 
           <div className="flex-1 min-w-0 pr-6">
-            <h3 className="text-base font-bold text-white tracking-tight">{title}</h3>
+            <h3 id="confirm-modal-title" className="text-base font-bold text-white tracking-tight">{title}</h3>
             <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{message}</p>
           </div>
 
