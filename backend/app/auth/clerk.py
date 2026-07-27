@@ -110,6 +110,8 @@ async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -
     return user
 
 
+import time
+
 async def verify_token(token: str, db: AsyncSession) -> str:
     jwks = await get_jwks()
 
@@ -119,6 +121,21 @@ async def verify_token(token: str, db: AsyncSession) -> str:
         algorithms=["RS256"],
         options={"verify_aud": False}
     )
+
+    now = time.time()
+    exp = payload.get("exp", 0)
+    if exp and exp < now:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired"
+        )
+
+    iat = payload.get("iat", 0)
+    if iat and (now - iat > 3600):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired"
+        )
 
     clerk_user_id = payload.get("sub")
     if not clerk_user_id:
@@ -138,9 +155,18 @@ async def get_current_user(
     token = credentials.credentials
     try:
         return await verify_token(token, db)
-    except JWTError as e:
-        logger.warning(f"Clerk JWT verification error: {e}")
+    except HTTPException:
+        raise
+    except JWTError:
+        logger.warning("Clerk JWT verification failed due to invalid token structure or signature")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token — please sign in again"
         )
+    except Exception:
+        logger.warning("Clerk JWT verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token — please sign in again"
+        )
+

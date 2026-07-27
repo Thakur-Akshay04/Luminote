@@ -1,19 +1,22 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
 from app.auth.clerk import get_current_user
 from app.models.user import User
+from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.delete("/account", status_code=204, responses={404: {"description": "User not found"}})
+@limiter.limit("5/minute")
 async def delete_account(
+    request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):

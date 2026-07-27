@@ -5,11 +5,20 @@ from typing import Any, Optional
 from pydantic import BaseModel, field_validator
 
 
+import bleach
+
 class ChecklistItem(BaseModel):
     """Single checklist item — validates id, text, checked fields."""
     id: str
     text: str
     checked: bool
+
+    @field_validator("text")
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
+        if v:
+            return bleach.clean(v, tags=[], strip=True)
+        return v
 
 
 class NoteCreate(BaseModel):
@@ -21,6 +30,23 @@ class NoteCreate(BaseModel):
     summary_format: Optional[str] = "paragraph"
     extract_alerts: Optional[bool] = True
 
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            return bleach.clean(v, tags=[], strip=True)
+        return v
+
+    @field_validator("note_type")
+    @classmethod
+    def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"text", "checklist", "drawing", "audio"}
+        if v not in allowed:
+            raise ValueError(f"note_type must be one of {allowed}")
+        return v
+
 
 class NoteUpdate(BaseModel):
     title: Optional[str] = None
@@ -31,6 +57,23 @@ class NoteUpdate(BaseModel):
     is_favorite: Optional[bool] = None
     summary_format: Optional[str] = None
     extract_alerts: Optional[bool] = None
+
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            return bleach.clean(v, tags=[], strip=True)
+        return v
+
+    @field_validator("note_type")
+    @classmethod
+    def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"text", "checklist", "drawing", "audio"}
+        if v not in allowed:
+            raise ValueError(f"note_type must be one of {allowed}")
+        return v
 
     @field_validator("checklist_items", mode="before")
     @classmethod
@@ -47,6 +90,7 @@ class NoteUpdate(BaseModel):
                 if field not in item:
                     raise ValueError(f"Item at index {i} missing required field: {field}")
         return v
+
 
 
 class NoteResponse(BaseModel):

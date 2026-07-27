@@ -7,11 +7,27 @@ import json
 import logging
 import uuid
 
+import asyncio
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from app.config import settings
 from app.groq_client import client
 from app.services.ai_service import _extract_json_content
 
 logger = logging.getLogger(__name__)
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=8), reraise=True)
+async def _extract_tasks_call(messages: list, temperature: float = 0.2, max_tokens: int = 2048):
+    return await asyncio.wait_for(
+        client.chat.completions.create(
+            model=settings.groq_task_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ),
+        timeout=20.0
+    )
 
 
 async def extract_tasks(content: str) -> list[dict]:
@@ -29,15 +45,11 @@ async def extract_tasks(content: str) -> list[dict]:
     )
 
     try:
-        response = await client.chat.completions.create(
-            model=settings.groq_task_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content[:6000]},
-            ],
-            temperature=0.2,
-            max_tokens=2048,
-        )
+        response = await _extract_tasks_call([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content[:6000]},
+        ])
+
         raw = (response.choices[0].message.content or "").strip()
 
         # Handle reasoning-model <think>...</think> wrapping

@@ -7,13 +7,15 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.clerk import get_current_user
 from app.database import get_db
 from app.services.note_service import get_note
 from app.services.ai_tasks import extract_tasks
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,9 @@ router = APIRouter(prefix="/notes", tags=["tasks"])
 
 
 @router.post("/{note_id}/extract-tasks")
+@limiter.limit("10/minute")
 async def extract_note_tasks(
+    request: Request,
     note_id: uuid.UUID,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -7,7 +7,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,8 @@ from app.auth.clerk import get_current_user
 from app.database import get_db
 from app.redis_client import get_redis
 from app.services.note_service import get_note
+from app.limiter import limiter
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,9 @@ class ToggleRequest(BaseModel):
 
 
 @router.patch("/{note_id}/checklist/{item_index}")
+@limiter.limit("30/minute")
 async def toggle_checklist_item(
+    request: Request,
     note_id: uuid.UUID,
     item_index: int,
     body: ToggleRequest,
@@ -68,9 +72,10 @@ async def toggle_checklist_item(
     })
     await db.commit()
 
-    # Invalidate Redis cache — O(1)
+    # Invalidate Redis cache — user ID scoped
     redis = await get_redis()
-    cache_key = f"checklist:{note_id}"
+    cache_key = f"user:{user_id}:checklist:{note_id}"
     await redis.delete(cache_key)
 
     return {"status": "ok", "index": item_index, "checked": body.checked}
+

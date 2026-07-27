@@ -1,10 +1,13 @@
+import asyncio
 import hashlib
 import json
 import logging
 import re
 from typing import Optional, cast
 
+from fastapi import HTTPException, status
 from groq.types.chat import ChatCompletionMessageParam
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 import httpx
 
@@ -13,6 +16,32 @@ from app.redis_client import get_redis
 from app.groq_client import client, MODEL
 
 logger = logging.getLogger(__name__)
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=8), reraise=True)
+async def call_groq_with_retry(
+    messages: list[ChatCompletionMessageParam],
+    temperature: float = 0.3,
+    max_tokens: int = 1024
+):
+    """Call Groq API with 20 second timeout and exponential backoff retries."""
+    try:
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ),
+            timeout=20.0
+        )
+        return response
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="AI service timed out"
+        )
+
 
 
 def _sha256(text: str) -> str:
@@ -81,12 +110,10 @@ Note content:
 {sanitized_content}"""
 
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
+        response = await call_groq_with_retry(
             messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
             temperature=0.3,
             max_tokens=512,
-            timeout=30,
         )
         raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)
@@ -176,12 +203,10 @@ Answer the user's questions based on the note content. Be concise and accurate. 
     messages.append({"role": "user", "content": sanitized_question})
 
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
+        response = await call_groq_with_retry(
             messages=cast(list[ChatCompletionMessageParam], messages),
             temperature=0.4,
             max_tokens=1024,
-            timeout=30,
         )
         if response.choices and response.choices[0].message.content:
             return response.choices[0].message.content.strip()
@@ -241,12 +266,10 @@ Note content:
 {sanitized_content}"""
 
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
+        response = await call_groq_with_retry(
             messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
             temperature=0.3,
             max_tokens=1024,
-            timeout=30,
         )
         raw = (response.choices[0].message.content or "").strip()
         json_str = _extract_json_content(raw)
@@ -287,14 +310,13 @@ async def execute_ai_action(action: str, text: str, param: Optional[str] = None)
         prompt = f"Rewrite or improve the following text. Respond with only the modified text, no explanations, no quotes, no conversational filler:\n\n{sanitized_text}"
 
     try:
-        response = await client.chat.completions.create(
-            model=MODEL,
+        response = await call_groq_with_retry(
             messages=cast(list[ChatCompletionMessageParam], [{"role": "user", "content": prompt}]),
             temperature=0.3,
             max_tokens=1500,
-            timeout=30,
         )
         return (response.choices[0].message.content or "").strip()
     except Exception as e:
         logger.exception("Error executing AI writing action %s: %s", action, e)
         return "Failed to process text with AI. Please try again."
+

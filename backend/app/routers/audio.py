@@ -46,6 +46,23 @@ class TranscriptResponse(BaseModel):
     transcript: str
 
 
+import asyncio
+from tenacity import retry, stop_after_attempt, wait_exponential
+from app.services.file_security import validate_file, ALLOWED_AUDIO_TYPES, MAX_FILE_SIZE
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=8), reraise=True)
+async def _transcribe_with_retry(audio_bytes: bytes):
+    return await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            file=("recording.mp3", audio_bytes),
+            model=settings.groq_whisper_model,
+            language="en",
+        ),
+        timeout=20.0
+    )
+
+
 @router.post("/{note_id}/audio", response_model=AudioUploadResponse, status_code=200)
 async def upload_audio(
     note_id: uuid.UUID,
@@ -56,6 +73,7 @@ async def upload_audio(
     """Upload audio, save directly as .mp3 file, update media_url.
 
     - Validates note exists and belongs to authenticated user.
+    - Validates MIME type from buffer bytes with python-magic.
     - Saves to /media/audio/{note_id}.mp3 — overwrites if exists.
     - Updates media_url in notes table.
     - Invalidates stale transcript cache.
@@ -63,26 +81,8 @@ async def upload_audio(
     # Validate note ownership
     await get_note(note_id, uuid.UUID(user_id), db)
 
-    # Validate file type
-    content_type = file.content_type or ""
-    if content_type not in ALLOWED_AUDIO_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid audio format: {content_type}. Expected audio file."
-        )
-
-    # Read file bytes and validate size
-    audio_bytes = await file.read()
-    if len(audio_bytes) > MAX_AUDIO_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Audio file exceeds 10MB limit"
-        )
-    if len(audio_bytes) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Audio file is empty"
-        )
+    # Validate file size, magic MIME type from content bytes, and sanitize filename
+    audio_bytes, _ = await validate_file(file, ALLOWED_AUDIO_TYPES, max_size=MAX_FILE_SIZE)
 
     # Ensure media directory exists
     os.makedirs(MEDIA_DIR, exist_ok=True)
@@ -100,9 +100,9 @@ async def upload_audio(
     )
     await db.commit()
 
-    # Invalidate stale transcript cache
+    # Invalidate stale user-scoped transcript cache
     redis = await get_redis()
-    cache_key = f"transcript:{note_id}"
+    cache_key = f"user:{user_id}:transcript:{note_id}"
     await redis.delete(cache_key)
 
     return AudioUploadResponse(media_url=media_url)
@@ -117,17 +117,17 @@ async def transcribe_audio(
 ):
     """Transcribe already saved .mp3 file for a note via Groq Whisper on-demand.
 
-    - Check Redis cache first.
+    - Check user-scoped Redis cache first.
     - If cache miss, read .mp3 file from disk.
-    - Transcribe using Groq Whisper.
+    - Transcribe using Groq Whisper with retry & timeout.
     - Save transcript to DB and cache.
     """
     # Validate note ownership
     note = await get_note(note_id, uuid.UUID(user_id), db)
 
-    # Check cache first
+    # Check cache first — user ID scoped
     redis = await get_redis()
-    cache_key = f"transcript:{note_id}"
+    cache_key = f"user:{user_id}:transcript:{note_id}"
     if not force:
         cached_text = await redis.get(cache_key)
         if cached_text:
@@ -153,17 +153,15 @@ async def transcribe_audio(
         logger.exception("Failed to read audio file %s: %s", file_path, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to read audio file from disk"
+            detail="Internal server error"
         )
 
-    # Send to Groq Whisper for transcription
+    # Send to Groq Whisper for transcription with retry & timeout
     try:
-        transcription = await client.audio.transcriptions.create(
-            file=("recording.mp3", audio_bytes),
-            model=settings.groq_whisper_model,
-            language="en",
-        )
+        transcription = await _transcribe_with_retry(audio_bytes)
         transcript_text = transcription.text.strip()
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="AI service timed out")
     except Exception as e:
         logger.exception("Groq Whisper transcription error: %s", e)
         raise HTTPException(
@@ -177,7 +175,8 @@ async def transcribe_audio(
     )
     await db.commit()
 
-    # Populate cache
+    # Populate user-scoped cache
     await redis.setex(cache_key, settings.media_cache_ttl, transcript_text)
 
     return TranscriptResponse(transcript=transcript_text)
+

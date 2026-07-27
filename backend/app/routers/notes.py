@@ -3,7 +3,7 @@ import json
 from typing import Optional, Annotated
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -18,8 +18,10 @@ from app.services.note_service import (
     update_note,
     sync_ai_alerts,
 )
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
+
 
 
 def extract_text_from_tiptap_json(node) -> str:
@@ -41,7 +43,9 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 
 
 @router.get("", response_model=list[NoteResponse])
+@limiter.limit("30/minute")
 async def list_notes(
+    request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     tag: Optional[str] = None,
@@ -54,7 +58,9 @@ async def list_notes(
 
 
 @router.post("", response_model=NoteResponse, status_code=201)
+@limiter.limit("30/minute")
 async def create(
+    request: Request,
     body: NoteCreate,
     background_tasks: BackgroundTasks,
     user_id: Annotated[str, Depends(get_current_user)],
@@ -75,7 +81,9 @@ async def create(
 
 
 @router.get("/{note_id}", response_model=NoteResponse)
+@limiter.limit("30/minute")
 async def get_one(
+    request: Request,
     note_id: uuid.UUID,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -84,7 +92,9 @@ async def get_one(
 
 
 @router.put("/{note_id}", response_model=NoteResponse)
+@limiter.limit("30/minute")
 async def update(
+    request: Request,
     note_id: uuid.UUID,
     body: NoteUpdate,
     background_tasks: BackgroundTasks,
@@ -103,7 +113,9 @@ async def update(
 
 
 @router.delete("/{note_id}", status_code=204)
+@limiter.limit("30/minute")
 async def remove(
+    request: Request,
     note_id: uuid.UUID,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -112,7 +124,9 @@ async def remove(
 
 
 @router.post("/{note_id}/ask", response_model=AskResponse)
+@limiter.limit("10/minute")
 async def ask(
+    request: Request,
     note_id: uuid.UUID,
     body: AskRequest,
     user_id: Annotated[str, Depends(get_current_user)],
@@ -157,7 +171,9 @@ async def ask(
 
 
 @router.post("/{note_id}/summarize", response_model=SummarizeResponse)
+@limiter.limit("10/minute")
 async def summarize(
+    request: Request,
     note_id: uuid.UUID,
     body: SummarizeRequest,
     user_id: Annotated[str, Depends(get_current_user)],
@@ -213,25 +229,21 @@ async def summarize(
 
 
 @router.post("/upload-image")
+@limiter.limit("10/minute")
 async def upload_image(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     user_id: Annotated[str, Depends(get_current_user)],
 ):
     import os
     import aiofiles
+    from app.services.file_security import validate_file, ALLOWED_IMAGE_TYPES
 
-    # Validate that it is an image
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be an image"
-        )
-    
-    # Generate unique filename with whitelisted extension
-    filename_str = file.filename or "image.png"
-    ext = os.path.splitext(filename_str)[1].lower()
-    allowed_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-    if ext not in allowed_extensions:
+    # Validate file size, magic MIME type from content bytes, and sanitize filename
+    contents, safe_name = await validate_file(file, ALLOWED_IMAGE_TYPES, max_size=10 * 1024 * 1024)
+
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
         ext = ".png"
         
     filename = f"{uuid.uuid4()}{ext}"
@@ -249,20 +261,21 @@ async def upload_image(
     
     try:
         async with aiofiles.open(file_path, "wb") as buffer:
-            while chunk := await file.read(1024 * 1024):
-                await buffer.write(chunk)
+            await buffer.write(contents)
     except Exception as e:
         logger.exception("Failed to save uploaded image: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save image"
+            detail="Internal server error"
         )
     
     return {"url": f"/media/uploads/{filename}"}
 
 
 @router.post("/{note_id}/ai-action", response_model=AIActionResponse)
+@limiter.limit("10/minute")
 async def ai_action(
+    request: Request,
     note_id: uuid.UUID,
     body: AIActionRequest,
     user_id: Annotated[str, Depends(get_current_user)],
@@ -278,3 +291,4 @@ async def ai_action(
     )
     
     return AIActionResponse(result=result)
+

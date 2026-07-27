@@ -1,5 +1,8 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Header, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, UploadFile, File
+from app.limiter import limiter
+
+
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -57,18 +60,17 @@ async def invalidate_user_sessions(user_id: str, redis) -> None:
         413: {"description": "Image must be under 5MB"},
     },
 )
+@limiter.limit("10/minute")
 async def upload_avatar(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Validate file size (max 5MB)
-    contents = await file.read()
-    if len(contents) > 5 * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image must be under 5MB"
-        )
+    from app.services.file_security import validate_file, ALLOWED_IMAGE_TYPES
+
+    # Validate file size, magic MIME type from content bytes, and sanitize filename
+    contents, _ = await validate_file(file, ALLOWED_IMAGE_TYPES, max_size=5 * 1024 * 1024)
 
     # Validate image file using PIL
     try:
@@ -103,9 +105,9 @@ async def upload_avatar(
     user.avatar_url = avatar_url
     await db.commit()
 
-    # Cache avatar URL in Redis for 30 days
+    # Cache avatar URL in Redis for 30 days — user ID scoped
     redis = await get_redis()
-    await redis.setex(f"avatar:{user_id}", 30 * 24 * 60 * 60, avatar_url)
+    await redis.setex(f"user:{user_id}:avatar", 30 * 24 * 60 * 60, avatar_url)
     await redis.delete(f"user:{user_id}")
 
     # Return cached URL with a timestamp query parameter to bust browser caches
@@ -117,10 +119,13 @@ async def upload_avatar(
     status_code=200,
     responses={404: {"description": USER_NOT_FOUND_DETAIL}},
 )
+@limiter.limit("10/minute")
 async def delete_avatar(
+    request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+
     # Update database column
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
@@ -158,7 +163,9 @@ async def delete_avatar(
         422: {"description": "Emails do not match"},
     },
 )
+@limiter.limit("5/minute")
 async def change_email(
+    request: Request,
     body: ChangeEmailRequest,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -203,7 +210,9 @@ async def change_email(
         404: {"description": USER_NOT_FOUND_DETAIL},
     },
 )
+@limiter.limit("5/minute")
 async def verify_email(
+    request: Request,
     token: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -264,7 +273,9 @@ async def verify_email(
         422: {"description": "Password must be at least 8 characters"},
     },
 )
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     body: ChangePasswordRequest,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -305,7 +316,9 @@ async def change_password(
         422: {"description": "Validation error for display name"},
     },
 )
+@limiter.limit("10/minute")
 async def change_display_name(
+    request: Request,
     body: ChangeNameRequest,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -341,7 +354,9 @@ async def change_display_name(
     status_code=204,
     responses={404: {"description": USER_NOT_FOUND_DETAIL}},
 )
+@limiter.limit("5/minute")
 async def delete_me(
+    request: Request,
     authorization: Annotated[str, Header(...)],
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -367,9 +382,10 @@ async def delete_me(
     # Evict sessions and caches
     redis = await get_redis()
     await invalidate_user_sessions(user_id, redis)
-    await redis.delete(f"avatar:{user_id}")
+    await redis.delete(f"user:{user_id}:avatar")
     await redis.delete(f"user:{user_id}")
 
     # Invalidate the current session token used for request
     token = authorization.split(" ", 1)[1]
     await redis.delete(f"session:{token}")
+

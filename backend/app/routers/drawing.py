@@ -157,7 +157,13 @@ async def save_drawing(
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 encoding")
 
-    # Validate it is a valid PNG image using Pillow — O(1) header check
+    # Validate image MIME type from content bytes using python-magic
+    import magic
+    mime = magic.from_buffer(image_bytes, mime=True)
+    if mime not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid image format: {mime}")
+
+    # Validate it is a valid image using Pillow — O(1) header check
     try:
         img = Image.open(io.BytesIO(image_bytes))
         img.verify()
@@ -189,11 +195,12 @@ async def save_drawing(
     )
     await db.commit()
 
-    # Invalidate stale cache, then set new value — O(1) Redis operations
+    # Invalidate stale cache, then set new value — user ID scoped
     redis = await get_redis()
-    cache_key = f"drawing:{note_id}"
+    cache_key = f"user:{user_id}:drawing:{note_id}"
     await redis.delete(cache_key)
     await redis.setex(cache_key, settings.media_cache_ttl, media_url)
+
 
     # Get updated versions
     new_version_files = get_version_files(note_id)
@@ -252,9 +259,9 @@ async def switch_drawing_version(
     )
     await db.commit()
 
-    # Update cache
+    # Update cache — user ID scoped
     redis = await get_redis()
-    cache_key = f"drawing:{note_id}"
+    cache_key = f"user:{user_id}:drawing:{note_id}"
     await redis.delete(cache_key)
     await redis.setex(cache_key, settings.media_cache_ttl, media_url)
 
@@ -300,12 +307,13 @@ async def delete_drawing_version(
     )
     await db.commit()
 
-    # Update cache
+    # Update cache — user ID scoped
     redis = await get_redis()
-    cache_key = f"drawing:{note_id}"
+    cache_key = f"user:{user_id}:drawing:{note_id}"
     await redis.delete(cache_key)
     if new_media_url:
         await redis.setex(cache_key, settings.media_cache_ttl, new_media_url)
+
 
     # Get updated versions
     version_files = get_version_files(note_id)

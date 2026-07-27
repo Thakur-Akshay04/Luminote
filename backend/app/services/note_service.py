@@ -157,14 +157,16 @@ async def _run_ai_pipeline(
         logger.exception("AI pipeline failed for note %s: %s", note_id, e)
 
 
-async def _update_checklist_cache(note_id: uuid.UUID, items: list) -> None:
+async def _update_checklist_cache(note_id: uuid.UUID, items: list, user_id: uuid.UUID) -> None:
     try:
         redis = await get_redis()
-        await redis.delete(f"checklist:{note_id}")
+        cache_key = f"user:{user_id}:checklist:{note_id}"
+        await redis.delete(cache_key)
         cache_val = json.dumps(items)
-        await redis.setex(f"checklist:{note_id}", settings.checklist_cache_ttl, cache_val)
+        await redis.setex(cache_key, settings.checklist_cache_ttl, cache_val)
     except Exception as e:
         logger.warning("Redis checklist cache update failed: %s", e)
+
 
 
 def _build_note_update_values(
@@ -293,7 +295,8 @@ async def update_note(
     await db.refresh(note)
 
     if checklist_items is not None:
-        await _update_checklist_cache(note_id, values["checklist_items"])
+        await _update_checklist_cache(note_id, values["checklist_items"], user_id)
+
 
     if content_changed:
         from app.database import AsyncSessionLocal

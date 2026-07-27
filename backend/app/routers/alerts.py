@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,14 +12,18 @@ from app.models.alert import Alert
 from app.models.note import Note
 from app.schemas.alert import AlertCreate, AlertResponse
 from app.services.note_service import get_note
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
+
 @router.get("", response_model=list[AlertResponse])
+@limiter.limit("30/minute")
 async def list_alerts(
+    request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -41,7 +45,9 @@ async def list_alerts(
 
 
 @router.post("", response_model=AlertResponse, status_code=201)
+@limiter.limit("30/minute")
 async def create(
+    request: Request,
     body: AlertCreate,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -65,7 +71,9 @@ async def create(
 
 
 @router.delete("/{alert_id}", status_code=204, responses={404: {"description": "Alert not found"}})
+@limiter.limit("30/minute")
 async def remove(
+    request: Request,
     alert_id: uuid.UUID,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -82,10 +90,13 @@ async def remove(
 
 
 @router.delete("", status_code=204)
+@limiter.limit("30/minute")
 async def clear_all(
+    request: Request,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+
     stmt = delete(Alert).where(Alert.user_id == uuid.UUID(user_id))
     await db.execute(stmt)
     await db.commit()

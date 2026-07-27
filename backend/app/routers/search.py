@@ -3,7 +3,7 @@ import json
 import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,8 @@ from app.config import settings
 from app.auth.clerk import get_current_user
 from app.schemas.search import SearchRequest, SearchResponse, SearchResultItem
 from app.services.ai_service import get_embedding
+from app.limiter import limiter
+
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -37,7 +39,9 @@ def _validate_embedding_vector(embedding: list[float]) -> str:
 
 
 @router.post("", response_model=SearchResponse)
+@limiter.limit("20/minute")
 async def semantic_search(
+    request: Request,
     body: SearchRequest,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -53,15 +57,16 @@ async def semantic_search(
             detail=f"Query too long. Maximum length is {MAX_QUERY_LENGTH} characters."
         )
 
-    # Use SHA-256 instead of MD5 for cache key hashing (cryptographically secure)
+    # Use SHA-256 instead of MD5 for cache key hashing (cryptographically secure) — user ID scoped
     query_hash = hashlib.sha256(f"{user_id}:{body.query}".encode()).hexdigest()
-    cache_key = f"search:{query_hash}"
+    cache_key = f"user:{user_id}:search:{query_hash}"
 
     redis = await get_redis()
     cached = await redis.get(cache_key)
     if cached:
         items = [SearchResultItem(**r) for r in json.loads(cached)]
         return SearchResponse(results=items, cached=True)
+
 
     # Get embedding for the search query - prepending instruction for BGE embedding retrieval optimization
     query_for_embedding = f"Represent this sentence for searching relevant passages: {body.query}"
