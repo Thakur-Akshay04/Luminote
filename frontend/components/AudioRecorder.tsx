@@ -44,6 +44,24 @@ export default function AudioRecorder({
     };
   }, []);
 
+function getSupportedAudioMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidateTypes = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/wav",
+  ];
+  for (const t of candidateTypes) {
+    if (MediaRecorder.isTypeSupported(t)) {
+      return t;
+    }
+  }
+  return "";
+}
+
   const startRecording = async () => {
     setError(null);
     audioChunksRef.current = [];
@@ -52,8 +70,10 @@ export default function AudioRecorder({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const options = { mimeType: "audio/webm" };
-      
+
+      const mimeType = getSupportedAudioMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
@@ -64,14 +84,18 @@ export default function AudioRecorder({
       };
 
       mediaRecorder.onstop = async () => {
-        // Stop all audio stream tracks to release microphone
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        await handleUpload(audioBlob);
+        const blobType = mediaRecorder.mimeType || mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        if (audioBlob.size > 0) {
+          await handleUpload(audioBlob);
+        } else {
+          setError("Recorded audio was empty. Please try recording again.");
+        }
       };
 
       mediaRecorder.start(250); // Slice every 250ms
@@ -92,18 +116,15 @@ export default function AudioRecorder({
 
   const stopRecording = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
-    
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
-    
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+    setIsRecording(false);
+    if (mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
     }
   };
 
@@ -112,11 +133,12 @@ export default function AudioRecorder({
     setError(null);
     try {
       let activeId = noteId;
-      if (noteId === "new" && onSaveBeforeAction) {
+      if ((noteId === "new" || !noteId) && onSaveBeforeAction) {
         activeId = await onSaveBeforeAction();
       }
       const res = await notesApi.uploadAudio(activeId, audioBlob);
       onMediaUrlUpdate(res.data.media_url);
+      await handleTranscribeForId(activeId, false);
     } catch (err: any) {
       console.error("Audio upload error:", err);
       setError(
@@ -127,15 +149,11 @@ export default function AudioRecorder({
     }
   };
 
-  const handleTranscribe = async (force: boolean = false) => {
+  const handleTranscribeForId = async (targetNoteId: string, force: boolean = false) => {
     setTranscribing(true);
     setError(null);
     try {
-      let activeId = noteId;
-      if (noteId === "new" && onSaveBeforeAction) {
-        activeId = await onSaveBeforeAction();
-      }
-      const res = await notesApi.transcribeAudio(activeId, force);
+      const res = await notesApi.transcribeAudio(targetNoteId, force);
       onTranscriptUpdate(res.data.transcript);
     } catch (err: any) {
       console.error("Audio transcription error:", err);
@@ -145,6 +163,14 @@ export default function AudioRecorder({
     } finally {
       setTranscribing(false);
     }
+  };
+
+  const handleTranscribe = async (force: boolean = false) => {
+    let activeId = noteId;
+    if ((noteId === "new" || !noteId) && onSaveBeforeAction) {
+      activeId = await onSaveBeforeAction();
+    }
+    await handleTranscribeForId(activeId, force);
   };
 
   const copyToClipboard = () => {
