@@ -171,24 +171,73 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       async (url: string) => {
         const canvas = canvasRef.current;
         const ctx = contextRef.current;
-        if (!canvas || !ctx) return;
+        if (!canvas || !ctx || !url) return;
 
-        const imgUrl = `${baseUrl}${url}?t=${Date.now()}`;
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = imgUrl;
-        img.onload = () => {
-          clearCanvas();
-          // Draw image keeping correct scaling
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          // Push initial loaded state to undo stack
-          undoStack.current = [canvas.toDataURL()];
-        };
-        img.onerror = () => {
-          console.error("Failed to load background image:", imgUrl);
-          clearCanvas();
-          undoStack.current = [canvas.toDataURL()];
-        };
+        let fullUrl = url.startsWith("http://") || url.startsWith("https://")
+          ? url
+          : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+
+        const imgUrl = fullUrl.includes("?")
+          ? `${fullUrl}&t=${Date.now()}`
+          : `${fullUrl}?t=${Date.now()}`;
+
+        const currentCanvas = canvas;
+        const currentCtx = ctx;
+
+        // Strategy 1: Fetch as Blob & load via blob object URL (immune to cross-origin image load bugs)
+        try {
+          const res = await fetch(imgUrl, { mode: "cors", cache: "no-cache" });
+          if (res.ok) {
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+              clearCanvas();
+              currentCtx.drawImage(img, 0, 0, currentCanvas.width, currentCanvas.height);
+              URL.revokeObjectURL(objectUrl);
+              undoStack.current = [currentCanvas.toDataURL()];
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(objectUrl);
+              fallbackImageLoad(imgUrl);
+            };
+            img.src = objectUrl;
+            return;
+          }
+        } catch {
+          // Proceed to image fallbacks
+        }
+
+        fallbackImageLoad(imgUrl);
+
+        function fallbackImageLoad(targetUrl: string) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            clearCanvas();
+            currentCtx.drawImage(img, 0, 0, currentCanvas.width, currentCanvas.height);
+            undoStack.current = [currentCanvas.toDataURL()];
+          };
+          img.onerror = () => {
+            const imgNoCors = new Image();
+            imgNoCors.onload = () => {
+              clearCanvas();
+              currentCtx.drawImage(imgNoCors, 0, 0, currentCanvas.width, currentCanvas.height);
+              try {
+                undoStack.current = [currentCanvas.toDataURL()];
+              } catch {
+                // Tainted canvas fallback
+              }
+            };
+            imgNoCors.onerror = () => {
+              console.warn("Failed to load background image:", targetUrl);
+              clearCanvas();
+              undoStack.current = [currentCanvas.toDataURL()];
+            };
+            imgNoCors.src = targetUrl;
+          };
+          img.src = targetUrl;
+        }
       },
       [baseUrl, clearCanvas]
     );
