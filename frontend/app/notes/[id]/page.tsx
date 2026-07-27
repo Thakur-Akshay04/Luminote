@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
+import ConfirmModal from "@/components/ConfirmModal";
 import type { DrawingCanvasRef } from "@/components/DrawingCanvas";
 import ChecklistEditor from "@/components/ChecklistEditor";
 
@@ -771,15 +772,28 @@ function NoteEditorContent() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Delete this note? This cannot be undone.")) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const handleOpenDeleteConfirm = (id?: string) => {
+    setDeleteTargetId(id || noteId);
+  };
+
+  const handleConfirmDeleteNote = async () => {
+    const targetId = deleteTargetId || noteId;
+    if (!targetId || targetId === "new") return;
     setDeleting(true);
     try {
-      await notesApi.delete(noteId);
-      router.push("/notes");
+      await notesApi.delete(targetId);
+      if (targetId === noteId) {
+        router.push("/notes");
+      } else {
+        setSidebarNotes((prev) => prev.filter((item) => item.id !== targetId));
+      }
     } catch {
       setError("Failed to delete note.");
+    } finally {
       setDeleting(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -1076,7 +1090,7 @@ function NoteEditorContent() {
           {/* Delete */}
           <button
             id="delete-note-btn"
-            onClick={handleDelete}
+            onClick={() => handleOpenDeleteConfirm(noteId)}
             disabled={deleting}
             className="flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/25 text-red-400 hover:text-red-300 shadow-md active:scale-95 transition-all"
           >
@@ -1341,19 +1355,10 @@ function NoteEditorContent() {
                         {/* Delete option */}
                         <button
                           type="button"
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             setOpenMenuNoteId(null);
-                            if (n.id === noteId) {
-                              handleDelete();
-                            } else {
-                              try {
-                                setSidebarNotes((prev) => prev.filter((item) => item.id !== n.id));
-                                await notesApi.delete(n.id);
-                              } catch {
-                                fetchSidebarNotes(noteType);
-                              }
-                            }
+                            handleOpenDeleteConfirm(n.id);
                           }}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors rounded-lg text-left"
                         >
@@ -2161,6 +2166,13 @@ function NoteEditorContent() {
           <AIPanel note={note} onUpdateNote={setNote} editor={editor} onSaveBeforeAction={ensureNoteSaved} />
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        loading={deleting}
+        onConfirm={handleConfirmDeleteNote}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

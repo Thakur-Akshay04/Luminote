@@ -9,6 +9,7 @@ import { notesApi, alertsApi } from "@/lib/api";
 import type { Note, Alert } from "@/types";
 import NoteCard from "@/components/NoteCard";
 import NoteTypeModal from "@/components/NoteTypeModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   StickyNote,
   Bell,
@@ -263,15 +264,26 @@ export default function DashboardPage() {
     setIsNoteTypeModalOpen(true);
   };
 
-  const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deletingNote, setDeletingNote] = useState(false);
+
+  const handleOpenDeleteConfirm = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this note?")) return;
+    setDeleteTargetId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+    setDeletingNote(true);
     try {
-      await notesApi.delete(id);
-      setNotes((prev) => prev.filter((n) => n.id !== id));
+      await notesApi.delete(deleteTargetId);
+      setNotes((prev) => prev.filter((n) => n.id !== deleteTargetId));
     } catch {
       alert("Failed to delete note.");
+    } finally {
+      setDeletingNote(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -373,7 +385,7 @@ export default function DashboardPage() {
             key={dayLabel}
             dayLabel={dayLabel}
             groupNotes={groupNotes}
-            onDelete={handleDeleteNote}
+            onDelete={handleOpenDeleteConfirm}
           />
         ))}
       </div>
@@ -515,6 +527,12 @@ export default function DashboardPage() {
       <NoteTypeModal
         isOpen={isNoteTypeModalOpen}
         onClose={() => setIsNoteTypeModalOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        loading={deletingNote}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
       />
     </div>
   );
