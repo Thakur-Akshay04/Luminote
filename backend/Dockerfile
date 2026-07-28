@@ -12,10 +12,13 @@ RUN PYTHONPATH=/install/lib/python3.12/site-packages python -c "from fastembed i
 # ---- Runtime stage: minimal image without build tools ----
 FROM python:3.12-slim AS runner
 
-# Install only the runtime library needed for PostgreSQL (no gcc)
+# Install runtime libraries needed for PostgreSQL, audio MIME magic detection, and media processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    libmagic1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Copy installed Python packages from the builder stage
 COPY --from=builder /install /usr/local

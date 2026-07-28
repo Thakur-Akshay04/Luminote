@@ -66,6 +66,7 @@ services:
       - /app/.next
     command: pnpm run dev
 
+
 volumes:
   postgres_data:
   redis_data:
