@@ -73,5 +73,6 @@ pyrightconfig.json
 *.seed
 *.bak
 
-# User-generated media (drawings, audio uploads)
+# User-generated media (drawings, audio uploads, webm/mp3 cache)
 backend/media/
+
