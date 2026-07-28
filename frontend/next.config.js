@@ -1,4 +1,5 @@
-/** @type {import('next').NextConfig} */
+const apiHost = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -11,9 +12,9 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://clerk.com https://*.clerk.accounts.dev",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https:",
-      "media-src 'self' blob:",
-      "connect-src 'self' https://api.clerk.com https://*.clerk.accounts.dev http://localhost:8000",
+      "img-src 'self' blob: data: https: http://localhost:8000 http://127.0.0.1:8000",
+      `media-src 'self' blob: http://localhost:8000 http://127.0.0.1:8000 ${apiHost}`,
+      `connect-src 'self' https://api.clerk.com https://*.clerk.accounts.dev http://localhost:8000 http://127.0.0.1:8000 ${apiHost}`,
       "frame-src 'none'",
     ].join('; ')
   }
@@ -30,7 +31,11 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/:path*`,
+        destination: `${apiHost}/:path*`,
+      },
+      {
+        source: "/media/:path*",
+        destination: `${apiHost}/media/:path*`,
       },
     ];
   },
