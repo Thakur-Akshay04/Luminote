@@ -3,12 +3,14 @@ import logging
 import os
 import time
 import uuid
+
+import aiofiles
 from contextlib import asynccontextmanager
 from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -293,12 +295,129 @@ app.include_router(audio.router)
 app.include_router(checklist.router)
 app.include_router(tasks.router)
 
-# Static file serving for /media/
-media_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
-os.makedirs(media_path, exist_ok=True)
-app.mount("/media", StaticFiles(directory=media_path), name="media")
+# Media file serving with HTTP Range (206 Partial Content) & CORS preflight support
+@app.api_route("/media/{path:path}", methods=["GET", "HEAD", "OPTIONS"])
+async def serve_media(path: str, request: Request):
+    if request.method == "OPTIONS":
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Max-Age": "86400",
+            }
+        )
+
+    media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
+    safe_relative_path = os.path.normpath(path).lstrip("/")
+    file_path = os.path.join(media_base, safe_relative_path)
+
+    if not os.path.abspath(file_path).startswith(os.path.abspath(media_base)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_size = os.path.getsize(file_path)
+
+    import mimetypes
+    content_type, _ = mimetypes.guess_type(file_path)
+    if not content_type:
+        content_type = "application/octet-stream"
+
+    if file_path.endswith(".webm"):
+        content_type = "audio/webm"
+    elif file_path.endswith(".ogg"):
+        content_type = "audio/ogg"
+    elif file_path.endswith(".wav"):
+        content_type = "audio/wav"
+    elif file_path.endswith(".mp3"):
+        content_type = "audio/mpeg"
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type,
+        "Cache-Control": "public, max-age=86400",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+    }
+
+    if request.method == "HEAD":
+        headers["Content-Length"] = str(file_size)
+        return Response(status_code=200, headers=headers, media_type=content_type)
+
+    range_header = request.headers.get("range")
+    if not range_header or not range_header.startswith("bytes="):
+        async def full_file_iterator():
+            async with aiofiles.open(file_path, "rb") as f:
+                while chunk := await f.read(64 * 1024):
+                    yield chunk
+
+        headers["Content-Length"] = str(file_size)
+        return StreamingResponse(full_file_iterator(), status_code=200, headers=headers, media_type=content_type)
+
+    try:
+        units, range_val = range_header.split("=", 1)
+        parts = range_val.split("-", 1)
+        start_str, end_str = parts[0].strip(), parts[1].strip()
+
+        if start_str:
+            start = int(start_str)
+            end = int(end_str) if end_str else file_size - 1
+        else:
+            start = file_size - int(end_str)
+            end = file_size - 1
+
+        if start < 0 or start >= file_size or end < start:
+            raise ValueError()
+
+        if end >= file_size:
+            end = file_size - 1
+
+    except ValueError:
+        async def empty_iterator():
+            if False:
+                yield b""
+
+        return StreamingResponse(
+            empty_iterator(),
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+            }
+        )
+
+    content_length = (end - start) + 1
+    headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+    headers["Content-Length"] = str(content_length)
+
+    async def file_chunk_iterator(start_pos: int, length: int):
+        async with aiofiles.open(file_path, "rb") as f:
+            await f.seek(start_pos)
+            remaining = length
+            chunk_size = 64 * 1024
+            while remaining > 0:
+                bytes_to_read = min(chunk_size, remaining)
+                chunk = await f.read(bytes_to_read)
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    return StreamingResponse(
+        file_chunk_iterator(start, content_length),
+        status_code=206,
+        headers=headers,
+        media_type=content_type
+    )
+
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "luminote-api"}
+
