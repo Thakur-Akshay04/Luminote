@@ -1,3 +1,4 @@
+import base64
 import logging
 import uuid
 from typing import Annotated, Literal
@@ -20,6 +21,20 @@ from app.models.credit_transaction import (
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_log_data(data: str | None) -> str:
+    """
+    Sanitize user-controlled untrusted input before logging to prevent Log Injection (CRLF Injection).
+    Validates alphanumeric/hyphen/underscore format or encodes with Base64.
+    """
+    if not data:
+        return ""
+    cleaned = data.replace("\r", "").replace("\n", "").strip()
+    if cleaned.replace("_", "").replace("-", "").isalnum():
+        return cleaned
+    return base64.b64encode(data.encode("utf-8")).decode("utf-8")
+
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -179,7 +194,7 @@ async def verify_payment(
     except Exception as exc:
         logger.warning(
             "Payment signature verification failed for user %s, order %s: %s",
-            user_id, body.razorpay_order_id, exc
+            user_id, _sanitize_log_data(body.razorpay_order_id), exc
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -200,7 +215,7 @@ async def verify_payment(
         balance = user.credit_balance if user else 0
         logger.info(
             "Payment %s already completed for order %s (idempotent response)",
-            body.razorpay_payment_id, body.razorpay_order_id
+            _sanitize_log_data(body.razorpay_payment_id), _sanitize_log_data(body.razorpay_order_id)
         )
         return {
             "status": "success",
@@ -248,7 +263,7 @@ async def verify_payment(
 
     logger.info(
         "Successfully verified payment %s for order %s. Credited %d credits to user %s. New balance: %d",
-        body.razorpay_payment_id, body.razorpay_order_id, tx.amount, user_id, new_balance
+        _sanitize_log_data(body.razorpay_payment_id), _sanitize_log_data(body.razorpay_order_id), tx.amount, user_id, new_balance
     )
 
     return {
@@ -299,7 +314,7 @@ async def razorpay_webhook(
 
     payload = await request.json()
     event = payload.get("event")
-    logger.info("Received Razorpay webhook event: %s", event)
+    logger.info("Received Razorpay webhook event: %s", _sanitize_log_data(event))
 
     if event != "payment.captured":
         # Acknowledge non-captured events quickly
@@ -325,7 +340,7 @@ async def razorpay_webhook(
     existing_tx = res.scalar_one_or_none()
 
     if existing_tx and existing_tx.status == CreditTransactionStatus.COMPLETED:
-        logger.info("Webhook payment %s already processed (idempotent)", payment_id)
+        logger.info("Webhook payment %s already processed (idempotent)", _sanitize_log_data(payment_id))
         return {"status": "already_processed"}
 
     # 2. Find pending transaction by order_id
@@ -336,11 +351,11 @@ async def razorpay_webhook(
     tx = tx_res.scalar_one_or_none()
 
     if not tx:
-        logger.warning("Webhook received for unknown order_id %s", order_id)
+        logger.warning("Webhook received for unknown order_id %s", _sanitize_log_data(order_id))
         return {"status": "order_not_found"}
 
     if tx.status == CreditTransactionStatus.COMPLETED:
-        logger.info("Webhook order %s already completed", order_id)
+        logger.info("Webhook order %s already completed", _sanitize_log_data(order_id))
         return {"status": "already_completed"}
 
     # 3. Update status and credit balance atomically
@@ -356,7 +371,7 @@ async def razorpay_webhook(
 
     logger.info(
         "Webhook successfully processed payment %s for order %s. Added %d credits to user %s",
-        payment_id, order_id, tx.amount, tx.user_id
+        _sanitize_log_data(payment_id), _sanitize_log_data(order_id), tx.amount, tx.user_id
     )
 
     return {"status": "success", "order_id": order_id, "payment_id": payment_id}
