@@ -127,7 +127,7 @@ async def create_order(
     }
 
     try:
-        razorpay_order = client.order.create(data=order_payload)
+        razorpay_order = client.order.create(data=order_payload)  # type: ignore[attr-defined]
     except Exception as exc:
         logger.exception("Failed to create Razorpay order for user %s: %s", user_id, exc)
         raise HTTPException(
@@ -184,7 +184,7 @@ async def verify_payment(
 
     # 1. Verify Payment Signature
     try:
-        client.utility.verify_payment_signature(
+        client.utility.verify_payment_signature(  # type: ignore[attr-defined]
             {
                 "razorpay_order_id": body.razorpay_order_id,
                 "razorpay_payment_id": body.razorpay_payment_id,
@@ -300,7 +300,7 @@ async def razorpay_webhook(
     client = get_razorpay_client()
 
     try:
-        client.utility.verify_webhook_signature(
+        client.utility.verify_webhook_signature(  # type: ignore[attr-defined]
             raw_body.decode("utf-8"),
             x_razorpay_signature,
             settings.razorpay_webhook_secret,
