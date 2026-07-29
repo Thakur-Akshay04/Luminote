@@ -4,9 +4,31 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 
 ---
 
-## ✨ Features
+## 🛠️ Tech Stack
 
-### 📝 Multi-Format Note Types
+### Frontend
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Clerk](https://img.shields.io/badge/Clerk_Auth-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white)
+
+### Backend & Infrastructure
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+
+### AI & Speech-to-Text
+![Groq](https://img.shields.io/badge/Groq_AI-F56565?style=for-the-badge&logo=cpu&logoColor=white)
+![Whisper](https://img.shields.io/badge/Whisper_v3-00A67E?style=for-the-badge&logo=openai&logoColor=white)
+
+---
+
+## ✨ Core Features
+
+### 📝 Multi-Format Note Workspace
 - **Markdown Text Editor:** Rich text and markdown document editing powered by TipTap with real-time formatting tools and clean typography.
 - **Vector Canvas Sketchpad:** Freehand drawing canvas inside notes with multi-version history tracking (save, switch versions, and delete historical sketches).
 - **Voice Note Studio:** In-browser audio recording with real-time soundwave visualization, custom HTML5 audio playback deck (scrubber, `1x-2x` speed control, volume toggle), and AI speech-to-text transcription powered by **Groq Whisper** (`whisper-large-v3-turbo`).
@@ -32,25 +54,39 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 
 ---
 
-## 🛠️ Tech Stack
+## 📂 Repository Structure
 
-### Frontend
-- **Framework:** Next.js 16 (App Router, Turbopack) & React 19
-- **Styling:** Tailwind CSS v4 & Lucide React Icons
-- **Editor & Canvas:** TipTap Editor & HTML5 Canvas API
-- **Auth:** `@clerk/nextjs`
-- **Package Manager:** `pnpm`
-
-### Backend
-- **Framework:** FastAPI (Python 3.12, Uvicorn)
-- **Database:** PostgreSQL (SQLAlchemy async engine with AsyncPG)
-- **Cache:** Redis (`redis-py` async client for sessions and AI cache)
-- **Rate Limiting:** SlowAPI
-
-### AI & Speech-to-Text
-- **Transcription:** Groq API (`whisper-large-v3-turbo`)
-- **Text & Task AI:** Groq API (`qwen/qwen3.6-27b` / Llama 3 70B)
-- **Embeddings:** FastEmbed for vector generation
+```
+Luminote/
+├── backend/
+│   ├── app/
+│   │   ├── auth/            # Clerk JWT authentication verification
+│   │   ├── models/          # SQLAlchemy DB models (Note, Alert, User)
+│   │   ├── routers/         # FastAPI endpoint routers (notes, audio, drawing, search, alerts, tasks)
+│   │   ├── schemas/         # Pydantic data validation schemas
+│   │   ├── services/        # Business logic & AI processing services
+│   │   ├── config.py        # Environment settings & AI model configurations
+│   │   ├── database.py      # SQLAlchemy async DB session initialization
+│   │   ├── groq_client.py   # Groq API client helper
+│   │   ├── redis_client.py  # Async Redis client for caching
+│   │   └── main.py          # FastAPI application entrypoint & WebSockets manager
+│   ├── uploads/             # Audio recordings & binary storage
+│   ├── requirements.txt     # Python backend dependencies
+│   └── .env.example         # Backend environment variables template
+├── frontend/
+│   ├── app/
+│   │   ├── sign-in/         # Clerk Sign-in page
+│   │   ├── sign-up/         # Clerk Sign-up page
+│   │   ├── notes/           # Note view & editor workspace pages
+│   │   ├── dashboard/       # Workspace dashboard overview
+│   │   ├── search/          # Semantic search page
+│   │   └── layout.tsx       # Root layout with Clerk Provider
+│   ├── components/          # Reusable UI components (AudioRecorder, Canvas, Checklist, etc.)
+│   ├── lib/                 # API client services & utility helpers
+│   ├── package.json         # Frontend dependencies & scripts
+│   └── .env.local.example   # Frontend environment variables template
+└── README.md
+```
 
 ---
 
