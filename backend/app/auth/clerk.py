@@ -22,7 +22,7 @@ _jwks_cache = None
 _jwks_lock = asyncio.Lock()
 
 
-async def get_jwks():
+async def get_jwks(retries: int = 3, backoff_factor: float = 0.5):
     global _jwks_cache
 
     # Fast path — already cached
@@ -43,25 +43,34 @@ async def get_jwks():
             )
 
         timeout = httpx.Timeout(connect=10.0, read=10.0, write=5.0, pool=5.0)
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                res = await client.get(jwks_url)
-                res.raise_for_status()
-                _jwks_cache = res.json()
-        except httpx.ConnectTimeout:
-            logger.error("Timed out connecting to Clerk JWKS endpoint: %s", jwks_url)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication service unavailable — please try again"
-            )
-        except httpx.HTTPError as exc:
-            logger.exception("Failed to fetch Clerk JWKS: %s", exc)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication service unavailable — please try again"
-            )
+        last_exception = None
 
-    return _jwks_cache
+        for attempt in range(1, retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    res = await client.get(jwks_url)
+                    res.raise_for_status()
+                    _jwks_cache = res.json()
+                    return _jwks_cache
+            except (httpx.ConnectTimeout, httpx.HTTPError, httpx.RequestError) as exc:
+                last_exception = exc
+                logger.warning(
+                    "Attempt %d/%d failed to fetch Clerk JWKS from %s: %s",
+                    attempt, retries, jwks_url, exc
+                )
+                if attempt < retries:
+                    await asyncio.sleep(backoff_factor * (2 ** (attempt - 1)))
+
+        if _jwks_cache:
+            logger.warning("Using stale JWKS cache following failed refresh")
+            return _jwks_cache
+
+        logger.error("All %d attempts to fetch Clerk JWKS failed: %s", retries, last_exception)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service unavailable — please try again"
+        )
+
 
 
 def _extract_user_info(payload: dict) -> tuple[str, str, str]:

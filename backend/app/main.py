@@ -105,7 +105,13 @@ async def check_alerts_loop(manager: ConnectionManager):
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing database...")
-    await init_db()
+    # Pre-fetch Clerk JWKS keys on startup to avoid cold-start request latency/503 errors
+    try:
+        from app.auth.clerk import get_jwks
+        await get_jwks()
+        logger.info("Clerk JWKS pre-fetched successfully.")
+    except Exception as exc:
+        logger.warning("Failed to pre-fetch Clerk JWKS on startup: %s", exc)
 
     # Ensure media directories exist
     media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
@@ -377,12 +383,8 @@ async def serve_media(path: str, request: Request):
             end = file_size - 1
 
     except ValueError:
-        async def empty_iterator():
-            if False:
-                yield b""
-
         return StreamingResponse(
-            empty_iterator(),
+            iter([]),
             status_code=416,
             headers={
                 "Content-Range": f"bytes */{file_size}",
