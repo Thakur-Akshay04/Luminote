@@ -1,129 +1,236 @@
-# Luminote
+# 🌌 Luminote
 
-Luminote is a high-fidelity, collaborative markdown workspace that connects your notes, tasks, drawings, and audio recordings using a fullscreen, interactive thought map powered by customized spring physics, advanced AI summarization, semantic search, and document Q&A.
+> **Next-Generation AI Workspace, Interactive Thought Map & Multimodal Knowledge Base**
 
-![Workspace Sandbox Overview](https://img.shields.io/badge/Luminote-Workspace-blueviolet?style=for-the-badge)
+Luminote is an intelligent markdown workspace that connects your notes, checklists, vector drawings, and voice recordings using a fullscreen, interactive thought map powered by customized spring-drift physics, `pgvector` semantic search, Groq Whisper audio transcription, and document-level AI Q&A.
 
 ---
 
-## 🚀 Key Features
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16.2.9-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/FastAPI-0.110.0-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
+</p>
 
-* **Interactive Thought Map Sandbox:** An obsidian glass node network graph visualizer simulating spring-drift physics. Includes cursor magnet attraction, orbital spinning Synapse hub rings, radar pings on node hover, permanent node tags, and animated dual-packet glowing data flow lines traversing connection tracks.
-* **Keyboard & Accessibility Support:** Complete keyboard navigation for note lists and popovers, standard ARIA roles, focus management, and accessibility-compliant interactive components.
-* **Smart Auth Blending:** Beautifully blends login and registration pages using high-transparency glassmorphic containers (`bg-[#0c0c0e]/10` with `backdrop-blur-md`), user profile metadata registration database mapping, password strength check meters, and password show/hide eye toggles.
-* **Markdown Note Editor:** Dynamic note-taking environment supporting direct markdown rendering and formatting.
-* **Canvas Sketching:** Integrated freehand vector canvas sketchpad inside note documents to draw diagrams or sketch layouts directly alongside text.
-* **Voice Captures:** Audio recorder with instant browser voice captures and backend-supported speech transcription.
-* **Sprint Tracks:** Interactive checkbox checklists inside note blocks with automatic timeline synchronization.
-* **Calendar Sync:** Complete planning overview board linking checklists, note updates, and milestone deadlines.
-* **AI Copilot & Agents:** Perform document-level Q&A, extract tasks lists, and execute real-time document summaries.
+---
+
+## ✨ Key Features
+
+### 🧠 Interactive Thought Map Sandbox
+- **Spring-Drift Physics Engine:** Real-time node network simulation with custom tension, repulsion, and damping physics.
+- **Orbital Synapse Hub Rings & Data Packets:** Dynamic visual connections featuring animated glowing data-flow particles traversing link tracks.
+- **Cursor Magnet Attraction & Radar Pings:** Interactive cursor fields that pull nearby node clusters with radar ping visual feedback.
+
+### 🎙️ Voice Note Studio
+- **Context-Aware Studio Deck:** Sleek dark glass recording interface with real-time soundwave equalizer visualization.
+- **Precision Audio Player:** Custom scrubber bar with play/pause micro-animations, variable playback speed (`1.0x` – `2.0x`), and volume controls.
+- **Groq Whisper AI Transcription:** High-speed speech-to-text audio transcription stored directly inside your note database record.
+
+### 🎨 Integrated Vector Sketchpad
+- **Freehand Canvas Drawing:** Draw diagrams, mind maps, or wireframes directly alongside text content using an embedded vector canvas.
+- **Multi-Version History:** Save, retrieve, and switch between drawing versions directly within the document view.
+
+### 📋 Checklist Planner & AI Task Generator
+- **Interactive Checklists:** Track task completion with real-time progress indicators.
+- **AI Task Extraction:** Paste unstructured context or meeting notes to automatically extract actionable checklist items using LLM parsing.
+
+### 🔍 Semantic Vector Search & AI Document Q&A
+- **`pgvector` Embedding Search:** Perform vector-based semantic search across your entire workspace.
+- **Document Q&A & Summarization:** Chat directly with specific notes or extract key milestones and executive summaries on demand.
+
+### 📅 Calendar & Milestone Synchronization
+- **Timeline Overview:** Unified calendar board linking note creations, task deadlines, and project milestones.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Frontend:**
-  - ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white) 16.2.9 (Turbopack)
-  - ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
-  - ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-  - ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat-square&logo=pnpm&logoColor=white)
-* **Backend:**
-  - ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
-  - ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
-* **Database & Cache:**
-  - ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) with `pgvector` extension
-  - ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
-* **AI & Embeddings:**
-  - ![Groq](https://img.shields.io/badge/Groq-orange?style=flat-square) (Llama 3 70B / Qwen 72B)
-  - ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white) (text-embedding-3-small)
+| Category | Technology | Usage |
+| :--- | :--- | :--- |
+| **Frontend Framework** | **Next.js 16.2.9** (Turbopack) | App Router Single-Page Interface & Server Rendering |
+| **Frontend Language** | **TypeScript** | Type-safe React components and custom hooks |
+| **Styling & UI** | **Tailwind CSS** & **Lucide Icons** | Glassmorphic dark design system & micro-interactions |
+| **Backend Framework** | **FastAPI** | High-performance asynchronous REST API backend |
+| **Database** | **PostgreSQL** with **`pgvector`** | Relational data persistence & vector similarity search |
+| **Caching** | **Redis** | Session management, caching, and rate limiting |
+| **AI Transcription** | **Groq Whisper API** | High-speed speech-to-text audio transcription |
+| **AI Embeddings & LLM** | **OpenAI** / **Groq Llama 3** | Vector embeddings (`text-embedding-3-small`) & document Q&A |
+| **Package Managers** | **pnpm** (Frontend) / **uv** (Backend) | Ultra-fast dependency resolution and virtual environments |
 
 ---
 
-## 📦 Quick Start
+## 📁 Repository Structure
 
-### 1. Configure Environment Variables
-
-Create your local environment files and add your API keys:
-
-```bash
-# Copy backend env
-cp backend/.env.example backend/.env
-# Fill in required variables: GROQ_API_KEY, OPENAI_API_KEY, JWT_SECRET
-
-# Copy frontend env
-cp frontend/.env.local.example frontend/.env.local
+```
+Luminote/
+├── backend/                  # FastAPI Python Backend
+│   ├── app/
+│   │   ├── auth/             # Authentication & Clerk JWT handling
+│   │   ├── models/           # SQLAlchemy DB models (Note, Audio, Drawing, Vector)
+│   │   ├── routes/           # REST API Route Endpoints
+│   │   ├── services/         # AI, Transcription & Embedding Services
+│   │   └── main.py           # FastAPI Application Entrypoint
+│   ├── requirements.txt      # Python Dependencies
+│   └── Dockerfile
+│
+├── frontend/                 # Next.js Frontend Workspace
+│   ├── app/                  # Next.js App Router Pages (/notes, /dashboard, /calendar)
+│   ├── components/           # React Components (AudioRecorder, ThoughtMap, Canvas)
+│   ├── lib/                  # API Client Services & Axios Configuration
+│   ├── package.json
+│   └── Dockerfile
+│
+├── docker-compose.yml        # Docker Multi-Container Orchestration
+└── README.md
 ```
 
-### 2. Run with Docker Compose (Recommended)
+---
 
-Spins up the database, cache, backend server, and frontend web server instantly:
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** (v18.0+) & **pnpm**
+- **Python** (v3.11+)
+- **Docker** & **Docker Compose** (optional, recommended for full stack)
+
+---
+
+### Option 1: Docker Compose (Recommended)
+
+Spin up PostgreSQL, Redis, Backend, and Frontend services with a single command:
 
 ```bash
 docker-compose up --build
 ```
 
-* **Frontend Workspace:** http://localhost:3000
-* **Backend API Docs:** http://localhost:8000/docs
+- 🌐 **Frontend App:** `http://localhost:3000`
+- ⚙️ **Backend API Documentation:** `http://localhost:8000/docs`
 
-### 3. Run Locally (Without Docker)
+---
 
-**Backend Server Setup**
+### Option 2: Local Development Setup
+
+#### 1. Backend Setup
+
 ```bash
+# Navigate to backend directory
 cd backend
+
+# Create & activate virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+
+# Configure environment variables
+cp .env.example .env
+
+# Start FastAPI development server
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-**Frontend Server Setup**
+#### 2. Frontend Setup
+
 ```bash
+# Navigate to frontend directory
 cd frontend
+
+# Install dependencies
 pnpm install
+
+# Configure environment variables
+cp .env.local.example .env.local
+
+# Start Next.js development server
 pnpm run dev
 ```
 
 ---
 
-## 📑 API Routes Specification
+## 🔑 Environment Configuration
 
-### 🔐 Authentication
-* `POST /auth/register` — Register a new account (`email`, `password`, `name`).
-* `POST /auth/login` — Login user credentials and return jwt bearer token.
-* `PUT /auth/password` — Update user account password.
-* `DELETE /auth/account` — Delete user account.
+### Backend `.env`
 
-### 📝 Notes Management
-* `GET /notes` — List user notes (supports tag and type filter params).
-* `POST /notes` — Create a new note structure.
-* `GET /notes/{id}` — Fetch details for a specific note.
-* `PUT /notes/{id}` — Update note title, content, or tags.
-* `DELETE /notes/{id}` — Delete a note.
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=luminote
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 
-### 🎨 Freehand Canvas Drawing
-* `POST /notes/{id}/drawing` — Save canvas vector image content (Base64).
-* `GET /notes/{id}/drawing` — Fetch drawing content versions.
-* `POST /notes/{id}/drawing/switch` — Switch drawing to a specified version.
-* `DELETE /notes/{id}/drawing/version/{version}` — Delete a specific drawing version.
+REDIS_URL=redis://localhost:6379
 
-### 🎤 Voice Recording & Transcribing
-* `POST /notes/{id}/audio` — Upload audio recording binary file.
-* `POST /notes/{id}/transcribe` — Process audio transcription using speech-to-text.
+GROQ_API_KEY=your_groq_api_key
+OPENAI_API_KEY=your_openai_api_key
+JWT_SECRET=your_jwt_secret_key
+```
 
-### 📋 Checklists & To-dos
-* `PATCH /notes/{id}/checklist/{index}` — Toggle checklist item status (checked state).
-* `POST /notes/{id}/extract-tasks` — Extract checklists task lists using LLM parsing.
+### Frontend `.env.local`
 
-### 🧠 Semantic Search & AI Q&A
-* `POST /search` — Perform vector-based semantic search.
-* `POST /notes/{id}/ask` — Q&A document interaction chat.
-* `POST /notes/{id}/summarize` — AI-powered note summarization with key milestones.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+```
 
 ---
 
-## 🔒 Security & Accessibility Compliance
+## 📡 REST API Reference
 
-* **Keyboard Accessibility:** Interactive elements and popover menus include keyboard listeners (`onKeyDown`) and accessible ARIA attributes (`role="menu"`).
-* **Cryptographic Randomness:** Node velocities and layout jitter logic are calculated using browser-native cryptographically secure random generators (`window.crypto.getRandomValues`) to ensure robust random outputs.
-* **Salted Hashes:** User password storage leverages secure hashing algorithms inside the database service layers.
+### 🔐 Authentication (`/auth`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/auth/register` | Register a new user account |
+| `POST` | `/auth/login` | Authenticate user credentials and return JWT bearer token |
+| `PUT` | `/auth/password` | Update current user password |
+| `DELETE` | `/auth/account` | Permanently delete user account |
 
+### 📝 Notes Management (`/notes`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/notes` | List user notes (supports `type`, `favorite`, and `tag` query filters) |
+| `POST` | `/notes` | Create a new note (text, audio, drawing, or checklist) |
+| `GET` | `/notes/{id}` | Fetch full details for a specific note |
+| `PUT` | `/notes/{id}` | Update note title, content, or tags |
+| `DELETE` | `/notes/{id}` | Delete a note |
+
+### 🎨 Freehand Canvas (`/notes/{id}/drawing`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/notes/{id}/drawing` | Save new vector drawing canvas version |
+| `GET` | `/notes/{id}/drawing` | Retrieve drawing version history |
+| `POST` | `/notes/{id}/drawing/switch` | Switch active drawing to specified version |
+| `DELETE` | `/notes/{id}/drawing/version/{v}` | Delete a specific drawing version |
+
+### 🎤 Voice Recording & AI Speech-to-Text (`/notes/{id}/audio`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/notes/{id}/audio` | Upload binary audio recording file |
+| `POST` | `/notes/{id}/transcribe` | Transcribe audio recording via Groq Whisper API |
+
+### 🧠 Semantic Search & AI Copilot (`/search` & `/notes/{id}`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/search` | Vector similarity search across notes via `pgvector` |
+| `POST` | `/notes/{id}/ask` | Interactive Q&A chat on document content |
+| `POST` | `/notes/{id}/summarize` | AI-generated executive summary & milestones |
+| `POST` | `/notes/{id}/extract-tasks` | Parse unstructured text into checklist items |
+
+---
+
+## 🛡️ Security & Accessibility Standard
+
+- **Keyboard Accessibility:** Complete keyboard navigation for note selection, popover dialogs, and custom media players using standard ARIA roles (`role="menu"`, `role="region"`).
+- **Cryptographic Security:** Node physics velocity initialization and layout jitter utilize browser-native cryptographic random generators (`window.crypto.getRandomValues`).
+- **Data Protection:** Password hashing using bcrypt/argon2 standards with JWT stateless authentication options.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for details.
