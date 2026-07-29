@@ -4,25 +4,50 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Complete Tech Stack
 
-### Frontend
+### 🎨 Frontend Stack
 ![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript_5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 ![Clerk](https://img.shields.io/badge/Clerk_Auth-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white)
 
-### Backend & Infrastructure
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+- **Framework & Runtime:** Next.js 16 (App Router, Turbopack) & React 19 / React DOM 19
+- **Type System:** TypeScript 5.8
+- **Authentication:** Clerk Auth (`@clerk/nextjs`)
+- **Rich Text Editor:** TipTap Editor Ecosystem (`@tiptap/react`, `@tiptap/starter-kit`, Table, Image, Color, Highlight, Link, Subscript, Superscript, Character Count, Text Align, Font Family)
+- **Vector Canvas Sketchpad:** Fabric.js (`fabric` 7.4.0)
+- **HTTP Client:** Axios (`axios` 1.9.0)
+- **Icons & UI Utilities:** Lucide React (`lucide-react`), `clsx`, DOMPurify (`dompurify`), `date-fns`, `js-cookie`, `react-image-crop`, `react-markdown`, `remark-gfm`
 
-### AI & Speech-to-Text
-![Groq](https://img.shields.io/badge/Groq_AI-F56565?style=for-the-badge&logo=cpu&logoColor=white)
-![Whisper](https://img.shields.io/badge/Whisper_v3-00A67E?style=for-the-badge&logo=openai&logoColor=white)
+---
+
+### ⚡ Backend Stack
+![FastAPI](https://img.shields.io/badge/FastAPI_0.111-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Uvicorn](https://img.shields.io/badge/Uvicorn-4998F8?style=for-the-badge&logo=gunicorn&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![pgvector](https://img.shields.io/badge/pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis_5.0-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+
+- **API Framework & Server:** FastAPI 0.111, Uvicorn (standard with `httptools` & `uvloop`), Starlette
+- **Database & ORM:** PostgreSQL, SQLAlchemy 2.0 (Async Engine), `asyncpg` (async PostgreSQL driver), `pgvector` (Vector database extension), Alembic (Database schema migrations)
+- **Cache & In-Memory Store:** Redis 5.0 (`redis-py` async client)
+- **Rate Limiting & Security:** SlowAPI, Pydantic 2.7, Pydantic-Settings, PyJWT / Python-Jose, Cryptography, Passlib (Bcrypt), Python-Multipart
+- **Async I/O & Utilities:** `aiofiles` (async file I/O & static byte-range audio streaming), Pillow (Image processing), Bleach (HTML sanitization), Tenacity (Async retries & exponential backoff), SendGrid (`sendgrid`)
+
+---
+
+### 🤖 AI, Speech-to-Text & Embeddings
+![Groq](https://img.shields.io/badge/Groq_SDK-F56565?style=for-the-badge&logo=cpu&logoColor=white)
+![Whisper](https://img.shields.io/badge/Groq_Whisper_v3-00A67E?style=for-the-badge&logo=openai&logoColor=white)
+![FastEmbed](https://img.shields.io/badge/FastEmbed-412991?style=for-the-badge&logo=brain&logoColor=white)
+
+- **Speech Transcription:** Groq API (`whisper-large-v3-turbo`)
+- **Document AI & LLMs:** Groq API (`qwen/qwen3.6-27b` / Llama 3 70B) for document Q&A, note summarization, and AI task extraction
+- **Vector Embeddings:** FastEmbed (`fastembed`) & `pgvector` for semantic vector search across notes and transcripts
 
 ---
 
@@ -30,7 +55,7 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 
 ### 📝 Multi-Format Note Workspace
 - **Markdown Text Editor:** Rich text and markdown document editing powered by TipTap with real-time formatting tools and clean typography.
-- **Vector Canvas Sketchpad:** Freehand drawing canvas inside notes with multi-version history tracking (save, switch versions, and delete historical sketches).
+- **Vector Canvas Sketchpad:** Freehand drawing canvas inside notes powered by Fabric.js with multi-version history tracking (save, switch versions, and delete historical sketches).
 - **Voice Note Studio:** In-browser audio recording with real-time soundwave visualization, custom HTML5 audio playback deck (scrubber, `1x-2x` speed control, volume toggle), and AI speech-to-text transcription powered by **Groq Whisper** (`whisper-large-v3-turbo`).
 - **Checklist Planner:** Interactive checkbox lists with AI task extraction that automatically parses meeting notes or context paragraphs into actionable tasks using **Groq LLMs**.
 
@@ -40,7 +65,7 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 - Clickable nodes with smooth zoom, pan, and direct note navigation.
 
 ### 🧠 Semantic Search & Document AI
-- **Semantic Vector Search:** High-speed vector search across titles, markdown content, audio transcripts, and drawing metadata powered by **FastEmbed**.
+- **Semantic Vector Search:** High-speed vector search across titles, markdown content, audio transcripts, and drawing metadata powered by **FastEmbed** and **pgvector**.
 - **AI Document Summarization:** Generate instant key insights and summaries from your notes.
 - **Document Q&A:** Interactive Q&A chat grounded directly on a specific note's content.
 
@@ -71,7 +96,8 @@ Luminote/
 │   │   ├── redis_client.py  # Async Redis client for caching
 │   │   └── main.py          # FastAPI application entrypoint & WebSockets manager
 │   ├── uploads/             # Audio recordings & binary storage
-│   ├── requirements.txt     # Python backend dependencies
+│   ├── requirements.txt     # Python backend dependencies (autogenerated)
+│   ├── requirements.in      # Primary backend requirement declarations
 │   └── .env.example         # Backend environment variables template
 ├── frontend/
 │   ├── app/
