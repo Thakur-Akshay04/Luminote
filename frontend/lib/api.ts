@@ -12,6 +12,10 @@ import type {
   TranscriptResponse,
   ExtractTasksResponse,
   AudioUploadResponse,
+  UserProfile,
+  CreditPackage,
+  CreateOrderResponse,
+  CreditTransactionItem,
 } from "@/types";
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -33,12 +37,17 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// On 401, redirect to sign-in page. On 422, log details to console.
+// On 401, redirect to sign-in page. On 402, trigger insufficient credits modal event. On 422, log details.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
       window.location.href = "/sign-in";
+    }
+    if (err.response?.status === 402 && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("luminote:insufficient_credits", { detail: err.response?.data?.detail })
+      );
     }
     if (err.response?.status === 422) {
       console.error("[Axios 422 Validation Error]", err.config?.url, err.response?.data);
@@ -76,7 +85,7 @@ export function useApi() {
     return res.json();
   };
 
-  return { apiFetch, notesApi, alertsApi, searchApi, usersApi };
+  return { apiFetch, notesApi, alertsApi, searchApi, usersApi, paymentsApi };
 }
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
@@ -170,6 +179,7 @@ export const searchApi = {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
+  getMe: () => api.get<UserProfile>("/users/me"),
   uploadAvatar: (file: Blob, onUploadProgress?: (progressEvent: any) => void) => {
     const formData = new FormData();
     formData.append("file", file, "avatar.jpg");
@@ -185,3 +195,16 @@ export const usersApi = {
     api.patch<{ display_name: string }>("/users/me/name", { display_name: displayName }),
   deleteMe: () => api.delete<void>("/users/me"),
 };
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+export const paymentsApi = {
+  getPackages: () =>
+    api.get<{ packages: Record<string, CreditPackage>; razorpay_key_id: string }>("/payments/packages"),
+  createOrder: (creditPackage: "starter" | "pro" | "power") =>
+    api.post<CreateOrderResponse>("/payments/create-order", { credit_package: creditPackage }),
+  verifyPayment: (data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    api.post<{ status: string; message: string; credit_balance: number }>("/payments/verify", data),
+  getHistory: () =>
+    api.get<CreditTransactionItem[]>("/payments/history"),
+};
+

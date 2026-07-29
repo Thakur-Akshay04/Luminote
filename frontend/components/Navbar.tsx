@@ -4,7 +4,9 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useUser, UserButton } from "@clerk/nextjs";
-import { alertsApi } from "@/lib/api";
+import { alertsApi, usersApi } from "@/lib/api";
+
+import BuyCreditsModal from "@/components/BuyCreditsModal";
 import type { Alert } from "@/types";
 import {
   BookOpen,
@@ -25,6 +27,9 @@ import {
   X,
   User as UserIcon,
   Star,
+  Zap,
+  CreditCard,
+
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -41,6 +46,46 @@ function NavbarContent() {
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  // Credit system state
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [buyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
+  const [buyCreditsInitialMessage, setBuyCreditsInitialMessage] = useState<string | undefined>(undefined);
+
+  // Fetch current user details including credit_balance
+  const fetchUserProfile = async () => {
+    try {
+      const res = await usersApi.getMe();
+      setCreditBalance(res.data.credit_balance);
+    } catch {
+      // silent fail
+    }
+  };
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetchUserProfile();
+
+    // Listen for custom insufficient_credits event triggered by API 402 responses
+    const handleInsufficientCredits = (e: any) => {
+      const msg = e.detail?.message || "Not enough credits to complete this AI task.";
+      setBuyCreditsInitialMessage(msg);
+      setBuyCreditsModalOpen(true);
+    };
+
+    const handleRefreshCredits = () => {
+      fetchUserProfile();
+    };
+
+    window.addEventListener("luminote:insufficient_credits", handleInsufficientCredits);
+    window.addEventListener("luminote:refresh_credits", handleRefreshCredits);
+
+    return () => {
+      window.removeEventListener("luminote:insufficient_credits", handleInsufficientCredits);
+      window.removeEventListener("luminote:refresh_credits", handleRefreshCredits);
+    };
+  }, [isSignedIn]);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -200,8 +245,10 @@ function NavbarContent() {
       { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
       { href: "/calendar", label: "Calendar", icon: Calendar },
       { href: "/search", label: "Search", icon: Search },
+      { href: "/pricing", label: "Pricing", icon: CreditCard },
     ]
     : [];
+
 
   const dropdownOptions = [
     { type: "text", label: "Text", icon: FileText },
@@ -370,6 +417,30 @@ function NavbarContent() {
             <UserButton />
           </div>
         </div>
+
+        {/* Credit Balance Badge */}
+        <div className="-mt-4 px-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              setBuyCreditsInitialMessage(undefined);
+              setBuyCreditsModalOpen(true);
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-brand-600/15 via-indigo-500/10 to-purple-600/15 border border-brand-500/25 hover:border-brand-500/50 hover:bg-brand-500/20 transition-all duration-200 group cursor-pointer shadow-sm"
+            title="Click to top up AI Credits"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-brand-400 fill-brand-400/20 animate-pulse group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold text-white group-hover:text-brand-300">
+                {creditBalance !== null ? `${creditBalance} Credits` : "..."}
+              </span>
+            </div>
+            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-brand-500 text-white shadow-sm group-hover:bg-brand-400 transition-colors">
+              + Top Up
+            </span>
+          </button>
+        </div>
+
 
         {/* Navigation Section */}
         <div className="flex flex-col gap-1.5">
@@ -587,7 +658,15 @@ function NavbarContent() {
           Help
         </button>
       </div>
+
+      <BuyCreditsModal
+        isOpen={buyCreditsModalOpen}
+        onClose={() => setBuyCreditsModalOpen(false)}
+        onSuccess={(newBal) => setCreditBalance(newBal)}
+        initialMessage={buyCreditsInitialMessage}
+      />
     </aside>
+
   );
 }
 

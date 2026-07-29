@@ -149,8 +149,15 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
           chat_history: res.data.chat_history || optimisticHistory,
         });
       }
-    } catch {
-      setChatError("Failed to get an answer. Please try again.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("luminote:refresh_credits"));
+      }
+    } catch (err: any) {
+      if (err.response?.status === 402) {
+        setChatError("Insufficient credits for Q&A (Requires 2 credits). Please top up.");
+      } else {
+        setChatError("Failed to get an answer. Please try again.");
+      }
       if (onUpdateNote) {
         onUpdateNote({
           ...note,
@@ -160,6 +167,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
     } finally {
       setChatLoading(false);
     }
+
   };
 
   const handleClearChat = () => {
@@ -213,11 +221,19 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
       if (onUpdateNote) {
         onUpdateNote(res.data.note);
       }
-    } catch {
-      setSummarizeError("Failed to generate summary.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("luminote:refresh_credits"));
+      }
+    } catch (err: any) {
+      if (err.response?.status === 402) {
+        setSummarizeError("Insufficient credits for Summarization (Requires 5 credits). Please top up.");
+      } else {
+        setSummarizeError("Failed to generate summary.");
+      }
     } finally {
       setSummarizing(false);
     }
+
   };
 
   // Reading Stats
@@ -299,12 +315,20 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
         setAssistantError(refusal);
       } else {
         setAssistantOutput(resultText);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("luminote:refresh_credits"));
+        }
       }
-    } catch {
-      setAssistantError("Failed to process text with AI. Please check your network and try again.");
+    } catch (err: any) {
+      if (err.response?.status === 402) {
+        setAssistantError("Insufficient credits for AI Writing Action (Requires 3 credits). Please top up.");
+      } else {
+        setAssistantError("Failed to process text with AI. Please check your network and try again.");
+      }
     } finally {
       setAssistantLoading(false);
     }
+
   };
 
   const handleInsertToEditor = (textToInsert: string) => {

@@ -117,3 +117,37 @@ export interface ExtractTasksResponse {
 export interface AudioUploadResponse {
   media_url: string;
 }
+
+export interface UserProfile {
+  id: string;
+  clerk_user_id: string | null;
+  email: string;
+  name: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  credit_balance: number;
+  created_at: string | null;
+}
+
+export interface CreditPackage {
+  credits: number;
+  amount_paise: number;
+  name: string;
+}
+
+export interface CreateOrderResponse {
+  order_id: string;
+  amount: number;
+  currency: string;
+  razorpay_key_id: string;
+}
+
+export interface CreditTransactionItem {
+  id: string;
+  type: string;
+  amount: number;
+  feature: string | null;
+  status: string;
+  created_at: string | null;
+}
+
