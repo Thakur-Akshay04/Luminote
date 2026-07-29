@@ -21,4 +21,5 @@ python-dotenv==1.0.1
 Pillow==10.3.0
 aiofiles==24.1.0
 sendgrid==6.11.0
+razorpay==1.4.1
 

@@ -25,7 +25,8 @@ from app.limiter import limiter
 from app.models.alert import Alert
 from app.models.note import Note
 from app.redis_client import close_redis, get_redis
-from app.routers import alerts, audio, auth, checklist, drawing, notes, search, tasks, users
+from app.routers import alerts, audio, auth, checklist, drawing, notes, payments, search, tasks, users
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +106,12 @@ async def check_alerts_loop(manager: ConnectionManager):
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing database...")
+    try:
+        await init_db()
+        logger.info("Database initialized successfully.")
+    except Exception as exc:
+        logger.error("Failed to initialize database: %s", exc)
+
     # Pre-fetch Clerk JWKS keys on startup to avoid cold-start request latency/503 errors
     try:
         from app.auth.clerk import get_jwks
@@ -112,6 +119,7 @@ async def lifespan(app: FastAPI):
         logger.info("Clerk JWKS pre-fetched successfully.")
     except Exception as exc:
         logger.warning("Failed to pre-fetch Clerk JWKS on startup: %s", exc)
+
 
     # Ensure media directories exist
     media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
@@ -300,6 +308,8 @@ app.include_router(drawing.router)
 app.include_router(audio.router)
 app.include_router(checklist.router)
 app.include_router(tasks.router)
+app.include_router(payments.router)
+
 
 # Media file serving with HTTP Range (206 Partial Content) & CORS preflight support
 @app.api_route("/media/{path:path}", methods=["GET", "HEAD", "OPTIONS"])

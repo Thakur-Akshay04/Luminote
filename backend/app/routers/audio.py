@@ -179,6 +179,11 @@ async def transcribe_audio(
             await redis.setex(cache_key, settings.media_cache_ttl, note.transcript)
             return TranscriptResponse(transcript=note.transcript)
 
+    from app.services.credit_service import check_and_deduct_credits
+    # Check and deduct credits for transcription feature (10 credits)
+    await check_and_deduct_credits(user_id, "transcription", cost=10, db=db)
+
+
     # Read audio file from disk matching note_id.*
     matching_files = glob.glob(os.path.join(MEDIA_DIR, f"{note_id}.*"))
     if not matching_files:

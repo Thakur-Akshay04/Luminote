@@ -51,7 +51,32 @@ async def invalidate_user_sessions(user_id: str, redis) -> None:
         await redis.delete(*keys_to_delete)
 
 
+@router.get("/me", status_code=200)
+@limiter.limit("60/minute")
+async def get_me(
+    request: Request,
+    user_id: Annotated[str, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+
+    return {
+        "id": str(user.id),
+        "clerk_user_id": user.clerk_user_id,
+        "email": user.email,
+        "name": user.name,
+        "display_name": user.display_name,
+        "avatar_url": user.avatar_url,
+        "credit_balance": user.credit_balance,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
 @router.post(
+
     "/me/avatar",
     status_code=200,
     responses={

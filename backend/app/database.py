@@ -41,7 +41,7 @@ async def init_db() -> None:
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
         )
-        from app.models import user, note, alert  # noqa: F401 — register models
+        from app.models import user, note, alert, credit_transaction  # noqa: F401 — register models
         await conn.run_sync(Base.metadata.create_all)
 
         # ── Schema migration for Features 1–4 (idempotent) ───────────────────
@@ -76,6 +76,16 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email TEXT",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT true",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(50)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance INTEGER NOT NULL DEFAULT 50",
+            """
+            DO $$ 
+            BEGIN 
+              IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_user_credit_balance_non_negative') THEN 
+                ALTER TABLE users ADD CONSTRAINT chk_user_credit_balance_non_negative CHECK (credit_balance >= 0); 
+              END IF; 
+            END $$;
+            """,
+
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS note_type VARCHAR(20) DEFAULT 'text'",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS media_url TEXT",
             "ALTER TABLE notes ADD COLUMN IF NOT EXISTS transcript TEXT",

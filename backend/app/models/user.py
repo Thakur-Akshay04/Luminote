@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text, text
+from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -9,6 +9,9 @@ from app.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("credit_balance >= 0", name="chk_user_credit_balance_non_negative"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
@@ -26,3 +29,7 @@ class User(Base):
     pending_email: Mapped[str | None] = mapped_column(Text, nullable=True)
     email_verified: Mapped[bool] = mapped_column(default=True, server_default=text("true"), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    credit_balance: Mapped[int] = mapped_column(
+        Integer, default=50, server_default=text("50"), nullable=False
+    )
+

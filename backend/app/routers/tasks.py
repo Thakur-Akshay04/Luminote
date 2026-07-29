@@ -51,6 +51,11 @@ async def extract_note_tasks(
     if not content_to_extract or not content_to_extract.strip():
         return {"tasks": []}
 
+    from app.services.credit_service import check_and_deduct_credits
+    # Check and deduct credits for task extraction feature (3 credits)
+    await check_and_deduct_credits(user_id, "task_extraction", cost=3, db=db)
+
+
     try:
         tasks = await extract_tasks(content_to_extract)
         return {"tasks": tasks}

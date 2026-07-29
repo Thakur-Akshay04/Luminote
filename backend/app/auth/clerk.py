@@ -22,17 +22,17 @@ _jwks_cache = None
 _jwks_lock = asyncio.Lock()
 
 
-async def get_jwks(retries: int = 3, backoff_factor: float = 0.5):
+async def get_jwks(retries: int = 3, backoff_factor: float = 0.5, force_refresh: bool = False):
     global _jwks_cache
 
     # Fast path — already cached
-    if _jwks_cache:
+    if _jwks_cache and not force_refresh:
         return _jwks_cache
 
     # Slow path — acquire lock so only ONE coroutine fetches from Clerk
     async with _jwks_lock:
         # Re-check inside the lock (another coroutine may have populated it)
-        if _jwks_cache:
+        if _jwks_cache and not force_refresh:
             return _jwks_cache
 
         jwks_url = settings.clerk_jwks_url or os.getenv("CLERK_JWKS_URL")
@@ -124,23 +124,27 @@ import time
 async def verify_token(token: str, db: AsyncSession) -> str:
     jwks = await get_jwks()
 
-    payload = jwt.decode(
-        token,
-        jwks,
-        algorithms=["RS256"],
-        options={"verify_aud": False}
-    )
+    try:
+        payload = jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            options={"verify_aud": False}
+        )
+    except JWTError:
+        # Retry with force-refreshed JWKS keys in case Clerk rotated keys
+        jwks = await get_jwks(force_refresh=True)
+        payload = jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            options={"verify_aud": False}
+        )
 
     now = time.time()
     exp = payload.get("exp", 0)
-    if exp and exp < now:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired"
-        )
-
-    iat = payload.get("iat", 0)
-    if iat and (now - iat > 3600):
+    # Allow 60 seconds leeway for minor server clock skew
+    if exp and exp < (now - 60):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired"
@@ -164,18 +168,20 @@ async def get_current_user(
     token = credentials.credentials
     try:
         return await verify_token(token, db)
-    except HTTPException:
+    except HTTPException as exc:
+        logger.warning("Clerk auth HTTP error (%d): %s", exc.status_code, exc.detail)
         raise
-    except JWTError:
-        logger.warning("Clerk JWT verification failed due to invalid token structure or signature")
+    except JWTError as exc:
+        logger.warning("Clerk JWT verification failed due to invalid token structure or signature: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token — please sign in again"
         )
-    except Exception:
-        logger.warning("Clerk JWT verification failed")
+    except Exception as exc:
+        logger.warning("Clerk JWT verification failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token — please sign in again"
         )
+
 

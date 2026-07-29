@@ -123,6 +123,9 @@ async def remove(
     await delete_note(note_id, uuid.UUID(user_id), db)
 
 
+from app.services.credit_service import check_and_deduct_credits
+
+
 @router.post("/{note_id}/ask", response_model=AskResponse)
 @limiter.limit("10/minute")
 async def ask(
@@ -135,6 +138,9 @@ async def ask(
     from datetime import datetime, timezone
 
     note = await get_note(note_id, uuid.UUID(user_id), db)
+
+    # Check and deduct credits for Q&A feature (2 credits)
+    await check_and_deduct_credits(user_id, "qa", cost=2, db=db)
 
     # Safely clone or initialize local list
     history = list(note.chat_history) if note.chat_history else []
@@ -187,6 +193,10 @@ async def summarize(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="AI summarization is disabled for voice and drawing notes."
         )
+
+    # Check and deduct credits for Summarization feature (5 credits)
+    await check_and_deduct_credits(user_id, "summarize", cost=5, db=db)
+
     current_time_str = datetime.now(timezone.utc).isoformat()
     
     text_content = note.content
@@ -284,6 +294,9 @@ async def ai_action(
     # Verify note existence and ownership
     await get_note(note_id, uuid.UUID(user_id), db)
     
+    # Check and deduct credits for AI writing action (3 credits)
+    await check_and_deduct_credits(user_id, "ai_action", cost=3, db=db)
+
     result = await execute_ai_action(
         action=body.action,
         text=body.text,
@@ -291,4 +304,5 @@ async def ai_action(
     )
     
     return AIActionResponse(result=result)
+
 

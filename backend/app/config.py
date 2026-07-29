@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     clerk_secret_key: str = ""
     clerk_jwks_url: str = ""
 
+    # Razorpay Payment Gateway
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+
     # Frontend URL — used for email verification redirects
     frontend_url: str = "http://localhost:3000"
 
