@@ -207,7 +207,7 @@ function getEditorPanelClass(noteType: string, previewMode: boolean): string {
   const display = previewMode ? "hidden sm:flex" : "flex";
   if (noteType === "drawing") return `flex flex-col ${display} w-full overflow-hidden h-full`;
   if (noteType === "checklist") return `flex flex-col ${display} w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto`;
-  if (noteType === "text") return `flex flex-col ${display} w-full overflow-y-auto`;
+  if (noteType === "text" || noteType === "audio") return `flex flex-col ${display} w-full overflow-y-auto`;
   return `flex flex-col ${display} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`;
 }
 
@@ -2066,34 +2066,9 @@ function NoteEditorContent() {
               )}
             </div>
 
-            {/* PREVIEW PANEL (RIGHT) - Only active for audio & checklist types */}
-            {noteType !== "drawing" && noteType !== "text" && (
-              <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} ${noteType === "checklist" ? "w-full sm:w-[35%]" : "w-full sm:w-1/2"
-                } overflow-y-auto`}>
-
-                {noteType === "audio" && (
-                  <>
-                    <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                      <Eye className="w-3.5 h-3.5 text-gray-600" />
-                      <span className="text-xs text-gray-600 font-medium">Voice Note Transcript</span>
-                    </div>
-                    <div className="flex-1 p-4 sm:p-6 prose-luminote overflow-y-auto">
-                      {note?.transcript ? (
-                        <div className="space-y-4">
-                          <p className="text-gray-300 text-sm leading-relaxed">{note.transcript}</p>
-                          <hr className="border-white/[0.06]" />
-                          <div className="text-xs text-gray-500 italic">
-                            Note: The audio transcript is saved inside your note database record and will automatically enrich search insights.
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-700 text-sm italic">
-                          Transcribed text will be generated here when you stop recording.
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
+            {/* PREVIEW PANEL (RIGHT) - Only active for checklist type */}
+            {noteType === "checklist" && (
+              <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-[35%] overflow-y-auto`}>
 
                 {noteType === "checklist" && (
                   <>

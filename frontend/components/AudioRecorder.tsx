@@ -13,9 +13,8 @@ import {
   VolumeX,
   Copy,
   Check,
-  Wand2,
   RefreshCw,
-  Sparkles,
+  FileText,
   Radio,
   FileAudio,
 } from "lucide-react";
@@ -348,34 +347,27 @@ export default function AudioRecorder({
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
-      {/* ── Studio Audio Recording Deck ──────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#16161a] to-[#0d0d10] border border-white/[0.08] shadow-2xl p-6 sm:p-8 flex flex-col items-center justify-center gap-6 text-center">
-        {/* Background Ambient Glow */}
-        <div
-          className={`absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl transition-all duration-700 pointer-events-none ${
-            isRecording
-              ? "bg-red-500/20 scale-125"
-              : audioUrl
-              ? "bg-brand-500/15"
-              : "bg-indigo-500/10"
-          }`}
-        />
-
-        {isRecording ? (
-          <div className="flex flex-col items-center gap-4 z-10 w-full">
-            {/* Live Recording Mic Badge */}
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-wider animate-pulse">
-              <Radio className="w-3.5 h-3.5" />
+    <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto py-2">
+      {/* ── LIVE RECORDING STATE ─────────────────────────────────────────────── */}
+      {isRecording ? (
+        <div className="relative overflow-hidden rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-6 sm:p-8 flex flex-col gap-6">
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
               <span>Recording Live</span>
             </div>
+            <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
+              <Mic className="w-3.5 h-3.5" />
+              <span>High-Quality Audio</span>
+            </div>
+          </div>
 
-            {/* Dynamic Soundwave Visualizer */}
-            <div className="flex items-center justify-center gap-1 h-16 w-full max-w-sm px-4">
+          <div className="flex flex-col items-center justify-center gap-6 py-4">
+            <div className="flex items-center justify-center gap-1.5 h-16 w-full max-w-md px-4">
               {audioLevelsHistory.current.map((lvl, idx) => (
                 <span
                   key={idx}
-                  className="w-1.5 rounded-full bg-gradient-to-t from-red-600 via-rose-400 to-amber-300 transition-all duration-75"
+                  className="w-1.5 rounded-full bg-gradient-to-t from-rose-500 to-amber-400 transition-all duration-75"
                   style={{
                     height: `${Math.max(6, (lvl / 100) * 56)}px`,
                     opacity: 0.4 + (idx / 40) * 0.6,
@@ -384,85 +376,46 @@ export default function AudioRecorder({
               ))}
             </div>
 
-            {/* Live Timer */}
-            <span className="text-3xl font-mono font-bold tracking-tight text-white drop-shadow-md">
+            <div className="text-4xl font-mono font-medium tracking-wider text-white">
               {formatTime(recordingTime)}
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 z-10">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600/30 to-indigo-600/30 border border-brand-500/30 flex items-center justify-center text-brand-400 shadow-lg shadow-brand-500/10">
-              <Mic className="w-8 h-8" />
             </div>
-            <div className="space-y-1">
-              <h3 className="font-bold text-base text-gray-100 tracking-tight">
-                Voice Note Studio
-              </h3>
-              <p className="text-xs text-neutral-400 max-w-sm leading-relaxed">
-                Capture high-quality audio ideas. Transcribe into actionable AI insights on-demand.
-              </p>
-            </div>
-          </div>
-        )}
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-4 z-10">
-          {isRecording ? (
             <button
               type="button"
               onClick={stopRecording}
-              className="flex items-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-sm font-semibold shadow-lg shadow-red-500/25 active:scale-95 transition-all"
+              className="flex items-center gap-2.5 px-7 py-3 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold shadow-lg shadow-rose-600/20 active:scale-95 transition-all"
               id="stop-recording-btn"
             >
               <Square className="w-4 h-4 fill-white" />
-              Stop & Save Recording
+              <span>Stop & Save Recording</span>
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={startRecording}
-              disabled={loading || transcribing}
-              className="flex items-center gap-2.5 px-7 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-semibold shadow-xl shadow-brand-500/20 hover:shadow-brand-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              id="start-recording-btn"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Mic className="w-4 h-4" />
-              )}
-              <span>{loading ? "Saving Audio..." : "Start Recording"}</span>
-            </button>
-          )}
+          </div>
         </div>
-
-        {/* Error notification */}
-        {error && (
-          <div className="w-full max-w-md px-4 py-2.5 bg-red-500/10 border border-red-500/25 rounded-xl text-xs text-red-400 font-medium z-10">
-            {error}
-          </div>
-        )}
-      </div>
-
-      {/* ── Custom HTML5 Audio Player Card ────────────────────────────────────── */}
-      {audioUrl && !isRecording && (
-        <div className="rounded-2xl bg-gradient-to-b from-[#18181c] to-[#0f0f12] border border-white/[0.08] shadow-2xl p-5 sm:p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
-                <FileAudio className="w-3.5 h-3.5" />
-              </div>
-              <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">
-                Voice Recording Player
-              </span>
+      ) : audioUrl ? (
+        /* ── AUDIO CAPTURED STATE (UNIFIED PLAYER & TRANSCRIPT STUDIO VIEW) ──── */
+        <div className="rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-6 sm:p-8 flex flex-col gap-6">
+          {/* Top Bar: Header Info & Compact Re-record CTA */}
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-300 uppercase tracking-wider">
+              <FileAudio className="w-4 h-4 text-brand-400" />
+              <span>Voice Note Audio</span>
             </div>
-            <div className="px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-mono font-medium text-gray-300 flex items-center gap-1 shadow-inner">
-              <span className="text-brand-300 font-semibold">{formatTime(currentTime)}</span>
-              <span className="text-neutral-500">/</span>
-              <span className="text-neutral-400">{formatTime(duration)}</span>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={loading || transcribing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-xs font-medium text-neutral-300 hover:text-white disabled:opacity-50 transition-all"
+                title="Record new audio to overwrite"
+              >
+                <Mic className="w-3.5 h-3.5 text-brand-400" />
+                <span>Re-record</span>
+              </button>
             </div>
           </div>
 
-          {/* Native Audio Element */}
+          {/* HTML5 Audio Element */}
           <audio
             key={audioUrl}
             ref={audioPlayerRef}
@@ -492,7 +445,6 @@ export default function AudioRecorder({
                 if (isFinite(dur) && !isNaN(dur) && dur > 0) {
                   setDuration(dur);
                 } else if (dur === Infinity) {
-                  // WebM duration trick for browser recordings without fixed header
                   audioPlayerRef.current.currentTime = 1e101;
                   setTimeout(() => {
                     if (audioPlayerRef.current) {
@@ -514,10 +466,9 @@ export default function AudioRecorder({
             id="voice-note-audio-player"
           />
 
-          {/* Modern Custom Controls Bar */}
-          <div className="flex flex-col gap-3.5">
-            {/* Scrubber Progress Range Slider */}
-            <div className="relative w-full flex items-center group">
+          {/* Custom Media Player Scrubber & Controls */}
+          <div className="flex flex-col gap-4">
+            <div className="relative w-full flex items-center">
               {(() => {
                 const progressPct =
                   isFinite(duration) && duration > 0
@@ -534,19 +485,18 @@ export default function AudioRecorder({
                     style={{
                       background: `linear-gradient(to right, #8b5cf6 0%, #a855f7 ${progressPct}%, #262626 ${progressPct}%, #262626 100%)`,
                     }}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-brand-400 focus:outline-none transition-all"
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-brand-400 focus:outline-none transition-all"
                   />
                 );
               })()}
             </div>
 
-            {/* Playback Button Toolbar */}
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={togglePlay}
-                  className="w-11 h-11 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-full bg-brand-500 hover:bg-brand-400 text-white flex items-center justify-center shadow-md shadow-brand-500/20 active:scale-95 transition-all"
                   title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
@@ -564,18 +514,24 @@ export default function AudioRecorder({
                       setCurrentTime(0);
                     }
                   }}
-                  className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] text-neutral-300 flex items-center justify-center active:scale-95 transition-all"
+                  className="w-8 h-8 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-neutral-300 flex items-center justify-center active:scale-95 transition-all"
                   title="Restart"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
+
+                <div className="text-xs font-mono font-medium text-neutral-400 ml-1">
+                  <span className="text-neutral-200">{formatTime(currentTime)}</span>
+                  <span className="mx-1 text-neutral-600">/</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={cyclePlaybackRate}
-                  className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] text-xs font-mono font-semibold text-neutral-300 transition-all active:scale-95"
+                  className="px-2.5 py-1 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-xs font-mono font-medium text-neutral-300 transition-all active:scale-95"
                   title="Playback Speed"
                 >
                   {playbackRate}x
@@ -584,13 +540,13 @@ export default function AudioRecorder({
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] text-neutral-300 flex items-center justify-center active:scale-95 transition-all"
+                  className="w-8 h-8 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-neutral-300 flex items-center justify-center active:scale-95 transition-all"
                   title={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted ? (
-                    <VolumeX className="w-4 h-4 text-red-400" />
+                    <VolumeX className="w-3.5 h-3.5 text-red-400" />
                   ) : (
-                    <Volume2 className="w-4 h-4" />
+                    <Volume2 className="w-3.5 h-3.5" />
                   )}
                 </button>
               </div>
@@ -602,68 +558,119 @@ export default function AudioRecorder({
               type="button"
               onClick={() => handleTranscribe(false)}
               disabled={transcribing}
-              className="mt-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600/90 to-indigo-600/90 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-50 transition-all"
+              className="mt-1 w-full py-2.5 rounded-xl bg-surface-800 border border-white/10 hover:border-brand-500/40 text-neutral-200 hover:text-white text-xs font-medium flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50 transition-all"
               id="transcribe-audio-btn"
             >
               {transcribing ? (
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
               ) : (
-                <Wand2 className="w-4 h-4 text-white" />
+                <FileText className="w-4 h-4 text-brand-400" />
               )}
-              <span>{transcribing ? "Transcribing with Groq Whisper..." : "Transcribe Audio with AI"}</span>
+              <span>{transcribing ? "Transcribing Audio..." : "Transcribe Audio"}</span>
             </button>
           )}
-        </div>
-      )}
 
-      {/* ── Voice Transcript Card ────────────────────────────────────────────── */}
-      {transcript && !isRecording && (
-        <div className="rounded-2xl bg-[#141417] border border-white/[0.08] shadow-xl p-5 sm:p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-400" />
-              <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                Voice Transcript
-              </span>
+          {/* Integrated Transcript Section */}
+          {transcript && (
+            <>
+              <div className="h-px bg-white/[0.06] my-1" />
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-brand-400" />
+                    <span className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">
+                      Voice Transcript
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleTranscribe(true)}
+                      disabled={transcribing}
+                      className="text-neutral-400 hover:text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                      title="Regenerate transcript"
+                      id="regenerate-transcript-btn"
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${transcribing ? "animate-spin text-brand-400" : ""}`}
+                      />
+                      <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={copyToClipboard}
+                      className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
+                      title="Copy to clipboard"
+                      id="copy-transcript-btn"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-sm text-neutral-200 leading-relaxed font-sans whitespace-pre-wrap selection:bg-brand-500/30">
+                  {transcript}
+                </p>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="w-full px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-medium">
+              {error}
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleTranscribe(true)}
-                disabled={transcribing}
-                className="text-neutral-400 hover:text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 text-xs font-medium"
-                title="Regenerate transcript"
-                id="regenerate-transcript-btn"
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${transcribing ? "animate-spin text-brand-400" : ""}`}
-                />
-                <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={copyToClipboard}
-                className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
-                title="Copy to clipboard"
-                id="copy-transcript-btn"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
+          )}
+        </div>
+      ) : (
+        /* ── INITIAL NO-AUDIO RECORD STATION (HERO DECK) ───────────────────── */
+        <div className="rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-8 sm:p-12 flex flex-col items-center justify-center gap-6 text-center">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-neutral-400 text-xs font-medium">
+            <span className="w-2 h-2 rounded-full bg-neutral-500" />
+            <span>Ready to Record</span>
           </div>
-          <p className="text-sm text-gray-200 leading-relaxed font-sans whitespace-pre-wrap">
-            {transcript}
-          </p>
+
+          <button
+            type="button"
+            onClick={startRecording}
+            disabled={loading || transcribing}
+            className="group relative w-20 h-20 rounded-full bg-surface-800 border border-white/10 hover:border-brand-500/50 flex items-center justify-center text-brand-400 hover:text-brand-300 shadow-xl shadow-black/40 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+            id="start-recording-btn"
+          >
+            <div className="absolute inset-0 rounded-full bg-brand-500/10 group-hover:scale-110 transition-transform duration-300 pointer-events-none" />
+            {loading ? (
+              <Loader2 className="w-8 h-8 animate-spin" />
+            ) : (
+              <Mic className="w-8 h-8 group-hover:scale-105 transition-transform" />
+            )}
+          </button>
+
+          <div className="space-y-1">
+            <p className="text-base font-medium text-neutral-200">
+              {loading ? "Saving audio recording..." : "Click to record audio"}
+            </p>
+            <p className="text-xs text-neutral-500 max-w-xs">
+              Captures high-fidelity voice notes for automatic transcription
+            </p>
+          </div>
+
+          {error && (
+            <div className="w-full max-w-md px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-medium">
+              {error}
+            </div>
+          )}
         </div>
       )}
     </div>
