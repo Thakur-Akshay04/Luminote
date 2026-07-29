@@ -310,27 +310,34 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen pb-20 pt-6 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto font-sans antialiased text-zinc-100 animate-fade-in">
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <header className="text-center max-w-3xl mx-auto mb-14">
-        <h1 className="group cursor-default text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-4 transition-all duration-500">
-          <span className="inline-block transition-all duration-500 group-hover:bg-gradient-to-r group-hover:from-white group-hover:via-violet-300 group-hover:to-indigo-200 group-hover:bg-clip-text group-hover:text-transparent group-hover:scale-[1.01]">
-            Simple pricing.
-          </span>{" "}
-          <span className="inline-block transition-all duration-500 group-hover:bg-gradient-to-r group-hover:from-violet-300 group-hover:via-purple-300 group-hover:to-pink-300 group-hover:bg-clip-text group-hover:text-transparent group-hover:scale-[1.01]">
-            No subscriptions.
-          </span>
-        </h1>
+      <header className="relative mb-12 p-8 sm:p-10 rounded-3xl bg-zinc-900/70 border border-zinc-800 backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+        <div>
+          <div className="flex items-center gap-2 text-violet-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI Credit System</span>
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
+            Pay-as-you-go credit plans
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-2 max-w-lg font-normal leading-relaxed">
+            Top up your workspace credits anytime. Unused credits never expire and roll over automatically without recurring monthly fees.
+          </p>
+        </div>
 
-        <p className="text-sm sm:text-base text-zinc-400 font-normal leading-relaxed">
-          Buy credit top-ups whenever you need them. Credits never expire and roll over automatically.
-        </p>
-
-        {/* User Balance Widget */}
+        {/* Integrated Right-Side Balance Card */}
         {userProfile && (
-          <div className="mt-6 inline-flex items-center gap-3 px-4 py-2 rounded-full bg-zinc-900/90 border border-zinc-800 backdrop-blur-md hover:border-violet-500/50 hover:bg-zinc-900 transition-all duration-300 shadow-lg shadow-black/20 group/balance">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <Coins className="w-4 h-4 text-violet-400 group-hover/balance:rotate-12 transition-transform" />
-            <span className="text-xs font-medium text-zinc-400">Current Balance:</span>
-            <span className="text-sm font-bold text-white tracking-tight">{userProfile.credit_balance} Credits</span>
+          <div className="shrink-0 p-5 rounded-2xl bg-zinc-950/80 border border-zinc-800 flex flex-col items-start md:items-end gap-1.5 min-w-[210px] hover:border-violet-500/40 transition-colors">
+            <div className="flex items-center gap-2 text-zinc-400 text-[11px] font-semibold uppercase tracking-wider">
+              <Coins className="w-3.5 h-3.5 text-violet-400" />
+              <span>Available Balance</span>
+            </div>
+            <div className="text-2xl font-black text-white tracking-tight">
+              {userProfile.credit_balance} <span className="text-xs font-bold text-violet-400">Credits</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Account Active
+            </span>
           </div>
         )}
       </header>
