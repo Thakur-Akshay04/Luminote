@@ -1,6 +1,6 @@
 # Luminote
 
-Luminote is a modern, high-performance note-taking and knowledge management workspace. It combines rich markdown editing, freehand vector canvas sketching, voice note recording with AI speech-to-text transcription, interactive checklists, and a visual Thought Map network graph powered by FastAPI, Next.js, and AI.
+Luminote is a modern, high-performance note-taking and knowledge management workspace. It combines rich markdown editing, voice note recording with AI speech-to-text transcription, interactive checklists, and a visual Thought Map network graph powered by FastAPI, Next.js, and AI.
 
 ---
 
@@ -18,7 +18,6 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 - **Type System:** TypeScript 5.8
 - **Authentication:** Clerk Auth (`@clerk/nextjs`)
 - **Rich Text Editor:** TipTap Editor Ecosystem (`@tiptap/react`, `@tiptap/starter-kit`, Table, Image, Color, Highlight, Link, Subscript, Superscript, Character Count, Text Align, Font Family)
-- **Vector Canvas Sketchpad:** Fabric.js (`fabric` 7.4.0)
 - **HTTP Client:** Axios (`axios` 1.9.0)
 - **Icons & UI Utilities:** Lucide React (`lucide-react`), `clsx`, DOMPurify (`dompurify`), `date-fns`, `js-cookie`, `react-image-crop`, `react-markdown`, `remark-gfm`
 
@@ -55,17 +54,16 @@ Luminote is a modern, high-performance note-taking and knowledge management work
 
 ### 📝 Multi-Format Note Workspace
 - **Markdown Text Editor:** Rich text and markdown document editing powered by TipTap with real-time formatting tools and clean typography.
-- **Vector Canvas Sketchpad:** Freehand drawing canvas inside notes powered by Fabric.js with multi-version history tracking (save, switch versions, and delete historical sketches).
 - **Voice Note Studio:** In-browser audio recording with real-time soundwave visualization, custom HTML5 audio playback deck (scrubber, `1x-2x` speed control, volume toggle), and AI speech-to-text transcription powered by **Groq Whisper** (`whisper-large-v3-turbo`).
 - **Checklist Planner:** Interactive checkbox lists with AI task extraction that automatically parses meeting notes or context paragraphs into actionable tasks using **Groq LLMs**.
 
 ### 🕸️ Interactive Thought Map
 - Fullscreen interactive node graph visualizer mapping connections between your notes.
-- Filter node network by note type (Text, Drawing, Audio, Checklist), search by title, or filter by custom tags.
+- Filter node network by note type (Text, Audio, Checklist), search by title, or filter by custom tags.
 - Clickable nodes with smooth zoom, pan, and direct note navigation.
 
 ### 🧠 Semantic Search & Document AI
-- **Semantic Vector Search:** High-speed vector search across titles, markdown content, audio transcripts, and drawing metadata powered by **FastEmbed** and **pgvector**.
+- **Semantic Vector Search:** High-speed vector search across titles, markdown content, and audio transcripts powered by **FastEmbed** and **pgvector**.
 - **AI Document Summarization:** Generate instant key insights and summaries from your notes.
 - **Document Q&A:** Interactive Q&A chat grounded directly on a specific note's content.
 
@@ -87,7 +85,7 @@ Luminote/
 │   ├── app/
 │   │   ├── auth/            # Clerk JWT authentication verification
 │   │   ├── models/          # SQLAlchemy DB models (Note, Alert, User)
-│   │   ├── routers/         # FastAPI endpoint routers (notes, audio, drawing, search, alerts, tasks)
+│   │   ├── routers/         # FastAPI endpoint routers (notes, audio, search, alerts, tasks)
 │   │   ├── schemas/         # Pydantic data validation schemas
 │   │   ├── services/        # Business logic & AI processing services
 │   │   ├── config.py        # Environment settings & AI model configurations
@@ -181,12 +179,6 @@ pnpm run dev
 ### 🎤 Audio & Speech (`/notes/{id}`)
 - `POST /notes/{id}/audio` — Upload audio recording file
 - `POST /notes/{id}/transcribe` — Transcribe audio using Groq Whisper
-
-### 🎨 Drawing Canvas (`/notes/{id}/drawing`)
-- `POST /notes/{id}/drawing` — Save canvas drawing version
-- `GET /notes/{id}/drawing` — Fetch drawing versions
-- `POST /notes/{id}/drawing/switch` — Switch active drawing version
-- `DELETE /notes/{id}/drawing/version/{version}` — Delete a drawing version
 
 ### 📋 Checklists & Tasks
 - `PATCH /notes/{id}/checklist/{index}` — Toggle checklist item completion
