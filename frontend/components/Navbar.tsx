@@ -19,7 +19,6 @@ import {
   ChevronDown,
   FileText,
   Mic,
-  Palette,
   ListTodo,
   Bell,
   Trash2,
@@ -253,7 +252,6 @@ function NavbarContent() {
   const dropdownOptions = [
     { type: "text", label: "Text", icon: FileText },
     { type: "audio", label: "Voice", icon: Mic },
-    { type: "drawing", label: "Drawing", icon: Palette },
     { type: "checklist", label: "Checklist", icon: ListTodo },
   ];
 

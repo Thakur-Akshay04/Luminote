@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Brain, AudioLines, Palette, FileText, Zap, Calendar, Bot } from "lucide-react";
+import { Brain, AudioLines, FileText, Zap, Calendar, Bot } from "lucide-react";
 
 interface Node {
   id: string;
@@ -133,21 +133,6 @@ const INITIAL_NODES: Node[] = [
     glowColor: "rgba(6, 182, 212, 0.15)",
   },
   {
-    id: "sketch",
-    name: "Canvas Sketching",
-    x: 380,
-    y: 180,
-    vx: 0,
-    vy: 0,
-    size: 60,
-    icon: Palette,
-    baseBorder: "border-pink-500/30",
-    hoverBorder: "border-pink-400 shadow-[0_0_20px_rgba(219,39,119,0.4)]",
-    baseIconColor: "text-pink-500/60",
-    iconColor: "text-pink-300",
-    glowColor: "rgba(219, 39, 119, 0.15)",
-  },
-  {
     id: "editor",
     name: "Markdown Notes",
     x: 120,
@@ -235,7 +220,6 @@ export default function InteractiveThoughtMap() {
       const positions: Record<string, { x: number; y: number }> = {
         core: { x: center.x, y: center.y },
         voice: { x: center.x - 180, y: center.y - 140 },
-        sketch: { x: center.x + 180, y: center.y - 130 },
         editor: { x: center.x - 190, y: center.y + 150 },
         tasks: { x: center.x + 190, y: center.y + 140 },
         calendar: { x: center.x, y: center.y - 210 },
@@ -264,14 +248,13 @@ export default function InteractiveThoughtMap() {
       const mouse = mouseRef.current;
       const dims = dimensionsRef.current;
 
-      for (let i = 0; i < currentNodes.length; i++) {
-        applyPhysicsToNode(currentNodes[i], mouse, dims, currentNodes);
+      for (const node of currentNodes) {
+        applyPhysicsToNode(node, mouse, dims, currentNodes);
       }
 
       // Direct DOM updates for 60fps performance without React re-renders
       const core = currentNodes.find((n) => n.id === "core");
-      for (let i = 0; i < currentNodes.length; i++) {
-        const node = currentNodes[i];
+      for (const node of currentNodes) {
         const el = nodeRefs.current[node.id];
         if (el) {
           el.style.left = `${node.x}px`;
@@ -319,7 +302,7 @@ export default function InteractiveThoughtMap() {
       onMouseLeave={handleMouseLeave}
     >
       {/* Connected Lines */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
         <defs>
           <linearGradient id="purple-cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.45" />
@@ -352,6 +335,12 @@ export default function InteractiveThoughtMap() {
         const Icon = node.icon;
         const isHovered = hoveredNodeId === node.id;
         const isCore = node.id === "core";
+        const bubbleStyle = isHovered
+          ? `scale-110 shadow-2xl ${node.hoverBorder}`
+          : `border-white/[0.04] ${node.baseBorder}`;
+        const iconStyle = isHovered
+          ? `${node.iconColor} scale-110`
+          : node.baseIconColor;
 
         return (
           <div
@@ -403,14 +392,10 @@ export default function InteractiveThoughtMap() {
 
             {/* Obsidian Glass Circle Bubble */}
             <div
-              className={`w-full h-full rounded-full bg-[#0a0a0c]/90 backdrop-blur-md border flex items-center justify-center transition-all duration-300 ${isHovered
-                ? `scale-110 shadow-2xl ${node.hoverBorder}`
-                : `border-white/[0.04] ${node.baseBorder}`
-                }`}
+              className={`w-full h-full rounded-full bg-[#0a0a0c]/90 backdrop-blur-md border flex items-center justify-center transition-all duration-300 ${bubbleStyle}`}
             >
               <Icon
-                className={`transition-all duration-300 ${isHovered ? `${node.iconColor} scale-110` : `${node.baseIconColor}`
-                  }`}
+                className={`transition-all duration-300 ${iconStyle}`}
                 style={{
                   width: node.size * 0.42,
                   height: node.size * 0.42,

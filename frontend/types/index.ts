@@ -101,11 +101,6 @@ export interface SummarizeResponse {
   alerts: Alert[];
 }
 
-export interface DrawingResponse {
-  media_url: string | null;
-  versions: string[];
-}
-
 export interface TranscriptResponse {
   transcript: string;
 }

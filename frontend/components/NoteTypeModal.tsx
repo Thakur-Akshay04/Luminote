@@ -7,7 +7,6 @@ import {
   FileText, 
   ListTodo, 
   Mic, 
-  Palette,
   Notebook
 } from "lucide-react";
 
@@ -60,14 +59,6 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
       icon: Mic,
       colorClass: "text-accent-pink bg-accent-pink/10",
       hoverClass: "hover:shadow-[0_0_20px_rgba(219,39,119,0.15)] hover:border-accent-pink/40",
-    },
-    {
-      id: "drawing",
-      label: "Drawing Canvas",
-      description: "Sketch and visualize your ideas on a freehand canvas.",
-      icon: Palette,
-      colorClass: "text-accent-amber bg-accent-amber/10",
-      hoverClass: "hover:shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:border-accent-amber/40",
     },
   ];
 

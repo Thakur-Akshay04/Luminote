@@ -10,10 +10,8 @@ import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
 import ConfirmModal from "@/components/ConfirmModal";
-import type { DrawingCanvasRef } from "@/components/DrawingCanvas";
 import ChecklistEditor from "@/components/ChecklistEditor";
 
-const DrawingCanvas = dynamic(() => import("@/components/DrawingCanvas"), { ssr: false });
 const AudioRecorder = dynamic(() => import("@/components/AudioRecorder"), { ssr: false });
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
@@ -205,7 +203,6 @@ const ResizableImage = ImageExtension.extend({
 
 function getEditorPanelClass(noteType: string, previewMode: boolean): string {
   const display = previewMode ? "hidden sm:flex" : "flex";
-  if (noteType === "drawing") return `flex flex-col ${display} w-full overflow-hidden h-full`;
   if (noteType === "checklist") return `flex flex-col ${display} w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto`;
   if (noteType === "text" || noteType === "audio") return `flex flex-col ${display} w-full overflow-y-auto`;
   return `flex flex-col ${display} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`;
@@ -242,7 +239,6 @@ function NoteEditorContent() {
   const contentRef = useRef("");
   const descriptionRef = useRef("");
   const aiContextRef = useRef("");
-  const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
 
   // Tabbed Rich Text Toolbar
   const [activeToolbarTab, setActiveToolbarTab] = useState<string>("Formatting");
@@ -823,12 +819,8 @@ function NoteEditorContent() {
       }
     }
 
-    if (noteType === "drawing" && drawingCanvasRef.current) {
-      await drawingCanvasRef.current.save(activeId);
-    } else {
-      isDirty.current = true;
-      saveNote();
-    }
+    isDirty.current = true;
+    saveNote();
   };
 
   const handleNoteTypeChange = (type: string) => {
@@ -1011,7 +1003,6 @@ function NoteEditorContent() {
         <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-xl p-1 shrink-0 select-none items-center gap-1">
           {[
             { id: "text", label: "Text", icon: FileText },
-            { id: "drawing", label: "Drawing", icon: Palette },
             { id: "audio", label: "Voice", icon: Mic },
             { id: "checklist", label: "Task", icon: ListTodo },
           ].map((type) => {
@@ -1066,7 +1057,7 @@ function NoteEditorContent() {
 
         <div className="flex items-center gap-2.5 ml-auto shrink-0">
           {/* Preview toggle (mobile) - hidden for text notes */}
-          {noteType !== "drawing" && noteType !== "text" && (
+          {noteType !== "text" && (
             <button
               onClick={() => setPreviewMode(!previewMode)}
               className="sm:hidden w-9 h-9 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 text-gray-300 flex items-center justify-center text-xs active:scale-95 transition-all"
@@ -1133,12 +1124,10 @@ function NoteEditorContent() {
               </div>
               <div className="flex items-center gap-2">
                 {noteType === "text" && <FileText className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
-                {noteType === "drawing" && <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                 {noteType === "audio" && <Mic className="w-3.5 h-3.5 text-pink-400 shrink-0" />}
                 {noteType === "checklist" && <ListTodo className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                 <span className="text-sm font-bold text-white tracking-tight truncate">
                   {noteType === "text" && "Text Notes"}
-                  {noteType === "drawing" && "Drawing Notes"}
                   {noteType === "audio" && "Voice Notes"}
                   {noteType === "checklist" && "Checklists"}
                   {!noteType && "Notes"}
@@ -1241,7 +1230,6 @@ function NoteEditorContent() {
 
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        {n.note_type === "drawing" && <Palette className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
                         {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
                         {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
 
@@ -1956,22 +1944,6 @@ function NoteEditorContent() {
                   </div>
 
                   <EditorContent editor={editor} className="flex-1" />
-                </div>
-              )}
-
-              {noteType === "drawing" && (
-                <div className="p-3 pb-1 sm:p-4 sm:pb-1 flex-1 flex flex-col min-h-0">
-                  <DrawingCanvas
-                    ref={drawingCanvasRef}
-                    noteId={noteId}
-                    mediaUrl={note?.media_url || null}
-                    onDrawingSave={(newUrl) => {
-                      if (note) {
-                        setNote({ ...note, media_url: newUrl });
-                      }
-                    }}
-                    onSaveBeforeAction={ensureNoteSaved}
-                  />
                 </div>
               )}
 

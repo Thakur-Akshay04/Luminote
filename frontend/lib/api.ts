@@ -8,7 +8,6 @@ import type {
   AskResponse,
   Alert,
   SummarizeResponse,
-  DrawingResponse,
   TranscriptResponse,
   ExtractTasksResponse,
   AudioUploadResponse,
@@ -123,16 +122,6 @@ export const notesApi = {
     api.post<AskResponse>(`/notes/${id}/ask`, { question }),
   summarize: (id: string, format: string, extractAlerts: boolean) =>
     api.post<SummarizeResponse>(`/notes/${id}/summarize`, { format, extract_alerts: extractAlerts }),
-
-  // Freehand Drawing
-  saveDrawing: (id: string, base64Image: string) =>
-    api.post<DrawingResponse>(`/notes/${id}/drawing`, { image: base64Image }),
-  getDrawing: (id: string) =>
-    api.get<DrawingResponse>(`/notes/${id}/drawing`),
-  switchDrawingVersion: (id: string, version: number) =>
-    api.post<DrawingResponse>(`/notes/${id}/drawing/switch`, { version }),
-  deleteDrawingVersion: (id: string, version: number) =>
-    api.delete<DrawingResponse>(`/notes/${id}/drawing/version/${version}`),
 
   // Audio Recording & Transcription
   uploadAudio: (id: string, audioBlob: Blob, filename: string = "recording.webm") => {

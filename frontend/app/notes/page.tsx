@@ -60,7 +60,6 @@ function NotesContent() {
     const typeMap: { [key: string]: string } = {
       text: "Text Notes",
       audio: "Voice Notes",
-      drawing: "Drawing Notes",
       checklist: "Checklists",
     };
     return typeMap[noteTypeParam] || "My Notes";

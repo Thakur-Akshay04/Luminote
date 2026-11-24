@@ -12,8 +12,8 @@ import {
   Bell,
   Notebook,
   FileText,
+  ListTodo,
   Mic,
-  Palette,
   Shield,
   ArrowRight,
   CheckCircle2,
@@ -508,22 +508,19 @@ export default function LandingPage() {
                               </div>
                             </div>
 
-                            {/* Sketch Attachment */}
+                            {/* Checklist Attachment */}
                             <div className="border border-white/[0.06] bg-[#121217]/40 p-3 rounded-2xl flex flex-col justify-between" style={{ transform: "translateZ(25px)" }}>
                               <div className="flex items-center gap-2 mb-1.5">
                                 <div className="w-6 h-6 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
-                                  <Palette className="w-3.5 h-3.5" />
+                                  <ListTodo className="w-3.5 h-3.5" />
                                 </div>
-                                <span className="text-[10px] font-bold text-white truncate">PH Wireframe.png</span>
+                                <span className="text-[10px] font-bold text-white truncate">Sprint Tasks</span>
                               </div>
-                              {/* Hand-drawn Mockup SVG */}
-                              <div className="bg-[#030303]/60 border border-white/[0.05] rounded-xl p-1.5 h-10 flex items-center justify-center overflow-hidden">
-                                <svg className="w-full h-full text-brand-400/40 stroke-current" viewBox="0 0 100 40" fill="none" strokeWidth="1.5">
-                                  <path d="M 5 5 L 95 5 L 95 35 L 5 35 Z" strokeDasharray="2 2" />
-                                  <path d="M 5 13 L 95 13" />
-                                  <path d="M 12 24 L 60 24" strokeWidth="1" />
-                                  <circle cx="80" cy="24" r="4" />
-                                </svg>
+                              <div className="bg-[#030303]/60 border border-white/[0.05] rounded-xl p-2 h-10 flex flex-col justify-center gap-1 overflow-hidden">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-2.5 h-2.5 rounded bg-brand-500/30 shrink-0" />
+                                  <span className="text-[9px] text-neutral-400 truncate">Core API integration</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -653,7 +650,7 @@ export default function LandingPage() {
                   {/* Mock Search Input */}
                   <div className="flex items-center gap-2 bg-[#0c0c0f] border border-white/[0.06] rounded-lg px-3 py-1.5 text-xs text-neutral-400">
                     <Search className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                    <span>Search: "PH product wireframes and layout drawings"</span>
+                    <span>Search: "PH product wireframes and sprint plans"</span>
                   </div>
                   {/* Results preview */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -758,19 +755,19 @@ export default function LandingPage() {
                   <div className="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shadow-md">
                     <Notebook className="w-5.5 h-5.5" />
                   </div>
-                  <h3 className="text-lg font-bold text-white tracking-wide mt-4">Multimodal Canvas</h3>
+                  <h3 className="text-lg font-bold text-white tracking-wide mt-4">Structured Workspace</h3>
                   <p className="text-xs text-zinc-400 leading-relaxed mt-2 max-w-xl">
-                    Organize raw ideas with multiple structural tools. Create real-time task lists, embed drawing boards, and build document networks.
+                    Organize raw ideas with multiple structural tools. Create real-time task lists, interactive checklists, and build document networks.
                   </p>
                 </div>
 
-                {/* Visual Mockup: Split Checklist and Canvas */}
+                {/* Visual Mockup: Split Checklist and Tasks */}
                 <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 grid grid-cols-2 gap-4 h-[106px]">
                   {/* Left Side: Checklist */}
                   <div className="flex flex-col justify-center gap-2 border-r border-white/[0.04] pr-2">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-3.5 h-3.5 text-brand-400 shrink-0" />
-                      <span className="text-[10px] text-neutral-500 line-through truncate font-medium">Finalize PH wireframe sketch</span>
+                      <span className="text-[10px] text-neutral-500 line-through truncate font-medium">Finalize roadmap review</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-3.5 h-3.5 rounded border border-white/20 shrink-0" />
@@ -778,14 +775,10 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Right Side: Sketch Mockup */}
-                  <div className="flex items-center justify-center bg-[#0c0c0f]/80 border border-white/[0.06] rounded-lg p-2 overflow-hidden h-full">
-                    <svg className="w-full h-full text-neutral-600 opacity-60 stroke-current" viewBox="0 0 100 40" fill="none" strokeWidth="1.5">
-                      <path d="M 5 5 L 95 5 L 95 35 L 5 35 Z" strokeDasharray="2 2" />
-                      <path d="M 5 13 L 95 13" />
-                      <path d="M 12 24 L 60 24" strokeWidth="1" />
-                      <circle cx="80" cy="24" r="4" className="text-brand-500/50" fill="currentColor" />
-                    </svg>
+                  {/* Right Side: Notes Preview */}
+                  <div className="flex flex-col justify-center gap-1.5 bg-[#0c0c0f]/80 border border-white/[0.06] rounded-lg p-2.5 overflow-hidden h-full">
+                    <span className="text-[10px] font-bold text-neutral-300 truncate">Sprint Documentation</span>
+                    <span className="text-[9px] text-neutral-500 line-clamp-2">Architecture diagrams and API specs finalized for v2 release.</span>
                   </div>
                 </div>
               </SpotlightCard>
@@ -840,7 +833,7 @@ export default function LandingPage() {
                 <div className="relative group/step">
                   <div className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-[10px] font-bold text-brand-300">1</div>
                   <h4 className="text-xs sm:text-sm font-bold text-white">Dump your thoughts</h4>
-                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Quick text, voice memos, workflows, or sketches. Drop it in raw without worrying about formatting or folders.</p>
+                  <p className="text-[11px] sm:text-xs text-zinc-400 leading-relaxed mt-1">Quick text, voice memos, workflows, or checklists. Drop it in raw without worrying about formatting or folders.</p>
                 </div>
 
                 {/* Step 2 */}

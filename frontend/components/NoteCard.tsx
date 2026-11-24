@@ -1,7 +1,7 @@
 import type { Note } from "@/types";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { FileText, Mic, Palette, ListTodo, Trash2, Clock, Pin, Star } from "lucide-react";
+import { FileText, Mic, ListTodo, Trash2, Clock, Pin, Star } from "lucide-react";
 import clsx from "clsx";
 
 interface NoteCardProps {
@@ -41,16 +41,6 @@ const typeConfig: {
     iconClass: "bg-rose-500/10 border-rose-500/20 text-rose-400",
     labelClass: "text-rose-400 bg-rose-500/10 border-rose-500/10",
     accentLine: "bg-rose-500/30",
-  },
-  drawing: {
-    icon: Palette,
-    label: "Drawing Note",
-    subtitle: "Canvas sketch board",
-    glowClass: "bg-violet-500/5 group-hover:bg-violet-500/10",
-    borderClass: "hover:border-violet-500/25 hover:shadow-violet-950/20",
-    iconClass: "bg-violet-500/10 border-violet-500/20 text-violet-400",
-    labelClass: "text-violet-400 bg-violet-500/10 border-violet-500/10",
-    accentLine: "bg-violet-500/30",
   },
   checklist: {
     icon: ListTodo,
@@ -121,7 +111,7 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
     }
 
     if (!cleaned) {
-      return effectiveType === "drawing" ? "" : "Start writing here...";
+      return "Start writing here...";
     }
     return cleaned.slice(0, 120);
   };
@@ -130,7 +120,7 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
   const getWordCount = () => {
     const rawText = extractCleanNoteText(note);
     const cleaned = rawText
-      .replace(/^(Start writing here[….]*|Start writing|Draw here)\s*/i, "")
+      .replace(/^(Start writing here[….]*|Start writing)\s*/i, "")
       .trim();
     return cleaned.split(/\s+/).filter(Boolean).length;
   };
@@ -201,35 +191,6 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
               </div>
             ) : (
               <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2">{preview || "No tasks listed."}</p>
-            )}
-          </div>
-        );
-      }
-
-      case "drawing": {
-        return (
-          <div className="space-y-2 z-10">
-            {/* Minimal Sketchpad Outline */}
-            <div className="relative h-24 w-full rounded-lg border border-violet-500/10 bg-violet-950/10 overflow-hidden flex items-center justify-center group-hover:bg-violet-950/20 group-hover:border-violet-500/20 transition-all duration-300">
-              {/* Dot Grid Background */}
-              <div
-                className="absolute inset-0 opacity-[0.03]"
-                style={{
-                  backgroundImage: "radial-gradient(#8b5cf6 1px, transparent 1px)",
-                  backgroundSize: "12px 12px"
-                }}
-              />
-
-              {/* Clean abstract stroke line */}
-              <svg className="w-1/2 h-1/2 opacity-35 text-violet-400 group-hover:opacity-60 transition-opacity duration-300" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 25 C 25 5, 45 35, 60 20 S 75 10, 90 20" />
-                <circle cx="90" cy="20" r="2" fill="currentColor" />
-              </svg>
-            </div>
-            {preview && (
-              <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2 italic">
-                "{preview}"
-              </p>
             )}
           </div>
         );

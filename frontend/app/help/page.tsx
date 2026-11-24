@@ -31,7 +31,7 @@ const FAQS: FAQItem[] = [
     id: "what-is-luminote",
     category: "general",
     question: "What is Luminote?",
-    answer: "Luminote is a next-generation AI note-taking and thought workspace. It combines rich-text Markdown editing, freehand drawings, voice recordings with transcription, semantic vector search, and automated AI insights into a unified workspace.",
+    answer: "Luminote is a next-generation AI note-taking and thought workspace. It combines rich-text Markdown editing, interactive checklists, voice recordings with transcription, semantic vector search, and automated AI insights into a unified workspace.",
     tags: ["Overview", "Features", "Getting Started"],
   },
   {
