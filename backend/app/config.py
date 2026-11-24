@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     ai_cache_ttl: int = 7 * 24 * 60 * 60       # 7 days
     search_cache_ttl: int = 10 * 60              # 10 minutes
     session_ttl: int = 7 * 24 * 60 * 60         # 7 days
-    media_cache_ttl: int = 7 * 24 * 60 * 60     # 7 days (drawings, transcripts)
+    media_cache_ttl: int = 7 * 24 * 60 * 60     # 7 days (transcripts)
     checklist_cache_ttl: int = 1 * 24 * 60 * 60  # 1 day
 
     def model_post_init(self, __context: object) -> None:

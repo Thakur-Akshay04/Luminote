@@ -188,10 +188,10 @@ async def summarize(
     from datetime import datetime, timezone
     
     note = await get_note(note_id, uuid.UUID(user_id), db)
-    if note.note_type in ("audio", "drawing"):
+    if note.note_type == "audio":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="AI summarization is disabled for voice and drawing notes."
+            detail="AI summarization is disabled for voice notes."
         )
 
     # Check and deduct credits for Summarization feature (5 credits)

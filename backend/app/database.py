@@ -98,6 +98,7 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_notes_favorite ON notes (is_favorite)",
             "CREATE INDEX IF NOT EXISTS idx_notes_checklist ON notes USING GIN (checklist_items)",
             "CREATE INDEX IF NOT EXISTS idx_notes_embedding_hnsw ON notes USING hnsw (embedding vector_cosine_ops)",
+            "UPDATE notes SET note_type = 'text', media_url = NULL WHERE note_type = 'drawing'",
             """
             CREATE OR REPLACE FUNCTION immutable_array_to_string(arr TEXT[], sep TEXT)
             RETURNS TEXT AS $$

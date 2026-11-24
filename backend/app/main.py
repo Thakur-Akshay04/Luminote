@@ -25,7 +25,7 @@ from app.limiter import limiter
 from app.models.alert import Alert
 from app.models.note import Note
 from app.redis_client import close_redis, get_redis
-from app.routers import alerts, audio, auth, checklist, drawing, notes, payments, search, tasks, users
+from app.routers import alerts, audio, auth, checklist, notes, payments, search, tasks, users
 
 
 logging.basicConfig(
@@ -123,7 +123,6 @@ async def lifespan(app: FastAPI):
 
     # Ensure media directories exist
     media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
-    os.makedirs(os.path.join(media_base, "drawings"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "uploads"), exist_ok=True)
     os.makedirs(os.path.join(media_base, "avatars"), exist_ok=True)
@@ -304,7 +303,6 @@ app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(search.router)
 app.include_router(alerts.router)
-app.include_router(drawing.router)
 app.include_router(audio.router)
 app.include_router(checklist.router)
 app.include_router(tasks.router)

@@ -119,7 +119,7 @@ async def _run_ai_pipeline(
 
         text_content = _parse_note_text_content(content)
 
-        if note_type in ("audio", "drawing", "checklist"):
+        if note_type in ("audio", "checklist"):
             await _process_non_text_note(note_id, text_content, note_type, session_factory)
             return
 

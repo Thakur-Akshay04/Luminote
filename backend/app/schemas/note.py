@@ -42,7 +42,7 @@ class NoteCreate(BaseModel):
     def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        allowed = {"text", "checklist", "drawing", "audio"}
+        allowed = {"text", "checklist", "audio"}
         if v not in allowed:
             raise ValueError(f"note_type must be one of {allowed}")
         return v
@@ -70,7 +70,7 @@ class NoteUpdate(BaseModel):
     def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        allowed = {"text", "checklist", "drawing", "audio"}
+        allowed = {"text", "checklist", "audio"}
         if v not in allowed:
             raise ValueError(f"note_type must be one of {allowed}")
         return v
