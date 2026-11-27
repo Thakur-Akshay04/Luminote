@@ -5,20 +5,23 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import delete, select, update
+from fastapi import HTTPException, status
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.config import settings
-from app.models.note import Note
 from app.models.alert import Alert
-from app.redis_client import get_redis
+from app.models.note import Note
+from app.pagination import decode_cursor, encode_cursor
+from app.redis_client import bump_search_version, redis_delete_safe, redis_setex_safe
 from app.services.ai_service import get_embedding, summarize_note_with_ai
-
 
 logger = logging.getLogger(__name__)
 
 
 def extract_text_from_tiptap_json(node) -> str:
+    """Recursively extract plain text from a Tiptap JSON document."""
     if not node:
         return ""
     if isinstance(node, str):
@@ -45,7 +48,7 @@ async def sync_ai_alerts(
     new_alerts = []
     for alert_data in alerts_data:
         try:
-            title = alert_data.get("title", "Note Reminder")
+            title = str(alert_data.get("title", "Note Reminder"))[:500]
             date_str = alert_data.get("date")
             if not date_str:
                 continue
@@ -58,7 +61,7 @@ async def sync_ai_alerts(
                 note_id=note_id,
                 title=title,
                 alert_time=alert_time,
-                created_by_ai=True
+                created_by_ai=True,
             )
             db.add(new_alert)
             new_alerts.append(new_alert)
@@ -68,8 +71,10 @@ async def sync_ai_alerts(
     return new_alerts
 
 
-def _parse_note_text_content(content: str) -> str:
-    if not (content.strip().startswith('{"') or content.strip().startswith('[{')):
+def parse_note_text_content(content: str) -> str:
+    """Extract readable plain text when note content is stored as Tiptap JSON."""
+    stripped = content.strip()
+    if not (stripped.startswith('{"') or stripped.startswith("[{")):
         return content
     try:
         data = json.loads(content)
@@ -77,27 +82,29 @@ def _parse_note_text_content(content: str) -> str:
             extracted = extract_text_from_tiptap_json(data).strip()
             return extracted or content
     except Exception as parse_err:
-        logger.exception("Failed to parse content as Tiptap JSON in AI pipeline: %s", parse_err)
+        logger.debug("Content is not Tiptap JSON: %s", parse_err)
     return content
 
 
 async def _process_non_text_note(
     note_id: uuid.UUID,
+    user_id: uuid.UUID,
     text_content: str,
     note_type: str,
-    session_factory
+    session_factory,
 ) -> None:
-    logger.info("Skipping AI summary task using model for note type '%s' (note %s)", note_type, note_id)
+    logger.debug("Skipping AI summary for note type '%s' (note %s)", note_type, note_id)
     embedding = await get_embedding(text_content)
     if embedding:
         async with session_factory() as db:
             await db.execute(
                 update(Note).where(Note.id == note_id).values(
                     embedding=embedding,
-                    updated_at=datetime.now(timezone.utc)
+                    updated_at=datetime.now(timezone.utc),
                 )
             )
             await db.commit()
+        await bump_search_version(str(user_id))
 
 
 async def _run_ai_pipeline(
@@ -105,22 +112,25 @@ async def _run_ai_pipeline(
     content: str,
     session_factory,
     summary_format: str = "paragraph",
-    extract_alerts: bool = True
+    extract_alerts: bool = True,
 ) -> None:
     """Background task: enrich a note with AI summary, tags, and embedding."""
     try:
         async with session_factory() as db:
-            note = await db.get(Note, note_id)
-            if not note:
+            row = (
+                await db.execute(
+                    select(Note.note_type, Note.user_id).where(Note.id == note_id)
+                )
+            ).first()
+            if not row:
                 logger.warning("Note %s not found during AI pipeline execution", note_id)
                 return
-            note_type = note.note_type
-            user_id = note.user_id
+            note_type, user_id = row[0], row[1]
 
-        text_content = _parse_note_text_content(content)
+        text_content = parse_note_text_content(content)
 
         if note_type in ("audio", "checklist"):
-            await _process_non_text_note(note_id, text_content, note_type, session_factory)
+            await _process_non_text_note(note_id, user_id, text_content, note_type, session_factory)
             return
 
         current_time_str = datetime.now(timezone.utc).isoformat()
@@ -129,15 +139,15 @@ async def _run_ai_pipeline(
                 text_content,
                 summary_format=summary_format,
                 extract_alerts=extract_alerts,
-                current_time_str=current_time_str
+                current_time_str=current_time_str,
             ),
             get_embedding(text_content),
         )
 
         async with session_factory() as db:
-            note = await db.get(Note, note_id)
-            if not note:
-                logger.warning("Note %s not found during AI pipeline execution", note_id)
+            exists = (await db.execute(select(Note.id).where(Note.id == note_id))).scalar_one_or_none()
+            if not exists:
+                logger.warning("Note %s deleted before AI pipeline writeback", note_id)
                 return
 
             values: dict = {
@@ -152,21 +162,16 @@ async def _run_ai_pipeline(
             await sync_ai_alerts(db, user_id, note_id, enrichment.get("alerts", []))
             await db.commit()
 
+        await bump_search_version(str(user_id))
         logger.info("AI pipeline complete for note %s", note_id)
-    except Exception as e:
-        logger.exception("AI pipeline failed for note %s: %s", note_id, e)
+    except Exception as exc:
+        logger.exception("AI pipeline failed for note %s: %s", note_id, exc)
 
 
 async def _update_checklist_cache(note_id: uuid.UUID, items: list, user_id: uuid.UUID) -> None:
-    try:
-        redis = await get_redis()
-        cache_key = f"user:{user_id}:checklist:{note_id}"
-        await redis.delete(cache_key)
-        cache_val = json.dumps(items)
-        await redis.setex(cache_key, settings.checklist_cache_ttl, cache_val)
-    except Exception as e:
-        logger.warning("Redis checklist cache update failed: %s", e)
-
+    cache_key = f"user:{user_id}:checklist:{note_id}"
+    await redis_delete_safe(cache_key, cache_name="checklist")
+    await redis_setex_safe(cache_key, settings.checklist_cache_ttl, json.dumps(items), cache_name="checklist")
 
 
 def _build_note_update_values(
@@ -185,12 +190,28 @@ def _build_note_update_values(
     if content is not None:
         values["content"] = content
     if checklist_items is not None:
-        values["checklist_items"] = [item if isinstance(item, dict) else item.model_dump() for item in checklist_items]
+        values["checklist_items"] = [
+            item if isinstance(item, dict) else item.model_dump() for item in checklist_items
+        ]
     if is_pinned is not None:
         values["is_pinned"] = is_pinned
     if is_favorite is not None:
         values["is_favorite"] = is_favorite
     return values
+
+
+def encode_note_cursor(note: Note) -> str:
+    return encode_cursor(int(bool(note.is_pinned)), note.updated_at.isoformat(), note.id)
+
+
+def decode_note_cursor(cursor: str) -> tuple[bool, datetime, uuid.UUID]:
+    try:
+        pinned_s, ts_s, id_s = decode_cursor(cursor, 3)
+        return bool(int(pinned_s)), datetime.fromisoformat(ts_s), uuid.UUID(id_s)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid pagination cursor")
 
 
 async def create_note(
@@ -217,20 +238,26 @@ async def create_note(
         transcript=transcript,
         is_pinned=is_pinned or False,
         is_favorite=is_favorite or False,
-        checklist_items=[item if isinstance(item, dict) else item.model_dump() for item in checklist_items] if checklist_items else None,
+        checklist_items=[
+            item if isinstance(item, dict) else item.model_dump() for item in checklist_items
+        ]
+        if checklist_items
+        else None,
     )
     db.add(note)
     await db.commit()
     await db.refresh(note)
+    await bump_search_version(str(user_id))
 
     from app.database import AsyncSessionLocal
+
     background_tasks.add_task(
         _run_ai_pipeline,
         note.id,
         content,
         AsyncSessionLocal,
         summary_format or "paragraph",
-        extract_alerts if extract_alerts is not None else True
+        extract_alerts if extract_alerts is not None else True,
     )
 
     return note
@@ -243,8 +270,16 @@ async def get_notes(
     db: AsyncSession,
     is_favorite: Optional[bool] = None,
     is_pinned: Optional[bool] = None,
-) -> list[Note]:
-    stmt = select(Note).where(Note.user_id == user_id).order_by(Note.is_pinned.desc(), Note.updated_at.desc())
+    limit: Optional[int] = None,
+    cursor: Optional[str] = None,
+) -> tuple[list[Note], Optional[str]]:
+    """Fetch user notes without over-fetching heavy embedding vectors, with optional keyset pagination."""
+    stmt = (
+        select(Note)
+        .options(defer(Note.embedding))
+        .where(Note.user_id == user_id)
+        .order_by(Note.is_pinned.desc(), Note.updated_at.desc(), Note.id.desc())
+    )
     if tag:
         stmt = stmt.where(Note.tags.contains([tag]))
     if note_type:
@@ -253,15 +288,36 @@ async def get_notes(
         stmt = stmt.where(Note.is_favorite == True)
     if is_pinned is True:
         stmt = stmt.where(Note.is_pinned == True)
+
+    if cursor:
+        c_pinned, c_updated, c_id = decode_note_cursor(cursor)
+        stmt = stmt.where(
+            or_(
+                Note.is_pinned < c_pinned,
+                and_(Note.is_pinned == c_pinned, Note.updated_at < c_updated),
+                and_(Note.is_pinned == c_pinned, Note.updated_at == c_updated, Note.id < c_id),
+            )
+        )
+
+    if limit is not None:
+        stmt = stmt.limit(limit + 1)
+
     result = await db.execute(stmt)
-    return list(result.scalars().all())
+    notes = list(result.scalars().all())
+
+    next_cursor: Optional[str] = None
+    if limit is not None and len(notes) > limit:
+        notes = notes[:limit]
+        next_cursor = encode_note_cursor(notes[-1])
+
+    return notes, next_cursor
 
 
 async def get_note(note_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Note:
-    from fastapi import HTTPException, status
-
     result = await db.execute(
-        select(Note).where(Note.id == note_id, Note.user_id == user_id)
+        select(Note)
+        .options(defer(Note.embedding))
+        .where(Note.id == note_id, Note.user_id == user_id)
     )
     note = result.scalar_one_or_none()
     if not note:
@@ -290,37 +346,34 @@ async def update_note(
         note, title, content, note_type, checklist_items, is_pinned, is_favorite
     )
 
-    await db.execute(update(Note).where(Note.id == note_id).values(**values))
+    await db.execute(update(Note).where(Note.id == note_id, Note.user_id == user_id).values(**values))
     await db.commit()
     await db.refresh(note)
+    await bump_search_version(str(user_id))
 
     if checklist_items is not None:
         await _update_checklist_cache(note_id, values["checklist_items"], user_id)
 
-
-    if content_changed:
+    if content_changed and content is not None:
         from app.database import AsyncSessionLocal
+
         background_tasks.add_task(
             _run_ai_pipeline,
             note.id,
             content,
             AsyncSessionLocal,
             summary_format or "paragraph",
-            extract_alerts if extract_alerts is not None else True
+            extract_alerts if extract_alerts is not None else True,
         )
 
     return note
 
 
 async def delete_note(note_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> None:
-    from fastapi import HTTPException, status
-
-    result = await db.execute(
-        select(Note).where(Note.id == note_id, Note.user_id == user_id)
-    )
-    note = result.scalar_one_or_none()
-    if not note:
+    result = await db.execute(select(Note.id).where(Note.id == note_id, Note.user_id == user_id))
+    if result.scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
 
-    await db.execute(delete(Note).where(Note.id == note_id))
+    await db.execute(delete(Note).where(Note.id == note_id, Note.user_id == user_id))
     await db.commit()
+    await bump_search_version(str(user_id))
