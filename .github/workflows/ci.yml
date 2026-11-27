@@ -1,0 +1,38 @@
+name: Security & Backend Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test-and-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies (hash-verified)
+        run: pip install --require-hashes --only-binary :all: -r requirements.txt
+      - name: Run unit and security tests
+        run: python -m unittest discover -s tests -v
+      - name: Run pip-audit vulnerability scan
+        run: pip-audit -r requirements.txt
+
+  container-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend Docker image
+        run: docker build -t luminote-backend:ci ./backend
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: luminote-backend:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
