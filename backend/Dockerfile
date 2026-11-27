@@ -1,5 +1,5 @@
 # ---- Builder stage: install dependencies ----
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 WORKDIR /build
 
@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir --require-hashes --only-binary :all: --prefix=/in
 RUN PYTHONPATH=/install/lib/python3.12/site-packages python -c "from fastembed import TextEmbedding; TextEmbedding()"
 
 # ---- Runtime stage: minimal image without build tools ----
-FROM python:3.12-slim AS runner
+FROM python:3.15-slim AS runner
 
 # Install runtime libraries needed for PostgreSQL, audio MIME magic detection, and media processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
