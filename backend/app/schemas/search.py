@@ -2,11 +2,11 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(..., max_length=512)
 
 
 class SearchResultItem(BaseModel):

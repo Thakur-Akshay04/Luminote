@@ -1,79 +1,58 @@
 import uuid
 from datetime import datetime
-from typing import Any, Optional
-
-from pydantic import BaseModel, field_validator
-
+from typing import Any, Literal, Optional
 
 import bleach
+from pydantic import BaseModel, Field, field_validator
+
+from app.schemas.alert import AlertResponse
+
+NoteType = Literal["text", "checklist", "audio"]
+SummaryFormat = Literal["paragraph", "bullets", "actions"]
+AIActionType = Literal["rewrite", "translate", "tone", "grammar", "simplify", "expand"]
+
 
 class ChecklistItem(BaseModel):
     """Single checklist item — validates id, text, checked fields."""
-    id: str
-    text: str
+
+    id: str = Field(..., min_length=1, max_length=128)
+    text: str = Field(..., max_length=1000)
     checked: bool
 
     @field_validator("text")
     @classmethod
     def sanitize_text(cls, v: str) -> str:
-        if v:
+        return bleach.clean(v, tags=[], strip=True) if v else v
+
+
+class NoteBaseMixin(BaseModel):
+    @field_validator("title", check_fields=False)
+    @classmethod
+    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
             return bleach.clean(v, tags=[], strip=True)
         return v
 
 
-class NoteCreate(BaseModel):
-    title: Optional[str] = None
-    content: str
-    note_type: Optional[str] = "text"
+class NoteCreate(NoteBaseMixin):
+    title: Optional[str] = Field(default=None, max_length=500)
+    content: str = Field(..., max_length=500_000)
+    note_type: Optional[NoteType] = "text"
     is_pinned: Optional[bool] = False
     is_favorite: Optional[bool] = False
-    summary_format: Optional[str] = "paragraph"
+    summary_format: Optional[SummaryFormat] = "paragraph"
     extract_alerts: Optional[bool] = True
 
-    @field_validator("title")
-    @classmethod
-    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            return bleach.clean(v, tags=[], strip=True)
-        return v
 
-    @field_validator("note_type")
-    @classmethod
-    def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        allowed = {"text", "checklist", "audio"}
-        if v not in allowed:
-            raise ValueError(f"note_type must be one of {allowed}")
-        return v
-
-
-class NoteUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    note_type: Optional[str] = None
-    checklist_items: Optional[list[ChecklistItem]] = None
+class NoteUpdate(NoteBaseMixin):
+    title: Optional[str] = Field(default=None, max_length=500)
+    content: Optional[str] = Field(default=None, max_length=500_000)
+    note_type: Optional[NoteType] = None
+    checklist_items: Optional[list[ChecklistItem]] = Field(default=None, max_length=500)
     is_pinned: Optional[bool] = None
     is_favorite: Optional[bool] = None
-    summary_format: Optional[str] = None
+    summary_format: Optional[SummaryFormat] = None
     extract_alerts: Optional[bool] = None
-
-    @field_validator("title")
-    @classmethod
-    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            return bleach.clean(v, tags=[], strip=True)
-        return v
-
-    @field_validator("note_type")
-    @classmethod
-    def validate_note_type(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        allowed = {"text", "checklist", "audio"}
-        if v not in allowed:
-            raise ValueError(f"note_type must be one of {allowed}")
-        return v
 
     @field_validator("checklist_items", mode="before")
     @classmethod
@@ -90,7 +69,6 @@ class NoteUpdate(BaseModel):
                 if field not in item:
                     raise ValueError(f"Item at index {i} missing required field: {field}")
         return v
-
 
 
 class NoteResponse(BaseModel):
@@ -114,7 +92,7 @@ class NoteResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(..., min_length=1, max_length=4000)
 
 
 class AskResponse(BaseModel):
@@ -124,11 +102,9 @@ class AskResponse(BaseModel):
 
 
 class SummarizeRequest(BaseModel):
-    format: str = "paragraph"  # "paragraph", "bullets", "actions"
+    format: SummaryFormat = "paragraph"
     extract_alerts: bool = True
 
-
-from app.schemas.alert import AlertResponse
 
 class SummarizeResponse(BaseModel):
     note: NoteResponse
@@ -136,11 +112,10 @@ class SummarizeResponse(BaseModel):
 
 
 class AIActionRequest(BaseModel):
-    action: str  # "rewrite" | "translate" | "tone" | "grammar" | "simplify" | "expand"
-    text: str
-    param: Optional[str] = None
+    action: AIActionType
+    text: str = Field(..., min_length=1, max_length=20_000)
+    param: Optional[str] = Field(default=None, max_length=100)
 
 
 class AIActionResponse(BaseModel):
     result: str
-

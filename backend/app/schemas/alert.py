@@ -2,13 +2,22 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+import bleach
+from pydantic import BaseModel, Field, field_validator
 
 
 class AlertCreate(BaseModel):
     note_id: uuid.UUID
-    title: str
+    title: str = Field(..., min_length=1, max_length=500)
     alert_time: datetime
+
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: str) -> str:
+        cleaned = bleach.clean(v.strip(), tags=[], strip=True)
+        if not cleaned:
+            raise ValueError("Alert title cannot be empty")
+        return cleaned
 
 
 class AlertResponse(BaseModel):
