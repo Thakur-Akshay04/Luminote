@@ -1,43 +1,44 @@
-import uuid
-import json
-from typing import Optional, Annotated
 import logging
+import os
+import uuid
+from datetime import datetime, timezone
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status, File, UploadFile
+import aiofiles
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.schemas.note import AskRequest, AskResponse, NoteCreate, NoteResponse, NoteUpdate, SummarizeRequest, SummarizeResponse, AIActionRequest, AIActionResponse
-from app.services.ai_service import ask_question, summarize_note_with_ai, execute_ai_action
 from app.auth.clerk import get_current_user
+from app.database import get_db
+from app.limiter import limiter
+from app.models.note import Note
+from app.pagination import set_pagination_headers
+from app.redis_client import bump_search_version
+from app.schemas.note import (
+    AIActionRequest,
+    AIActionResponse,
+    AskRequest,
+    AskResponse,
+    NoteCreate,
+    NoteResponse,
+    NoteUpdate,
+    SummarizeRequest,
+    SummarizeResponse,
+)
+from app.services.ai_service import ask_question, execute_ai_action, summarize_note_with_ai
+from app.services.credit_service import check_and_deduct_credits, ensure_sufficient_credits
 from app.services.note_service import (
     create_note,
     delete_note,
     get_note,
     get_notes,
-    update_note,
+    parse_note_text_content,
     sync_ai_alerts,
+    update_note,
 )
-from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
-
-
-
-def extract_text_from_tiptap_json(node) -> str:
-    if not node:
-        return ""
-    if isinstance(node, str):
-        return node
-    if isinstance(node, dict):
-        if "text" in node and isinstance(node["text"], str):
-            return node["text"]
-        if "content" in node:
-            return extract_text_from_tiptap_json(node["content"])
-    if isinstance(node, list):
-        return " ".join(extract_text_from_tiptap_json(child) for child in node if child)
-    return ""
-
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -46,14 +47,27 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 @limiter.limit("120/minute")
 async def list_notes(
     request: Request,
+    response: Response,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     tag: Optional[str] = None,
     note_type: Optional[str] = None,
     is_favorite: Optional[bool] = None,
     is_pinned: Optional[bool] = None,
+    limit: Optional[int] = Query(default=None, ge=1, le=200),
+    cursor: Optional[str] = None,
 ):
-    notes = await get_notes(uuid.UUID(user_id), tag, note_type, db, is_favorite=is_favorite, is_pinned=is_pinned)
+    notes, next_cursor = await get_notes(
+        uuid.UUID(user_id),
+        tag,
+        note_type,
+        db,
+        is_favorite=is_favorite,
+        is_pinned=is_pinned,
+        limit=limit,
+        cursor=cursor,
+    )
+    set_pagination_headers(response, next_cursor, limit is not None)
     return notes
 
 
@@ -102,7 +116,12 @@ async def update(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await update_note(
-        note_id, uuid.UUID(user_id), body.title, body.content, db, background_tasks,
+        note_id,
+        uuid.UUID(user_id),
+        body.title,
+        body.content,
+        db,
+        background_tasks,
         note_type=body.note_type,
         checklist_items=body.checklist_items,
         is_pinned=body.is_pinned,
@@ -123,9 +142,6 @@ async def remove(
     await delete_note(note_id, uuid.UUID(user_id), db)
 
 
-from app.services.credit_service import check_and_deduct_credits, ensure_sufficient_credits
-
-
 @router.post("/{note_id}/ask", response_model=AskResponse)
 @limiter.limit("10/minute")
 async def ask(
@@ -135,48 +151,34 @@ async def ask(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from datetime import datetime, timezone
-
-    note = await get_note(note_id, uuid.UUID(user_id), db)
-
-    # Verify sufficient credits before calling Groq (deducted only after AI succeeds)
+    uid = uuid.UUID(user_id)
+    note = await get_note(note_id, uid, db)
     await ensure_sufficient_credits(user_id, "qa", cost=2, db=db)
 
-    # Safely clone or initialize local list
-    history = list(note.chat_history) if note.chat_history else []
-    
-    # Append new user message
-    user_msg = {"role": "user", "content": body.question}
-    history.append(user_msg)
-    
-    # Extract text from Tiptap JSON if applicable
-    text_content = note.content
-    if note.content.strip().startswith('{"') or note.content.strip().startswith('[{'):
-        try:
-            data = json.loads(note.content)
-            if isinstance(data, dict) and data.get("type") == "doc":
-                extracted = extract_text_from_tiptap_json(data).strip()
-                if extracted:
-                    text_content = extracted
-        except Exception:
-            pass
+    prior_history = list(note.chat_history) if note.chat_history else []
+    text_content = parse_note_text_content(note.content)
 
-    # Call Groq Q&A with previous history (excluding user_msg because ask_question appends it)
-    answer = await ask_question(text_content, body.question, history[:-1])
-
-    # Deduct credits only after AI succeeds
-    await check_and_deduct_credits(user_id, "qa", cost=2, db=db)
-    
-    # Append assistant response
-    assistant_msg = {"role": "assistant", "content": answer}
-    history.append(assistant_msg)
-    
-    # Save updates via direct attribute reassignment (triggers dirty state automatically)
-    note.chat_history = history
-    note.updated_at = datetime.now(timezone.utc)
+    # End read transaction before slow external AI call so no DB locks/tx stay open
     await db.commit()
-    
-    return AskResponse(answer=answer, note_id=note_id, chat_history=note.chat_history)
+
+    answer = await ask_question(text_content, body.question, prior_history)
+
+    # Lock note row during writeback to prevent concurrent Q&A turns overwriting each other
+    locked_res = await db.execute(
+        select(Note).where(Note.id == note_id, Note.user_id == uid).with_for_update()
+    )
+    locked_note = locked_res.scalar_one_or_none()
+    if not locked_note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    updated_history = list(locked_note.chat_history) if locked_note.chat_history else []
+    updated_history.append({"role": "user", "content": body.question})
+    updated_history.append({"role": "assistant", "content": answer})
+    locked_note.chat_history = updated_history
+    locked_note.updated_at = datetime.now(timezone.utc)
+
+    await check_and_deduct_credits(user_id, "qa", cost=2, db=db)
+    return AskResponse(answer=answer, note_id=note_id, chat_history=locked_note.chat_history)
 
 
 @router.post("/{note_id}/summarize", response_model=SummarizeResponse)
@@ -188,59 +190,51 @@ async def summarize(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from datetime import datetime, timezone
-    
-    note = await get_note(note_id, uuid.UUID(user_id), db)
+    uid = uuid.UUID(user_id)
+    note = await get_note(note_id, uid, db)
     if note.note_type == "audio":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="AI summarization is disabled for voice notes."
+            detail="AI summarization is disabled for voice notes.",
         )
 
-    # Verify sufficient credits before calling Groq (deducted only after AI succeeds)
     await ensure_sufficient_credits(user_id, "summarize", cost=5, db=db)
+    text_content = parse_note_text_content(note.content)
+    await db.commit()
 
     current_time_str = datetime.now(timezone.utc).isoformat()
-    
-    text_content = note.content
-    if note.content.strip().startswith('{"') or note.content.strip().startswith('[{'):
-        try:
-            data = json.loads(note.content)
-            if isinstance(data, dict) and data.get("type") == "doc":
-                extracted = extract_text_from_tiptap_json(data).strip()
-                if extracted:
-                    text_content = extracted
-        except Exception:
-            pass
-
     enrichment = await summarize_note_with_ai(
         content=text_content,
         summary_format=body.format,
         extract_alerts=body.extract_alerts,
-        current_time_str=current_time_str
+        current_time_str=current_time_str,
     )
 
-    # Deduct credits only after AI succeeds
-    await check_and_deduct_credits(user_id, "summarize", cost=5, db=db)
-    
-    note.summary = enrichment.get("summary")
-    note.tags = enrichment.get("tags", [])
-    note.updated_at = datetime.now(timezone.utc)
-    
+    locked_res = await db.execute(
+        select(Note).where(Note.id == note_id, Note.user_id == uid).with_for_update()
+    )
+    locked_note = locked_res.scalar_one_or_none()
+    if not locked_note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    locked_note.summary = enrichment.get("summary")
+    locked_note.tags = enrichment.get("tags", [])
+    locked_note.updated_at = datetime.now(timezone.utc)
+
     new_alerts = []
     if body.extract_alerts:
-        new_alerts = await sync_ai_alerts(db, uuid.UUID(user_id), note_id, enrichment.get("alerts", []))
-                
-    await db.commit()
-    await db.refresh(note)
-    
-    # Attach note title to returned alerts for validation serialization mapping
-    for a in new_alerts:
-        a.note_title = note.title
-        
+        new_alerts = await sync_ai_alerts(db, uid, note_id, enrichment.get("alerts", []))
+
+    await check_and_deduct_credits(user_id, "summarize", cost=5, db=db)
+    await db.refresh(locked_note)
+    await bump_search_version(user_id)
+
+    for alert in new_alerts:
+        alert.note_title = locked_note.title
+
     return {
-        "note": note,
-        "alerts": new_alerts
+        "note": locked_note,
+        "alerts": new_alerts,
     }
 
 
@@ -251,40 +245,31 @@ async def upload_image(
     file: Annotated[UploadFile, File(...)],
     user_id: Annotated[str, Depends(get_current_user)],
 ):
-    import os
-    import aiofiles
-    from app.services.file_security import validate_file, ALLOWED_IMAGE_TYPES
+    from app.services.file_security import ALLOWED_IMAGE_TYPES, validate_file
 
-    # Validate file size, magic MIME type from content bytes, and sanitize filename
     contents, safe_name = await validate_file(file, ALLOWED_IMAGE_TYPES, max_size=10 * 1024 * 1024)
 
     ext = os.path.splitext(safe_name)[1].lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
         ext = ".png"
-        
+
     filename = f"{uuid.uuid4()}{ext}"
-    
+
     media_base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    upload_dir = os.path.abspath(os.path.join(media_base, "uploads"))
+    upload_dir = os.path.realpath(os.path.join(media_base, "uploads"))
     os.makedirs(upload_dir, exist_ok=True)
-    
-    file_path = os.path.abspath(os.path.join(upload_dir, filename))
-    if not file_path.startswith(upload_dir):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file path"
-        )
-    
+
+    file_path = os.path.realpath(os.path.join(upload_dir, filename))
+    if not file_path.startswith(upload_dir + os.sep):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+
     try:
         async with aiofiles.open(file_path, "wb") as buffer:
             await buffer.write(contents)
-    except Exception as e:
-        logger.exception("Failed to save uploaded image: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-    
+    except Exception as exc:
+        logger.exception("Failed to save uploaded image: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
     return {"url": f"/media/uploads/{filename}"}
 
 
@@ -297,21 +282,11 @@ async def ai_action(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Verify note existence and ownership
     await get_note(note_id, uuid.UUID(user_id), db)
-    
-    # Verify sufficient credits before calling Groq (deducted only after AI succeeds)
     await ensure_sufficient_credits(user_id, "ai_action", cost=3, db=db)
+    await db.commit()
 
-    result = await execute_ai_action(
-        action=body.action,
-        text=body.text,
-        param=body.param
-    )
-
-    # Deduct credits only after AI succeeds
+    result = await execute_ai_action(action=body.action, text=body.text, param=body.param)
     await check_and_deduct_credits(user_id, "ai_action", cost=3, db=db)
-    
+
     return AIActionResponse(result=result)
-
-

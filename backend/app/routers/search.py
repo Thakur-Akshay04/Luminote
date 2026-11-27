@@ -1,39 +1,36 @@
 import hashlib
 import json
+import logging
 import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.redis_client import get_redis
-from app.config import settings
 from app.auth.clerk import get_current_user
+from app.config import settings
+from app.database import get_db
+from app.limiter import limiter
+from app.redis_client import get_search_version, redis_get_safe, redis_setex_safe
 from app.schemas.search import SearchRequest, SearchResponse, SearchResultItem
 from app.services.ai_service import get_embedding
-from app.limiter import limiter
 
-
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/search", tags=["search"])
 
-# Maximum allowed query length to prevent abuse
 MAX_QUERY_LENGTH = 512
 
 
 def _validate_embedding_vector(embedding: list[float]) -> str:
-    """
-    Build a safe embedding string for pgvector by validating each value is a finite number.
-    Prevents injection through malformed embedding values.
-    """
+    """Build a safe embedding string for pgvector by validating each value is finite."""
     validated = []
     for v in embedding:
         if not isinstance(v, (int, float)):
-            raise ValueError(f"Embedding contains non-numeric value: {type(v)}")
+            raise ValueError("Embedding contains non-numeric value")
         fv = float(v)
         if not (-1e10 < fv < 1e10):
-            raise ValueError(f"Embedding value out of safe range: {fv}")
+            raise ValueError("Embedding value out of safe range")
         validated.append(str(fv))
     return "[" + ",".join(validated) + "]"
 
@@ -46,62 +43,81 @@ async def semantic_search(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Check if query is empty or contains no alphanumeric characters
     if not body.query or not re.search(r"\w", body.query):
         return SearchResponse(results=[], cached=False)
 
-    # Enforce maximum query length to prevent abuse
     if len(body.query) > MAX_QUERY_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Query too long. Maximum length is {MAX_QUERY_LENGTH} characters."
+            detail=f"Query too long. Maximum length is {MAX_QUERY_LENGTH} characters.",
         )
 
-    # Use SHA-256 instead of MD5 for cache key hashing (cryptographically secure) — user ID scoped
-    query_hash = hashlib.sha256(f"{user_id}:{body.query}".encode()).hexdigest()
+    search_ver = await get_search_version(user_id)
+    query_hash = hashlib.sha256(f"{user_id}:{search_ver}:{body.query}".encode()).hexdigest()
     cache_key = f"user:{user_id}:search:{query_hash}"
 
-    redis = await get_redis()
-    cached = await redis.get(cache_key)
+    cached = await redis_get_safe(cache_key, cache_name="search")
     if cached:
         items = [SearchResultItem(**r) for r in json.loads(cached)]
         return SearchResponse(results=items, cached=True)
 
-
-    # Get embedding for the search query - prepending instruction for BGE embedding retrieval optimization
     query_for_embedding = f"Represent this sentence for searching relevant passages: {body.query}"
     query_embedding = await get_embedding(query_for_embedding)
     if not query_embedding:
         return SearchResponse(results=[], cached=False)
 
-    # Validate and build safe embedding string for pgvector
     try:
         embedding_str = _validate_embedding_vector(query_embedding)
-    except ValueError as e:
+    except ValueError as exc:
+        logger.error("Invalid embedding generated during search: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Invalid embedding vector: {e}"
+            detail="Search failed due to invalid embedding data",
         )
 
-    # pgvector + Full-text search hybrid search
+    # Hybrid pgvector HNSW + GIN FTS search:
+    # Candidate CTE restricts scoring to top semantic & top FTS matches so indexes are utilized.
     stmt = text(
         """
-        WITH scored_notes AS (
+        WITH vec_candidates AS (
+            SELECT id
+            FROM notes
+            WHERE user_id = :user_id AND embedding IS NOT NULL
+            ORDER BY embedding <=> CAST(:embedding AS vector)
+            LIMIT 50
+        ),
+        fts_candidates AS (
+            SELECT id
+            FROM notes
+            WHERE user_id = :user_id
+              AND (
+                setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+                setweight(to_tsvector('english', coalesce(content, '')), 'B') ||
+                setweight(to_tsvector('english', coalesce(immutable_array_to_string(tags, ' '), '')), 'A')
+              ) @@ websearch_to_tsquery('english', :query)
+            LIMIT 50
+        ),
+        candidate_ids AS (
+            SELECT id FROM vec_candidates
+            UNION
+            SELECT id FROM fts_candidates
+        ),
+        scored_notes AS (
             SELECT
-                id, user_id, title, content, summary, tags,
-                created_at, updated_at,
-                CASE 
-                    WHEN embedding IS NOT NULL THEN 1 - (embedding <=> CAST(:embedding AS vector))
+                n.id, n.user_id, n.title, n.content, n.summary, n.tags,
+                n.created_at, n.updated_at,
+                CASE
+                    WHEN n.embedding IS NOT NULL THEN 1 - (n.embedding <=> CAST(:embedding AS vector))
                     ELSE 0.55
                 END AS raw_semantic,
                 ts_rank(
-                    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-                    setweight(to_tsvector('english', coalesce(content, '')), 'B') ||
-                    setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'A'),
+                    setweight(to_tsvector('english', coalesce(n.title, '')), 'A') ||
+                    setweight(to_tsvector('english', coalesce(n.content, '')), 'B') ||
+                    setweight(to_tsvector('english', coalesce(immutable_array_to_string(n.tags, ' '), '')), 'A'),
                     websearch_to_tsquery('english', :query)
                 ) AS fts_rank
-            FROM notes
-            WHERE user_id = :user_id
+            FROM notes n
+            INNER JOIN candidate_ids c ON n.id = c.id
         ),
         hybrid_notes AS (
             SELECT
@@ -113,7 +129,6 @@ async def semantic_search(
         final_notes AS (
             SELECT
                 *,
-                -- Hybrid weighted sum + small boost for matching both semantic & FTS keyword signals
                 (scaled_semantic * 0.6) + (keyword_score * 0.4) + (scaled_semantic * keyword_score * 0.1) AS similarity
             FROM hybrid_notes
         )
@@ -145,7 +160,11 @@ async def semantic_search(
         for row in rows
     ]
 
-    # Cache for 10 minutes
-    await redis.setex(cache_key, settings.search_cache_ttl, json.dumps([i.model_dump(mode="json") for i in items]))
+    await redis_setex_safe(
+        cache_key,
+        settings.search_cache_ttl,
+        json.dumps([i.model_dump(mode="json") for i in items]),
+        cache_name="search",
+    )
 
     return SearchResponse(results=items, cached=False)

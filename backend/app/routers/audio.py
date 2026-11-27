@@ -1,9 +1,7 @@
 """
-Feature 2 — Audio Recording & Transcription: upload audio as mp3, transcribe on-demand via Groq Whisper.
-
-POST  /notes/{note_id}/audio — save audio as .mp3 on disk + DB, invalidate cache
-POST  /notes/{note_id}/transcribe — transcribe saved .mp3 via Groq Whisper, cache result
+Feature 2 — Audio Recording & Transcription: upload audio, transcribe on-demand via Groq Whisper.
 """
+import asyncio
 import glob
 import logging
 import os
@@ -12,35 +10,30 @@ from typing import Annotated
 
 import aiofiles
 import magic
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from app.auth.clerk import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.groq_client import client
-from app.auth.clerk import get_current_user
+from app.limiter import limiter
 from app.models.note import Note
-from app.redis_client import get_redis
+from app.redis_client import bump_search_version, redis_delete_safe, redis_get_safe, redis_setex_safe
+from app.services.credit_service import check_and_deduct_credits, ensure_sufficient_credits
+from app.services.file_security import ALLOWED_AUDIO_TYPES, MAX_FILE_SIZE, validate_file
 from app.services.note_service import get_note
+from app.services.resilience import CircuitBreakerOpenError, groq_breaker
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notes", tags=["audio"])
 
 MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media", "audio")
-# Max upload size: 10 MB
-MAX_AUDIO_SIZE = 10 * 1024 * 1024
-ALLOWED_AUDIO_TYPES = {
-    "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
-    "audio/mp4", "audio/flac", "audio/x-wav", "audio/mp3",
-    "audio/aac", "audio/m4a", "audio/x-m4a", "audio/x-matroska",
-    "video/webm", "video/mp4", "video/x-matroska",
-    "application/octet-stream", "application/x-matroska",
-}
 
-
-from pydantic import BaseModel
 
 class AudioUploadResponse(BaseModel):
     media_url: str
@@ -48,11 +41,6 @@ class AudioUploadResponse(BaseModel):
 
 class TranscriptResponse(BaseModel):
     transcript: str
-
-
-import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential
-from app.services.file_security import validate_file, ALLOWED_AUDIO_TYPES, MAX_FILE_SIZE
 
 
 def get_audio_extension(mime: str, filename: str) -> str:
@@ -74,122 +62,104 @@ def get_audio_extension(mime: str, filename: str) -> str:
     }
     if mime in mime_map:
         return mime_map[mime]
-    
+
     _, ext = os.path.splitext(filename)
     if ext and len(ext) <= 5:
         return ext.lower()
     return ".webm"
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=8), reraise=True)
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=8),
+    retry=retry_if_exception(lambda exc: not isinstance(exc, CircuitBreakerOpenError)),
+    reraise=True,
+)
 async def _transcribe_with_retry(audio_bytes: bytes, filename: str = "recording.webm"):
-    return await asyncio.wait_for(
-        client.audio.transcriptions.create(
-            file=(filename, audio_bytes),
-            model=settings.groq_whisper_model,
-            language="en",
-        ),
-        timeout=20.0
-    )
+    async def _invoke():
+        return await asyncio.wait_for(
+            client.audio.transcriptions.create(
+                file=(filename, audio_bytes),
+                model=settings.groq_whisper_model,
+                language="en",
+            ),
+            timeout=20.0,
+        )
+
+    return await groq_breaker.call(_invoke)
 
 
 @router.post("/{note_id}/audio", response_model=AudioUploadResponse, status_code=200)
+@limiter.limit("20/minute")
 async def upload_audio(
+    request: Request,
     note_id: uuid.UUID,
     file: Annotated[UploadFile, File(...)],
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Upload audio, save with proper extension based on MIME type, update media_url.
-
-    - Validates note exists and belongs to authenticated user.
-    - Validates MIME type from buffer bytes with python-magic.
-    - Saves to /media/audio/{note_id}.<ext> — cleans up pre-existing recordings.
-    - Updates media_url in notes table.
-    - Invalidates stale transcript cache.
-    """
-    # Validate note ownership
+    """Upload audio, validate magic bytes, save to disk, update media_url, and invalidate cache."""
     await get_note(note_id, uuid.UUID(user_id), db)
 
-    # Validate file size, magic MIME type from content bytes, and sanitize filename
     audio_bytes, safe_name = await validate_file(file, ALLOWED_AUDIO_TYPES, max_size=MAX_FILE_SIZE)
-
-    # Detect proper extension from magic MIME type or uploaded filename
     mime = magic.from_buffer(audio_bytes, mime=True)
     ext = get_audio_extension(mime, safe_name)
 
-    # Ensure media directory exists
     os.makedirs(MEDIA_DIR, exist_ok=True)
-
-    # Clean up any previous audio files for this note
     for existing in glob.glob(os.path.join(MEDIA_DIR, f"{note_id}.*")):
         try:
             os.remove(existing)
         except OSError:
             pass
 
-    # Save to disk with proper extension — O(1) write
     file_path = os.path.join(MEDIA_DIR, f"{note_id}{ext}")
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(audio_bytes)
 
     media_url = f"/media/audio/{note_id}{ext}"
 
-    # Update media_url and note_type in DB by primary key — O(log n)
     await db.execute(
-        update(Note).where(Note.id == note_id).values(media_url=media_url, note_type="audio")
+        update(Note).where(Note.id == note_id, Note.user_id == uuid.UUID(user_id)).values(
+            media_url=media_url,
+            note_type="audio",
+        )
     )
     await db.commit()
 
-    # Invalidate stale user-scoped transcript cache
-    redis = await get_redis()
-    cache_key = f"user:{user_id}:transcript:{note_id}"
-    await redis.delete(cache_key)
-
+    await redis_delete_safe(f"user:{user_id}:transcript:{note_id}", cache_name="transcript")
     return AudioUploadResponse(media_url=media_url)
 
 
 @router.post("/{note_id}/transcribe", response_model=TranscriptResponse)
+@limiter.limit("10/minute")
 async def transcribe_audio(
+    request: Request,
     note_id: uuid.UUID,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     force: bool = False,
 ):
-    """Transcribe already saved audio file for a note via Groq Whisper on-demand.
-
-    - Check user-scoped Redis cache first.
-    - If cache miss, read audio file from disk.
-    - Transcribe using Groq Whisper with retry & timeout.
-    - Save transcript to DB and cache.
-    """
-    # Validate note ownership
+    """Transcribe saved audio file on-demand via Groq Whisper, charging credits only on success."""
     note = await get_note(note_id, uuid.UUID(user_id), db)
 
-    # Check cache first — user ID scoped
-    redis = await get_redis()
     cache_key = f"user:{user_id}:transcript:{note_id}"
     if not force:
-        cached_text = await redis.get(cache_key)
+        cached_text = await redis_get_safe(cache_key, cache_name="transcript")
         if cached_text:
             return TranscriptResponse(transcript=cached_text)
 
-        # Check DB transcript if already present
         if note.transcript:
-            await redis.setex(cache_key, settings.media_cache_ttl, note.transcript)
+            await redis_setex_safe(cache_key, settings.media_cache_ttl, note.transcript, cache_name="transcript")
             return TranscriptResponse(transcript=note.transcript)
 
-    from app.services.credit_service import check_and_deduct_credits
-    # Check and deduct credits for transcription feature (10 credits)
-    await check_and_deduct_credits(user_id, "transcription", cost=10, db=db)
+    # Check sufficient credits upfront, deduct ONLY after transcription succeeds
+    await ensure_sufficient_credits(user_id, "transcription", cost=10, db=db)
 
-
-    # Read audio file from disk matching note_id.*
     matching_files = glob.glob(os.path.join(MEDIA_DIR, f"{note_id}.*"))
     if not matching_files:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audio recording not found. Please record audio first."
+            detail="Audio recording not found. Please record audio first.",
         )
     file_path = matching_files[0]
     filename = os.path.basename(file_path)
@@ -197,35 +167,41 @@ async def transcribe_audio(
     try:
         async with aiofiles.open(file_path, "rb") as f:
             audio_bytes = await f.read()
-    except Exception as e:
-        logger.exception("Failed to read audio file %s: %s", file_path, e)
+    except Exception as exc:
+        logger.exception("Failed to read audio file %s: %s", file_path, exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="Internal server error",
         )
 
-    # Send to Groq Whisper for transcription with retry & timeout
+    # Close read transaction before external Whisper call
+    await db.commit()
+
     try:
         transcription = await _transcribe_with_retry(audio_bytes, filename=filename)
         transcript_text = transcription.text.strip()
+    except CircuitBreakerOpenError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Transcription service temporarily unavailable — please try again shortly",
+        )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="AI service timed out")
-    except Exception as e:
-        logger.exception("Groq Whisper transcription error: %s", e)
+    except Exception as exc:
+        logger.exception("Groq Whisper transcription error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Transcription service unavailable — please try again"
+            detail="Transcription service unavailable — please try again",
         )
 
-    # Save transcript to DB
     await db.execute(
-        update(Note).where(Note.id == note_id).values(transcript=transcript_text)
+        update(Note).where(Note.id == note_id, Note.user_id == uuid.UUID(user_id)).values(
+            transcript=transcript_text
+        )
     )
-    await db.commit()
+    await check_and_deduct_credits(user_id, "transcription", cost=10, db=db)
 
-    # Populate user-scoped cache
-    await redis.setex(cache_key, settings.media_cache_ttl, transcript_text)
+    await redis_setex_safe(cache_key, settings.media_cache_ttl, transcript_text, cache_name="transcript")
+    await bump_search_version(user_id)
 
     return TranscriptResponse(transcript=transcript_text)
-
-

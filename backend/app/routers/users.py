@@ -1,25 +1,32 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, UploadFile, File
-from app.limiter import limiter
-
-
-from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import uuid
-import os
 import io
-from PIL import Image
-from jose import jwt, JWTError
+import os
+import re
+import uuid
 from datetime import datetime, timezone
+from typing import Annotated
 
-from app.database import get_db
-from app.models.user import User
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi.responses import RedirectResponse
+from jose import JWTError, jwt
+from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.clerk import get_current_user
-from app.redis_client import get_redis
 from app.config import settings
-from app.schemas.users import ChangeEmailRequest, ChangePasswordRequest, ChangeNameRequest
-from app.services.auth_service import verify_password, hash_password
+from app.database import get_db
+from app.limiter import limiter
+from app.models.user import User
+from app.observability import audit_log
+from app.redis_client import redis_delete_safe, redis_setex_safe
+from app.schemas.users import ChangeEmailRequest, ChangeNameRequest, ChangePasswordRequest
+from app.services.auth_service import (
+    delete_user_and_cleanup,
+    hash_password,
+    invalidate_user_sessions,
+    remove_avatar_file,
+    verify_password,
+)
 from app.services.email_service import send_verification_email
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -28,10 +35,7 @@ USER_NOT_FOUND_DETAIL = "User not found"
 
 
 def _safe_path(base_dir: str, filename: str) -> str:
-    """Resolve `filename` inside `base_dir` and raise 400 if path escapes the base.
-
-    Defends against directory traversal (e.g. ../../etc/passwd).
-    """
+    """Resolve `filename` inside `base_dir` and raise 400 if path escapes the base."""
     resolved = os.path.realpath(os.path.join(base_dir, filename))
     real_base = os.path.realpath(base_dir)
     if not resolved.startswith(real_base + os.sep) and resolved != real_base:
@@ -40,15 +44,6 @@ def _safe_path(base_dir: str, filename: str) -> str:
             detail="Invalid file path",
         )
     return resolved
-
-
-async def invalidate_user_sessions(user_id: str, redis) -> None:
-    """Invalidate all active sessions for a user in O(1) time."""
-    tokens = await redis.smembers(f"user_sessions:{user_id}")
-    if tokens:
-        keys_to_delete = [f"session:{user_id}:{token}" for token in tokens]
-        keys_to_delete.append(f"user_sessions:{user_id}")
-        await redis.delete(*keys_to_delete)
 
 
 @router.get("/me", status_code=200)
@@ -76,7 +71,6 @@ async def get_me(
 
 
 @router.post(
-
     "/me/avatar",
     status_code=200,
     responses={
@@ -92,35 +86,26 @@ async def upload_avatar(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.services.file_security import validate_file, ALLOWED_IMAGE_TYPES
+    from app.services.file_security import ALLOWED_IMAGE_TYPES, validate_file
 
-    # Validate file size, magic MIME type from content bytes, and sanitize filename
     contents, _ = await validate_file(file, ALLOWED_IMAGE_TYPES, max_size=5 * 1024 * 1024)
 
-    # Validate image file using PIL
     try:
         img = Image.open(io.BytesIO(contents))
         img.verify()
+        img = Image.open(io.BytesIO(contents))
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image file")
 
-    # Re-open because verify() invalidates the image object state
-    img = Image.open(io.BytesIO(contents))
     if img.mode != "RGB":
         img = img.convert("RGB")
 
-    # Save to disk at /media/avatars/{user_id}.jpg
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
     avatars_dir = os.path.join(media_dir, "avatars")
     os.makedirs(avatars_dir, exist_ok=True)
-    # Guard against path traversal — user_id comes from JWT but we still validate
     file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
     img.save(file_path, "JPEG")
 
-    # Update avatar_url in database
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
@@ -130,12 +115,9 @@ async def upload_avatar(
     user.avatar_url = avatar_url
     await db.commit()
 
-    # Cache avatar URL in Redis for 30 days — user ID scoped
-    redis = await get_redis()
-    await redis.setex(f"user:{user_id}:avatar", 30 * 24 * 60 * 60, avatar_url)
-    await redis.delete(f"user:{user_id}")
+    await redis_setex_safe(f"user:{user_id}:avatar", 30 * 24 * 60 * 60, avatar_url, cache_name="avatar")
+    await redis_delete_safe(f"user:{user_id}", cache_name="user")
 
-    # Return cached URL with a timestamp query parameter to bust browser caches
     return {"avatar_url": f"{avatar_url}?t={int(datetime.now(timezone.utc).timestamp())}"}
 
 
@@ -150,8 +132,6 @@ async def delete_avatar(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-
-    # Update database column
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
@@ -160,20 +140,8 @@ async def delete_avatar(
     user.avatar_url = None
     await db.commit()
 
-    # Remove file from disk
-    media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    avatars_dir = os.path.join(media_dir, "avatars")
-    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception:
-            pass
-
-    # Evict Redis cache keys
-    redis = await get_redis()
-    await redis.delete(f"avatar:{user_id}")
-    await redis.delete(f"user:{user_id}")
+    remove_avatar_file(user_id)
+    await redis_delete_safe(f"user:{user_id}:avatar", f"user:{user_id}", cache_name="avatar")
 
     return {"message": "Avatar removed"}
 
@@ -192,13 +160,13 @@ async def delete_avatar(
 async def change_email(
     request: Request,
     body: ChangeEmailRequest,
+    background_tasks: BackgroundTasks,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     if body.new_email != body.confirm_new_email:
         raise HTTPException(status_code=422, detail="Emails do not match")
 
-    # Load current user
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
@@ -207,22 +175,21 @@ async def change_email(
     if user.email == body.new_email:
         raise HTTPException(status_code=400, detail="This is already your email")
 
-    # Check if new email is already taken
     taken_result = await db.execute(select(User).where(User.email == body.new_email))
     if taken_result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="This email is already in use")
 
-    # Store pending email changes
     user.pending_email = body.new_email
     user.email_verified = False
     await db.commit()
 
-    # Invalidate Redis user cache
-    redis = await get_redis()
-    await redis.delete(f"user:{user_id}")
-
-    # Send verification email
-    await send_verification_email(user_id, body.new_email)
+    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    background_tasks.add_task(send_verification_email, user_id, body.new_email)
+    audit_log(
+        "email_change_requested",
+        user_id=user_id,
+        ip=request.client.host if request.client else None,
+    )
 
     return {"message": "Verification email sent"}
 
@@ -241,7 +208,6 @@ async def verify_email(
     token: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    import re
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "email_verification":
@@ -249,23 +215,20 @@ async def verify_email(
         user_id = payload.get("sub")
         new_email = payload.get("new_email")
     except JWTError:
+        audit_log("email_verify_failed", ip=request.client.host if request.client else None, outcome="failure")
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    # Guard: both fields must be present in the token
     if not user_id or not new_email:
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
-    # Validate email format before touching the database
     if not re.match(r"^[^@\s]+@[^@\s.]+\.[^@\s.]+$", new_email):
         raise HTTPException(status_code=400, detail="Invalid email address in token")
 
-    # Parse UUID safely
     try:
         uid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
-    # Fetch user by id
     result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
@@ -274,17 +237,14 @@ async def verify_email(
     if user.pending_email != new_email:
         raise HTTPException(status_code=400, detail="Email verification mismatch")
 
-    # Perform DB updates
     user.email = new_email
     user.pending_email = None
     user.email_verified = True
     await db.commit()
 
-    # Invalidate Redis cache
-    redis = await get_redis()
-    await redis.delete(f"user:{user_id}")
+    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    audit_log("email_verified", user_id=user_id, ip=request.client.host if request.client else None)
 
-    # Redirect to frontend profile (URL driven by config, not hardcoded)
     return RedirectResponse(url=f"{settings.frontend_url}/profile?email_verified=true")
 
 
@@ -305,30 +265,29 @@ async def change_password(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if len(body.new_password) < 8:
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
-
-    # Load current user
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
 
-    # Verify current password hash
     if not user.password_hash or not verify_password(body.current_password, user.password_hash):
+        audit_log(
+            "password_change_failed",
+            user_id=user_id,
+            ip=request.client.host if request.client else None,
+            outcome="failure",
+        )
         raise HTTPException(status_code=401, detail="Current password is incorrect")
 
     if body.current_password == body.new_password:
         raise HTTPException(status_code=400, detail="New password must be different")
 
-    # Hash and update
     user.password_hash = hash_password(body.new_password)
     await db.commit()
 
-    # Invalidate all active Redis sessions
-    redis = await get_redis()
-    await invalidate_user_sessions(user_id, redis)
-    await redis.delete(f"user:{user_id}")
+    await invalidate_user_sessions(user_id)
+    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    audit_log("password_changed", user_id=user_id, ip=request.client.host if request.client else None)
 
     return {"message": "Password updated successfully"}
 
@@ -348,30 +307,16 @@ async def change_display_name(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    name = body.display_name.strip()
-    if not name:
-        raise HTTPException(status_code=422, detail="Name cannot be empty")
-        
-    if len(name) > 50:
-        raise HTTPException(status_code=422, detail="Name must not exceed 50 characters")
-        
-    # Allowed: unicode letters, spaces, hyphens, apostrophes
-    if not all(char.isalpha() or char.isspace() or char in "-'" for char in name):
-        raise HTTPException(status_code=422, detail="Name contains invalid characters")
-        
     result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
-        
-    user.display_name = name
+
+    user.display_name = body.display_name
     await db.commit()
-    
-    # Invalidate Redis user cache
-    redis = await get_redis()
-    await redis.delete(f"user:{user_id}")
-    
-    return {"display_name": name}
+
+    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    return {"display_name": body.display_name}
 
 
 @router.delete(
@@ -386,31 +331,10 @@ async def delete_me(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
-
-    await db.delete(user)
-    await db.commit()
-
-    # Clean up avatar on disk
-    media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
-    avatars_dir = os.path.join(media_dir, "avatars")
-    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception:
-            pass
-
-    # Evict sessions and caches
-    redis = await get_redis()
-    await invalidate_user_sessions(user_id, redis)
-    await redis.delete(f"user:{user_id}:avatar")
-    await redis.delete(f"user:{user_id}")
-
-    # Invalidate the current session token used for request
-    token = authorization.split(" ", 1)[1]
-    await redis.delete(f"session:{token}")
-
+    await delete_user_and_cleanup(user_id, db, authorization)
+    audit_log(
+        "account_deleted",
+        user_id=user_id,
+        ip=request.client.host if request.client else None,
+        via="/users/me",
+    )

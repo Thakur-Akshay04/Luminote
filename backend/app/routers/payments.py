@@ -1,13 +1,15 @@
-import base64
+import asyncio
+import json
 import logging
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel, Field
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 import razorpay
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.clerk import get_current_user
 from app.config import settings
@@ -19,27 +21,16 @@ from app.models.credit_transaction import (
     CreditTransactionType,
 )
 from app.models.user import User
+from app.observability import audit_log, sanitize_log_value
+from app.pagination import decode_timestamp_id_cursor, encode_cursor, set_pagination_headers
+from app.redis_client import redis_get_safe, redis_setex_safe
+from app.services.resilience import CircuitBreakerOpenError, razorpay_breaker
 
 logger = logging.getLogger(__name__)
 
-
-def _sanitize_log_data(data: str | None) -> str:
-    """
-    Sanitize user-controlled untrusted input before logging to prevent Log Injection (CRLF Injection).
-    Validates alphanumeric/hyphen/underscore format or encodes with Base64.
-    """
-    if not data:
-        return ""
-    cleaned = data.replace("\r", "").replace("\n", "").strip()
-    if cleaned.replace("_", "").replace("-", "").isalnum():
-        return cleaned
-    return base64.b64encode(data.encode("utf-8")).decode("utf-8")
-
-
 router = APIRouter(prefix="/payments", tags=["payments"])
 
-# ── Server-Side Fixed Package Configuration ──────────────────────────────────
-# Security rule: Never accept amount or credit count from the client request.
+# Server-side fixed packages — never accept price or credit count from client
 PACKAGES = {
     "starter": {"credits": 100, "amount_paise": 4900, "name": "Starter Pack"},
     "pro": {"credits": 500, "amount_paise": 19900, "name": "Pro Pack"},
@@ -61,28 +52,88 @@ class CreateOrderResponse(BaseModel):
 
 
 class VerifyPaymentRequest(BaseModel):
-    razorpay_order_id: str
-    razorpay_payment_id: str
-    razorpay_signature: str
+    razorpay_order_id: str = Field(..., min_length=1, max_length=128)
+    razorpay_payment_id: str = Field(..., min_length=1, max_length=128)
+    razorpay_signature: str = Field(..., min_length=1, max_length=256)
 
 
 def get_razorpay_client() -> razorpay.Client:
-    """Initialize Razorpay SDK client with timeout and credentials."""
+    """Initialize Razorpay SDK client cleanly without disclosing internal config state."""
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
-        logger.error("Razorpay API credentials missing in environment variables.")
+        logger.error("Razorpay API credentials missing in environment configuration.")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Payment service configuration error — missing Razorpay credentials",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment service temporarily unavailable",
         )
-    client = razorpay.Client(
-        auth=(settings.razorpay_key_id, settings.razorpay_key_secret)
-    )
+    client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
     client.set_app_details({"title": "Luminote", "version": "1.0.0"})
     return client
 
 
+async def _run_razorpay_call(fn, *args, **kwargs):
+    """Run blocking Razorpay SDK call in a thread with timeout and circuit breaker."""
+
+    async def _invoke():
+        return await asyncio.wait_for(
+            asyncio.to_thread(fn, *args, **kwargs),
+            timeout=settings.razorpay_timeout_seconds,
+        )
+
+    try:
+        return await razorpay_breaker.call(_invoke)
+    except CircuitBreakerOpenError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment gateway temporarily unavailable — please try again shortly",
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Payment gateway timed out",
+        )
+
+
+async def _atomic_complete_purchase(
+    db: AsyncSession,
+    tx_filter,
+    payment_id: str,
+) -> tuple[bool, int | None, uuid.UUID | None]:
+    """
+    Atomically transition a PENDING CreditTransaction to COMPLETED and credit the user.
+
+    Returns (transitioned_now, credited_amount, user_id).
+    Guarantees exactly-once credit addition even when /verify and /webhook race concurrently.
+    """
+    try:
+        res = await db.execute(
+            update(CreditTransaction)
+            .where(tx_filter, CreditTransaction.status == CreditTransactionStatus.PENDING)
+            .values(
+                razorpay_payment_id=payment_id,
+                status=CreditTransactionStatus.COMPLETED,
+            )
+            .returning(CreditTransaction.amount, CreditTransaction.user_id)
+        )
+        row = res.first()
+        if row is None:
+            return False, None, None
+
+        credited_amount, tx_user_id = row[0], row[1]
+        await db.execute(
+            update(User)
+            .where(User.id == tx_user_id)
+            .values(credit_balance=User.credit_balance + credited_amount)
+        )
+        await db.commit()
+        return True, credited_amount, tx_user_id
+    except IntegrityError:
+        await db.rollback()
+        return False, None, None
+
+
 @router.get("/packages")
-async def get_packages():
+@limiter.limit("60/minute")
+async def get_packages(request: Request):
     """Return available credit packages and public Razorpay key ID."""
     return {
         "packages": PACKAGES,
@@ -97,20 +148,19 @@ async def create_order(
     body: CreateOrderRequest,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)] = None,
 ):
-    """
-    Create a Razorpay order and insert a pending CreditTransaction in DB.
-    
-    Security Controls:
-    - Auth required via Clerk JWT
-    - Rate limited to 10 orders/hour per user to prevent order spam
-    - Amount derived strictly server-side from fixed PACKAGES dict
-    """
+    """Create a Razorpay order and pending CreditTransaction with optional Idempotency-Key support."""
     package = PACKAGES.get(body.credit_package)
     if not package:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid package selected"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid package selected")
+
+    idem_cache_key: str | None = None
+    if idempotency_key:
+        idem_cache_key = f"user:{user_id}:order_idem:{body.credit_package}:{idempotency_key}"
+        cached = await redis_get_safe(idem_cache_key, cache_name="payment_idem")
+        if cached:
+            return CreateOrderResponse(**json.loads(cached))
 
     client = get_razorpay_client()
     uid = uuid.UUID(user_id)
@@ -127,7 +177,9 @@ async def create_order(
     }
 
     try:
-        razorpay_order = client.order.create(data=order_payload)  # type: ignore[attr-defined]
+        razorpay_order = await _run_razorpay_call(client.order.create, data=order_payload)  # type: ignore[attr-defined]
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Failed to create Razorpay order for user %s: %s", user_id, exc)
         raise HTTPException(
@@ -137,7 +189,6 @@ async def create_order(
 
     order_id = razorpay_order["id"]
 
-    # Insert pending transaction row
     pending_tx = CreditTransaction(
         id=uuid.uuid4(),
         user_id=uid,
@@ -149,17 +200,26 @@ async def create_order(
     db.add(pending_tx)
     await db.commit()
 
-    logger.info(
-        "Created pending Razorpay order %s for user %s (Package: %s, Credits: %d)",
-        order_id, user_id, body.credit_package, package["credits"]
-    )
-
-    return CreateOrderResponse(
+    response_payload = CreateOrderResponse(
         order_id=order_id,
         amount=package["amount_paise"],
         currency="INR",
         razorpay_key_id=settings.razorpay_key_id,
     )
+    if idem_cache_key:
+        await redis_setex_safe(
+            idem_cache_key, 24 * 60 * 60, response_payload.model_dump_json(), cache_name="payment_idem"
+        )
+
+    audit_log(
+        "payment_order_created",
+        user_id=user_id,
+        ip=request.client.host if request.client else None,
+        order_id=order_id,
+        package=body.credit_package,
+        credits=package["credits"],
+    )
+    return response_payload
 
 
 @router.post("/verify", status_code=200)
@@ -170,127 +230,98 @@ async def verify_payment(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """
-    Verify payment signature client-side checkout callback.
-    
-    Security & Reliability Controls:
-    - HMAC signature check via Razorpay SDK with RAZORPAY_KEY_SECRET
-    - DB transaction wrapping status update + balance increment
-    - DB unique constraint on razorpay_payment_id for replay protection
-    - Idempotency handling if payment was already credited by webhook
-    """
+    """Verify Razorpay payment signature and atomically credit user once."""
     client = get_razorpay_client()
     uid = uuid.UUID(user_id)
 
-    # 1. Verify Payment Signature
     try:
-        client.utility.verify_payment_signature(  # type: ignore[attr-defined]
+        await _run_razorpay_call(
+            client.utility.verify_payment_signature,  # type: ignore[attr-defined]
             {
                 "razorpay_order_id": body.razorpay_order_id,
                 "razorpay_payment_id": body.razorpay_payment_id,
                 "razorpay_signature": body.razorpay_signature,
-            }
+            },
         )
+    except HTTPException:
+        raise
     except Exception as exc:
+        audit_log(
+            "payment_verify_failed",
+            user_id=user_id,
+            ip=request.client.host if request.client else None,
+            outcome="failure",
+            order_id=body.razorpay_order_id,
+        )
         logger.warning(
             "Payment signature verification failed for user %s, order %s: %s",
-            user_id, _sanitize_log_data(body.razorpay_order_id), exc
+            user_id,
+            sanitize_log_value(body.razorpay_order_id),
+            exc,
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid payment signature",
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment signature")
+
+    # Fast-path idempotency check
+    existing = (
+        await db.execute(
+            select(CreditTransaction).where(
+                CreditTransaction.razorpay_payment_id == body.razorpay_payment_id
+            )
         )
+    ).scalar_one_or_none()
+    if existing and existing.status == CreditTransactionStatus.COMPLETED:
+        bal = (await db.execute(select(User.credit_balance).where(User.id == uid))).scalar_one_or_none() or 0
+        return {"status": "success", "message": "Payment already verified", "credit_balance": bal}
 
-    # 2. Check if this payment ID has ALREADY been processed (Idempotency check)
-    stmt = select(CreditTransaction).where(
-        CreditTransaction.razorpay_payment_id == body.razorpay_payment_id
-    )
-    existing_tx_res = await db.execute(stmt)
-    existing_tx = existing_tx_res.scalar_one_or_none()
-
-    if existing_tx and existing_tx.status == CreditTransactionStatus.COMPLETED:
-        # Fetch current user balance
-        user_res = await db.execute(select(User).where(User.id == uid))
-        user = user_res.scalar_one_or_none()
-        balance = user.credit_balance if user else 0
-        logger.info(
-            "Payment %s already completed for order %s (idempotent response)",
-            _sanitize_log_data(body.razorpay_payment_id), _sanitize_log_data(body.razorpay_order_id)
+    tx = (
+        await db.execute(
+            select(CreditTransaction).where(
+                CreditTransaction.razorpay_order_id == body.razorpay_order_id,
+                CreditTransaction.user_id == uid,
+            )
         )
-        return {
-            "status": "success",
-            "message": "Payment already verified",
-            "credit_balance": balance,
-        }
-
-    # 3. Find pending transaction for this order
-    order_stmt = select(CreditTransaction).where(
-        CreditTransaction.razorpay_order_id == body.razorpay_order_id,
-        CreditTransaction.user_id == uid,
-    )
-    tx_res = await db.execute(order_stmt)
-    tx = tx_res.scalar_one_or_none()
-
+    ).scalar_one_or_none()
     if not tx:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order transaction not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order transaction not found")
 
-    if tx.status == CreditTransactionStatus.COMPLETED:
-        user_res = await db.execute(select(User).where(User.id == uid))
-        user = user_res.scalar_one_or_none()
-        return {
-            "status": "success",
-            "message": "Payment already verified",
-            "credit_balance": user.credit_balance if user else 0,
-        }
-
-    # 4. Atomic DB Transaction: update transaction status & increment credit balance
-    tx.razorpay_payment_id = body.razorpay_payment_id
-    tx.status = CreditTransactionStatus.COMPLETED
-
-    user_update_res = await db.execute(
-        update(User)
-        .where(User.id == uid)
-        .values(credit_balance=User.credit_balance + tx.amount)
-        .returning(User.credit_balance)
-    )
-    new_balance_row = user_update_res.first()
-    new_balance = new_balance_row[0] if new_balance_row else 0
-
-    await db.commit()
-
-    logger.info(
-        "Successfully verified payment %s for order %s. Credited %d credits to user %s. New balance: %d",
-        _sanitize_log_data(body.razorpay_payment_id), _sanitize_log_data(body.razorpay_order_id), tx.amount, user_id, new_balance
+    transitioned, credited, _ = await _atomic_complete_purchase(
+        db,
+        and_(
+            CreditTransaction.id == tx.id,
+            CreditTransaction.user_id == uid,
+        ),
+        body.razorpay_payment_id,
     )
 
+    bal = (await db.execute(select(User.credit_balance).where(User.id == uid))).scalar_one_or_none() or 0
+    if not transitioned:
+        return {"status": "success", "message": "Payment already verified", "credit_balance": bal}
+
+    audit_log(
+        "payment_verified",
+        user_id=user_id,
+        ip=request.client.host if request.client else None,
+        order_id=body.razorpay_order_id,
+        payment_id=body.razorpay_payment_id,
+        credits=credited,
+    )
     return {
         "status": "success",
         "message": "Payment verified and credits added",
-        "credit_balance": new_balance,
+        "credit_balance": bal,
     }
 
 
 @router.post("/webhook", status_code=200)
+@limiter.limit("120/minute")
 async def razorpay_webhook(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     x_razorpay_signature: Annotated[str | None, Header(alias="X-Razorpay-Signature")] = None,
 ):
-    """
-    Server-to-server Razorpay webhook endpoint (Authoritative ground truth).
-    
-    Security & Reliability Controls:
-    - NO Clerk auth (called asynchronously by Razorpay servers)
-    - HMAC-SHA256 signature verification with RAZORPAY_WEBHOOK_SECRET
-    - Only processes 'payment.captured' events
-    - Idempotent: safe to run if /verify already processed the payment
-    - Never discloses secret keys or sensitive raw card details
-    """
+    """Authoritative server-to-server Razorpay webhook endpoint with atomic idempotency."""
     if not x_razorpay_signature or not settings.razorpay_webhook_secret:
-        logger.warning("Webhook rejected: missing signature header or server secret")
+        logger.warning("Webhook rejected: missing signature header or webhook secret")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing signature header or webhook secret",
@@ -300,31 +331,31 @@ async def razorpay_webhook(
     client = get_razorpay_client()
 
     try:
-        client.utility.verify_webhook_signature(  # type: ignore[attr-defined]
+        await _run_razorpay_call(
+            client.utility.verify_webhook_signature,  # type: ignore[attr-defined]
             raw_body.decode("utf-8"),
             x_razorpay_signature,
             settings.razorpay_webhook_secret,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.warning("Razorpay webhook signature verification failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid webhook signature",
+        audit_log(
+            "payment_webhook_invalid_sig",
+            ip=request.client.host if request.client else None,
+            outcome="failure",
         )
+        logger.warning("Razorpay webhook signature verification failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook signature")
 
     payload = await request.json()
     event = payload.get("event")
-    logger.info("Received Razorpay webhook event: %s", _sanitize_log_data(event))
+    logger.info("Received Razorpay webhook event: %s", sanitize_log_value(event))
 
     if event != "payment.captured":
-        # Acknowledge non-captured events quickly
         return {"status": "ignored", "event": event}
 
-    payment_entity = (
-        payload.get("payload", {})
-        .get("payment", {})
-        .get("entity", {})
-    )
+    payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
     order_id = payment_entity.get("order_id")
     payment_id = payment_entity.get("id")
 
@@ -332,48 +363,41 @@ async def razorpay_webhook(
         logger.warning("Webhook payment entity missing order_id or payment_id")
         return {"status": "invalid_payload"}
 
-    # 1. Idempotency Check: check if already completed
-    stmt = select(CreditTransaction).where(
-        CreditTransaction.razorpay_payment_id == payment_id
-    )
-    res = await db.execute(stmt)
-    existing_tx = res.scalar_one_or_none()
-
+    existing_tx = (
+        await db.execute(
+            select(CreditTransaction).where(CreditTransaction.razorpay_payment_id == payment_id)
+        )
+    ).scalar_one_or_none()
     if existing_tx and existing_tx.status == CreditTransactionStatus.COMPLETED:
-        logger.info("Webhook payment %s already processed (idempotent)", _sanitize_log_data(payment_id))
         return {"status": "already_processed"}
 
-    # 2. Find pending transaction by order_id
-    order_stmt = select(CreditTransaction).where(
-        CreditTransaction.razorpay_order_id == order_id
-    )
-    tx_res = await db.execute(order_stmt)
-    tx = tx_res.scalar_one_or_none()
-
+    tx = (
+        await db.execute(
+            select(CreditTransaction).where(CreditTransaction.razorpay_order_id == order_id)
+        )
+    ).scalar_one_or_none()
     if not tx:
-        logger.warning("Webhook received for unknown order_id %s", _sanitize_log_data(order_id))
+        logger.warning("Webhook received for unknown order_id %s", sanitize_log_value(order_id))
         return {"status": "order_not_found"}
-
     if tx.status == CreditTransactionStatus.COMPLETED:
-        logger.info("Webhook order %s already completed", _sanitize_log_data(order_id))
         return {"status": "already_completed"}
 
-    # 3. Update status and credit balance atomically
-    tx.razorpay_payment_id = payment_id
-    tx.status = CreditTransactionStatus.COMPLETED
-
-    await db.execute(
-        update(User)
-        .where(User.id == tx.user_id)
-        .values(credit_balance=User.credit_balance + tx.amount)
+    transitioned, credited, tx_user_id = await _atomic_complete_purchase(
+        db,
+        CreditTransaction.id == tx.id,
+        payment_id,
     )
-    await db.commit()
+    if not transitioned:
+        return {"status": "already_processed"}
 
-    logger.info(
-        "Webhook successfully processed payment %s for order %s. Added %d credits to user %s",
-        _sanitize_log_data(payment_id), _sanitize_log_data(order_id), tx.amount, tx.user_id
+    audit_log(
+        "payment_webhook_captured",
+        user_id=str(tx_user_id),
+        ip=request.client.host if request.client else None,
+        order_id=order_id,
+        payment_id=payment_id,
+        credits=credited,
     )
-
     return {"status": "success", "order_id": order_id, "payment_id": payment_id}
 
 
@@ -381,19 +405,37 @@ async def razorpay_webhook(
 @limiter.limit("30/minute")
 async def get_transaction_history(
     request: Request,
+    response: Response,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: Optional[str] = None,
 ):
-    """Return user's credit transaction history (purchases, usage, bonuses)."""
+    """Return user's credit transaction history with keyset pagination."""
     uid = uuid.UUID(user_id)
     stmt = (
         select(CreditTransaction)
         .where(CreditTransaction.user_id == uid)
-        .order_by(CreditTransaction.created_at.desc())
-        .limit(50)
+        .order_by(CreditTransaction.created_at.desc(), CreditTransaction.id.desc())
     )
+    if cursor:
+        c_created, c_id = decode_timestamp_id_cursor(cursor)
+        stmt = stmt.where(
+            or_(
+                CreditTransaction.created_at < c_created,
+                and_(CreditTransaction.created_at == c_created, CreditTransaction.id < c_id),
+            )
+        )
+
+    stmt = stmt.limit(limit + 1)
     res = await db.execute(stmt)
-    transactions = res.scalars().all()
+    transactions = list(res.scalars().all())
+
+    has_more = len(transactions) > limit
+    if has_more:
+        transactions = transactions[:limit]
+    next_cursor = encode_cursor(transactions[-1].created_at.isoformat(), transactions[-1].id) if has_more and transactions else None
+    set_pagination_headers(response, next_cursor, True)
 
     return [
         {

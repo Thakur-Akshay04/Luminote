@@ -1,46 +1,70 @@
 import logging
 import uuid
-from typing import Annotated
+from datetime import datetime, timezone
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status, WebSocket, WebSocketDisconnect
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, status
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db, AsyncSessionLocal
 from app.auth.clerk import get_current_user, verify_token
+from app.database import AsyncSessionLocal, get_db
+from app.limiter import limiter
 from app.models.alert import Alert
 from app.models.note import Note
+from app.pagination import decode_timestamp_id_cursor, encode_cursor, set_pagination_headers
 from app.schemas.alert import AlertCreate, AlertResponse
 from app.services.note_service import get_note
-from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
-
 @router.get("", response_model=list[AlertResponse])
 @limiter.limit("120/minute")
 async def list_alerts(
     request: Request,
+    response: Response,
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Optional[int] = Query(default=None, ge=1, le=200),
+    cursor: Optional[str] = None,
 ):
     stmt = (
         select(Alert, Note.title.label("note_title"))
         .outerjoin(Note, Alert.note_id == Note.id)
         .where(Alert.user_id == uuid.UUID(user_id))
-        .order_by(Alert.alert_time.asc())
+        .order_by(Alert.alert_time.asc(), Alert.id.asc())
     )
+
+    if cursor:
+        c_time, c_id = decode_timestamp_id_cursor(cursor)
+        stmt = stmt.where(
+            or_(
+                Alert.alert_time > c_time,
+                and_(Alert.alert_time == c_time, Alert.id > c_id),
+            )
+        )
+
+    if limit is not None:
+        stmt = stmt.limit(limit + 1)
+
     result = await db.execute(stmt)
-    
+    rows = result.all()
+
+    has_more = limit is not None and len(rows) > limit
+    if has_more and limit is not None:
+        rows = rows[:limit]
+
     alerts = []
-    for row in result.all():
-        alert, note_title = row
+    for alert, note_title in rows:
         alert.note_title = note_title
         alerts.append(alert)
-        
+
+    next_cursor = encode_cursor(alerts[-1].alert_time.isoformat(), alerts[-1].id) if has_more and alerts else None
+    set_pagination_headers(response, next_cursor, limit is not None)
+
     return alerts
 
 
@@ -52,16 +76,15 @@ async def create(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Verify note ownership
     note = await get_note(body.note_id, uuid.UUID(user_id), db)
-    
+
     new_alert = Alert(
         id=uuid.uuid4(),
         user_id=uuid.UUID(user_id),
         note_id=body.note_id,
         title=body.title,
         alert_time=body.alert_time,
-        created_by_ai=False
+        created_by_ai=False,
     )
     db.add(new_alert)
     await db.commit()
@@ -81,10 +104,10 @@ async def remove(
     stmt = select(Alert).where(Alert.id == alert_id, Alert.user_id == uuid.UUID(user_id))
     result = await db.execute(stmt)
     alert = result.scalar_one_or_none()
-    
+
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-        
+
     await db.delete(alert)
     await db.commit()
 
@@ -96,7 +119,6 @@ async def clear_all(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-
     stmt = delete(Alert).where(Alert.user_id == uuid.UUID(user_id))
     await db.execute(stmt)
     await db.commit()
@@ -122,7 +144,6 @@ async def mark_notified(
     return {"status": "ok"}
 
 
-
 @router.websocket("/ws")
 async def websocket_alerts(
     websocket: WebSocket,
@@ -131,8 +152,8 @@ async def websocket_alerts(
     try:
         async with AsyncSessionLocal() as db:
             user_id = await verify_token(token, db)
-    except Exception as e:
-        logger.exception("WebSocket auth failed: %s", e)
+    except Exception as exc:
+        logger.warning("WebSocket auth failed: %s", exc)
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
@@ -141,8 +162,6 @@ async def websocket_alerts(
     await manager.connect(user_uuid, websocket)
 
     try:
-        # Deliver any pending due alerts immediately upon connection
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         async with AsyncSessionLocal() as db:
             stmt = (
@@ -158,8 +177,7 @@ async def websocket_alerts(
             due_rows = result.all()
 
             notified_count = 0
-            for row in due_rows:
-                alert, note_title = row
+            for alert, note_title in due_rows:
                 payload = {
                     "type": "alert",
                     "id": str(alert.id),
@@ -179,7 +197,6 @@ async def websocket_alerts(
                 await db.commit()
 
         while True:
-            # Keep WebSocket open, wait for any message (ping/heartbeat) from client
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
