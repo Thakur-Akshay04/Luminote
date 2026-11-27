@@ -1,17 +1,22 @@
 import asyncio
-import os
-import uuid
 import logging
-import httpx
-from jose import jwt, JWTError
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+import os
+import time
+import uuid
 
+import httpx
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.config import settings
+from app.observability import audit_log
+from app.services.resilience import get_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +30,10 @@ _jwks_lock = asyncio.Lock()
 async def get_jwks(retries: int = 3, backoff_factor: float = 0.5, force_refresh: bool = False):
     global _jwks_cache
 
-    # Fast path — already cached
     if _jwks_cache and not force_refresh:
         return _jwks_cache
 
-    # Slow path — acquire lock so only ONE coroutine fetches from Clerk
     async with _jwks_lock:
-        # Re-check inside the lock (another coroutine may have populated it)
         if _jwks_cache and not force_refresh:
             return _jwks_cache
 
@@ -39,24 +41,26 @@ async def get_jwks(retries: int = 3, backoff_factor: float = 0.5, force_refresh:
         if not jwks_url:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="CLERK_JWKS_URL is not configured"
+                detail="Authentication service is not configured",
             )
 
+        client = get_http_client()
         timeout = httpx.Timeout(connect=10.0, read=10.0, write=5.0, pool=5.0)
         last_exception = None
 
         for attempt in range(1, retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    res = await client.get(jwks_url)
-                    res.raise_for_status()
-                    _jwks_cache = res.json()
-                    return _jwks_cache
+                res = await client.get(jwks_url, timeout=timeout)
+                res.raise_for_status()
+                _jwks_cache = res.json()
+                return _jwks_cache
             except (httpx.ConnectTimeout, httpx.HTTPError, httpx.RequestError) as exc:
                 last_exception = exc
                 logger.warning(
-                    "Attempt %d/%d failed to fetch Clerk JWKS from %s: %s",
-                    attempt, retries, jwks_url, exc
+                    "Attempt %d/%d failed to fetch Clerk JWKS: %s",
+                    attempt,
+                    retries,
+                    exc,
                 )
                 if attempt < retries:
                     await asyncio.sleep(backoff_factor * (2 ** (attempt - 1)))
@@ -68,9 +72,8 @@ async def get_jwks(retries: int = 3, backoff_factor: float = 0.5, force_refresh:
         logger.error("All %d attempts to fetch Clerk JWKS failed: %s", retries, last_exception)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service unavailable — please try again"
+            detail="Authentication service unavailable — please try again",
         )
-
 
 
 def _extract_user_info(payload: dict) -> tuple[str, str, str]:
@@ -96,6 +99,7 @@ async def _find_existing_user(clerk_user_id: str, email: str, db: AsyncSession) 
 
 
 async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -> User:
+    """Find or create local user for Clerk subject, handling concurrent first-login races."""
     email, name, display_name = _extract_user_info(payload)
     user = await _find_existing_user(clerk_user_id, email, db)
 
@@ -110,16 +114,30 @@ async def sync_user_to_db(clerk_user_id: str, payload: dict, db: AsyncSession) -
         )
         db.add(user)
     else:
-        user.email = user.email or email
-        user.name = user.name or name
-        user.display_name = user.display_name or display_name
+        changed = False
+        if not user.email and email:
+            user.email = email
+            changed = True
+        if not user.name and name:
+            user.name = name
+            changed = True
+        if not user.display_name and display_name:
+            user.display_name = display_name
+            changed = True
+        if not changed and user.clerk_user_id == clerk_user_id:
+            return user
 
-    await db.commit()
-    await db.refresh(user)
-    return user
+    try:
+        await db.commit()
+        await db.refresh(user)
+        return user
+    except IntegrityError:
+        await db.rollback()
+        existing = await _find_existing_user(clerk_user_id, email, db)
+        if existing:
+            return existing
+        raise
 
-
-import time
 
 async def verify_token(token: str, db: AsyncSession) -> str:
     jwks = await get_jwks()
@@ -129,32 +147,30 @@ async def verify_token(token: str, db: AsyncSession) -> str:
             token,
             jwks,
             algorithms=["RS256"],
-            options={"verify_aud": False}
+            options={"verify_aud": False},
         )
     except JWTError:
-        # Retry with force-refreshed JWKS keys in case Clerk rotated keys
         jwks = await get_jwks(force_refresh=True)
         payload = jwt.decode(
             token,
             jwks,
             algorithms=["RS256"],
-            options={"verify_aud": False}
+            options={"verify_aud": False},
         )
 
     now = time.time()
     exp = payload.get("exp", 0)
-    # Allow 60 seconds leeway for minor server clock skew
     if exp and exp < (now - 60):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired"
+            detail="Token expired",
         )
 
     clerk_user_id = payload.get("sub")
     if not clerk_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: missing sub"
+            detail="Invalid token: missing sub",
         )
 
     user = await sync_user_to_db(clerk_user_id, payload, db)
@@ -163,25 +179,26 @@ async def verify_token(token: str, db: AsyncSession) -> str:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> str:
     token = credentials.credentials
     try:
         return await verify_token(token, db)
     except HTTPException as exc:
+        audit_log("auth_failed", outcome="failure", status_code=exc.status_code, reason=exc.detail)
         logger.warning("Clerk auth HTTP error (%d): %s", exc.status_code, exc.detail)
         raise
     except JWTError as exc:
-        logger.warning("Clerk JWT verification failed due to invalid token structure or signature: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token — please sign in again"
-        )
-    except Exception as exc:
+        audit_log("auth_failed", outcome="failure", reason="invalid_jwt")
         logger.warning("Clerk JWT verification failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token — please sign in again"
+            detail="Invalid or expired token — please sign in again",
         )
-
-
+    except Exception as exc:
+        audit_log("auth_failed", outcome="failure", reason="verification_error")
+        logger.warning("Clerk auth verification failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token — please sign in again",
+        )

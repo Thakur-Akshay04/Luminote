@@ -1,13 +1,13 @@
-import os
-from dotenv import load_dotenv
 from groq import AsyncGroq
 
-# Load environment variables from .env file
-load_dotenv()
+from app.config import settings
 
-# Load GROQ_API_KEY and GROQ_MODEL from environment variables
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+# Single shared Groq client instance; retries & circuit breaking are managed by resilience.py
+GROQ_API_KEY = settings.groq_api_key
+MODEL = settings.groq_task_model
 
-# Initialize a single Groq client instance
-client = AsyncGroq(api_key=GROQ_API_KEY)
+client = AsyncGroq(
+    api_key=GROQ_API_KEY,
+    timeout=20.0,
+    max_retries=0,
+)
