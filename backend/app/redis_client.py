@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import redis.asyncio as aioredis
 
 from app.config import settings
@@ -8,6 +9,14 @@ from app.observability import metrics
 logger = logging.getLogger(__name__)
 
 _redis_pool: aioredis.Redis | None = None
+_SAFE_REDIS_KEY_RE = re.compile(r"^[A-Za-z0-9:._-]{1,256}$")
+
+
+def validate_redis_key(key: str) -> str:
+    """Ensure Redis keys contain only safe key characters (no whitespace, control chars, or wildcards)."""
+    if not isinstance(key, str) or not _SAFE_REDIS_KEY_RE.fullmatch(key):
+        raise ValueError("Invalid Redis key format")
+    return key
 
 
 async def get_redis() -> aioredis.Redis:
@@ -47,10 +56,11 @@ async def check_redis_health() -> bool:
 
 
 async def redis_get_safe(key: str, cache_name: str = "generic") -> str | None:
-    """Best-effort Redis GET that degrades gracefully on outages."""
+    """Best-effort Redis GET that validates the key and degrades gracefully on outages."""
     try:
+        safe_key = validate_redis_key(key)
         redis = await get_redis()
-        val = await redis.get(key)
+        val = await redis.get(safe_key)
         if val is not None:
             metrics.inc_counter("cache_hits_total", {"cache": cache_name})
         else:
@@ -63,22 +73,24 @@ async def redis_get_safe(key: str, cache_name: str = "generic") -> str | None:
 
 
 async def redis_setex_safe(key: str, ttl: int, value: str, cache_name: str = "generic") -> None:
-    """Best-effort Redis SETEX that degrades gracefully on outages."""
+    """Best-effort Redis SETEX that validates the key and degrades gracefully on outages."""
     try:
+        safe_key = validate_redis_key(key)
         redis = await get_redis()
-        await redis.setex(key, ttl, value)
+        await redis.setex(safe_key, ttl, value)
     except Exception as exc:
         metrics.inc_counter("cache_errors_total", {"cache": cache_name})
         logger.warning("Redis SETEX degraded for %s: %s", cache_name, exc)
 
 
 async def redis_delete_safe(*keys: str, cache_name: str = "generic") -> None:
-    """Best-effort Redis DELETE that degrades gracefully on outages."""
+    """Best-effort Redis DELETE that validates every key and degrades gracefully on outages."""
     if not keys:
         return
     try:
+        safe_keys = [validate_redis_key(k) for k in keys]
         redis = await get_redis()
-        await redis.delete(*keys)
+        await redis.delete(*safe_keys)
     except Exception as exc:
         metrics.inc_counter("cache_errors_total", {"cache": cache_name})
         logger.warning("Redis DELETE degraded for %s: %s", cache_name, exc)
@@ -93,8 +105,8 @@ async def get_search_version(user_id: str) -> str:
 async def bump_search_version(user_id: str) -> None:
     """Increment per-user search cache version so stale search results expire in O(1)."""
     try:
+        key = validate_redis_key(f"user:{user_id}:search_ver")
         redis = await get_redis()
-        key = f"user:{user_id}:search_ver"
         await redis.incr(key)
         await redis.expire(key, settings.search_cache_ttl * 2)
     except Exception as exc:

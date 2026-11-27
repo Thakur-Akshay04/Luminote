@@ -336,5 +336,71 @@ class SearchAndPaginationRouteTests(unittest.TestCase):
             self.assertIn("DESC, id DESC", executed_sqls[1])
 
 
+class RedisKeySanitizationAndUserCacheTests(unittest.IsolatedAsyncioTestCase):
+    async def test_validate_redis_key_rejects_injection_characters(self):
+        from app.redis_client import redis_delete_safe, redis_setex_safe, validate_redis_key
+
+        self.assertEqual(validate_redis_key("user:1234-abcd:avatar"), "user:1234-abcd:avatar")
+        for bad in ("user:123\r\nFLUSHALL", "user:123 FLUSHDB", "user:*", ""):
+            with self.assertRaises(ValueError):
+                validate_redis_key(bad)
+
+        mock_redis = AsyncMock()
+        with patch("app.redis_client.get_redis", new=AsyncMock(return_value=mock_redis)):
+            await redis_delete_safe("user:123\r\nFLUSHALL", cache_name="test")
+            await redis_setex_safe("user:123 bad", 60, "val", cache_name="test")
+            mock_redis.delete.assert_not_awaited()
+            mock_redis.setex.assert_not_awaited()
+
+    async def test_delete_user_and_cleanup_hashes_session_token_before_redis(self):
+        from app.services.auth_service import _hash_session_token, delete_user_and_cleanup
+
+        uid = uuid.uuid4()
+        fake_user = SimpleNamespace(id=uid)
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: fake_user))
+        db.delete = AsyncMock()
+        db.commit = AsyncMock()
+
+        raw_token = "eyJ.malicious\r\nFLUSHALL.token"
+        expected_hash = _hash_session_token(raw_token)
+        mock_del = AsyncMock()
+
+        with (
+            patch("app.services.auth_service.remove_avatar_file"),
+            patch("app.services.auth_service.invalidate_user_sessions", new=AsyncMock()),
+            patch("app.services.auth_service.redis_delete_safe", mock_del),
+        ):
+            await delete_user_and_cleanup(str(uid), db, f"Bearer {raw_token}")
+            session_calls = [c.args for c in mock_del.await_args_list]
+            self.assertIn((f"session:{expected_hash}",), session_calls)
+            for args in session_calls:
+                for key in args:
+                    self.assertNotIn("\r", key)
+                    self.assertNotIn("\n", key)
+
+    async def test_users_delete_avatar_uses_canonical_db_uuid(self):
+        from app.routers.users import delete_avatar
+
+        uid = uuid.uuid4()
+        fake_user = SimpleNamespace(id=uid, avatar_url="/media/avatars/old.jpg")
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: fake_user))
+        db.commit = AsyncMock()
+        req = _make_request("/users/me/avatar")
+        mock_del = AsyncMock()
+
+        with (
+            patch("app.routers.users.remove_avatar_file"),
+            patch("app.routers.users.redis_delete_safe", mock_del),
+        ):
+            await delete_avatar(req, str(uid), db)
+            mock_del.assert_awaited_once_with(
+                f"user:{uid}:avatar",
+                f"user:{uid}",
+                cache_name="avatar",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

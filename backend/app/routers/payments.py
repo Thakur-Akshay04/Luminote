@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import uuid
@@ -236,7 +237,8 @@ async def create_order(
     reservation_id: uuid.UUID | None = None
 
     if idempotency_key:
-        idem_cache_key = f"user:{user_id}:order_idem:{body.credit_package}:{idempotency_key}"
+        idem_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+        idem_cache_key = f"user:{user_id}:order_idem:{body.credit_package}:{idem_hash}"
         cached = await redis_get_safe(idem_cache_key, cache_name="payment_idem")
         if cached:
             return CreateOrderResponse(**json.loads(cached))

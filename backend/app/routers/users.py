@@ -46,6 +46,19 @@ def _safe_path(base_dir: str, filename: str) -> str:
     return resolved
 
 
+async def _get_user_or_404(user_id: str, db: AsyncSession) -> User:
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user identifier")
+
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=USER_NOT_FOUND_DETAIL)
+    return user
+
+
 @router.get("/me", status_code=200)
 @limiter.limit("60/minute")
 async def get_me(
@@ -53,10 +66,7 @@ async def get_me(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+    user = await _get_user_or_404(user_id, db)
 
     return {
         "id": str(user.id),
@@ -88,6 +98,9 @@ async def upload_avatar(
 ):
     from app.services.file_security import ALLOWED_IMAGE_TYPES, validate_file
 
+    user = await _get_user_or_404(user_id, db)
+    canonical_uid = str(user.id)
+
     contents, _ = await validate_file(file, ALLOWED_IMAGE_TYPES, max_size=5 * 1024 * 1024)
 
     try:
@@ -103,20 +116,15 @@ async def upload_avatar(
     media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "media")
     avatars_dir = os.path.join(media_dir, "avatars")
     os.makedirs(avatars_dir, exist_ok=True)
-    file_path = _safe_path(avatars_dir, f"{user_id}.jpg")
+    file_path = _safe_path(avatars_dir, f"{canonical_uid}.jpg")
     img.save(file_path, "JPEG")
 
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
-
-    avatar_url = f"/media/avatars/{user_id}.jpg"
+    avatar_url = f"/media/avatars/{canonical_uid}.jpg"
     user.avatar_url = avatar_url
     await db.commit()
 
-    await redis_setex_safe(f"user:{user_id}:avatar", 30 * 24 * 60 * 60, avatar_url, cache_name="avatar")
-    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    await redis_setex_safe(f"user:{canonical_uid}:avatar", 30 * 24 * 60 * 60, avatar_url, cache_name="avatar")
+    await redis_delete_safe(f"user:{canonical_uid}", cache_name="user")
 
     return {"avatar_url": f"{avatar_url}?t={int(datetime.now(timezone.utc).timestamp())}"}
 
@@ -132,16 +140,14 @@ async def delete_avatar(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+    user = await _get_user_or_404(user_id, db)
+    canonical_uid = str(user.id)
 
     user.avatar_url = None
     await db.commit()
 
-    remove_avatar_file(user_id)
-    await redis_delete_safe(f"user:{user_id}:avatar", f"user:{user_id}", cache_name="avatar")
+    remove_avatar_file(canonical_uid)
+    await redis_delete_safe(f"user:{canonical_uid}:avatar", f"user:{canonical_uid}", cache_name="avatar")
 
     return {"message": "Avatar removed"}
 
@@ -167,10 +173,8 @@ async def change_email(
     if body.new_email != body.confirm_new_email:
         raise HTTPException(status_code=422, detail="Emails do not match")
 
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+    user = await _get_user_or_404(user_id, db)
+    canonical_uid = str(user.id)
 
     if user.email == body.new_email:
         raise HTTPException(status_code=400, detail="This is already your email")
@@ -183,11 +187,11 @@ async def change_email(
     user.email_verified = False
     await db.commit()
 
-    await redis_delete_safe(f"user:{user_id}", cache_name="user")
-    background_tasks.add_task(send_verification_email, user_id, body.new_email)
+    await redis_delete_safe(f"user:{canonical_uid}", cache_name="user")
+    background_tasks.add_task(send_verification_email, canonical_uid, body.new_email)
     audit_log(
         "email_change_requested",
-        user_id=user_id,
+        user_id=canonical_uid,
         ip=request.client.host if request.client else None,
     )
 
@@ -212,20 +216,20 @@ async def verify_email(
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "email_verification":
             raise HTTPException(status_code=400, detail="Invalid token type")
-        user_id = payload.get("sub")
+        token_sub = payload.get("sub")
         new_email = payload.get("new_email")
     except JWTError:
         audit_log("email_verify_failed", ip=request.client.host if request.client else None, outcome="failure")
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    if not user_id or not new_email:
+    if not token_sub or not new_email:
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
     if not re.match(r"^[^@\s]+@[^@\s.]+\.[^@\s.]+$", new_email):
         raise HTTPException(status_code=400, detail="Invalid email address in token")
 
     try:
-        uid = uuid.UUID(user_id)
+        uid = uuid.UUID(token_sub)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
@@ -237,13 +241,14 @@ async def verify_email(
     if user.pending_email != new_email:
         raise HTTPException(status_code=400, detail="Email verification mismatch")
 
+    canonical_uid = str(user.id)
     user.email = new_email
     user.pending_email = None
     user.email_verified = True
     await db.commit()
 
-    await redis_delete_safe(f"user:{user_id}", cache_name="user")
-    audit_log("email_verified", user_id=user_id, ip=request.client.host if request.client else None)
+    await redis_delete_safe(f"user:{canonical_uid}", cache_name="user")
+    audit_log("email_verified", user_id=canonical_uid, ip=request.client.host if request.client else None)
 
     return RedirectResponse(url=f"{settings.frontend_url}/profile?email_verified=true")
 
@@ -265,15 +270,13 @@ async def change_password(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+    user = await _get_user_or_404(user_id, db)
+    canonical_uid = str(user.id)
 
     if not user.password_hash or not verify_password(body.current_password, user.password_hash):
         audit_log(
             "password_change_failed",
-            user_id=user_id,
+            user_id=canonical_uid,
             ip=request.client.host if request.client else None,
             outcome="failure",
         )
@@ -285,9 +288,9 @@ async def change_password(
     user.password_hash = hash_password(body.new_password)
     await db.commit()
 
-    await invalidate_user_sessions(user_id)
-    await redis_delete_safe(f"user:{user_id}", cache_name="user")
-    audit_log("password_changed", user_id=user_id, ip=request.client.host if request.client else None)
+    await invalidate_user_sessions(canonical_uid)
+    await redis_delete_safe(f"user:{canonical_uid}", cache_name="user")
+    audit_log("password_changed", user_id=canonical_uid, ip=request.client.host if request.client else None)
 
     return {"message": "Password updated successfully"}
 
@@ -307,15 +310,13 @@ async def change_display_name(
     user_id: Annotated[str, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail=USER_NOT_FOUND_DETAIL)
+    user = await _get_user_or_404(user_id, db)
+    canonical_uid = str(user.id)
 
     user.display_name = body.display_name
     await db.commit()
 
-    await redis_delete_safe(f"user:{user_id}", cache_name="user")
+    await redis_delete_safe(f"user:{canonical_uid}", cache_name="user")
     return {"display_name": body.display_name}
 
 
