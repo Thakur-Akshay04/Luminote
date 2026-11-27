@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     db_command_timeout: float = 15.0
     db_statement_timeout_ms: int = 15000
     db_idle_in_tx_timeout_ms: int = 30000
+    db_migration_command_timeout: float = 120.0
+    db_migration_statement_timeout_ms: int = 120000
     db_ssl_require: bool = False
 
     # Redis

@@ -119,10 +119,19 @@ class MetricsCollector:
         return tuple(sorted((str(k), str(v)) for k, v in labels.items()))
 
     @staticmethod
-    def _format_labels(labels: tuple[tuple[str, str], ...]) -> str:
+    def _escape_label_value(val: str) -> str:
+        return (
+            val.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+        )
+
+    @classmethod
+    def _format_labels(cls, labels: tuple[tuple[str, str], ...]) -> str:
         if not labels:
             return ""
-        parts = [f'{k}="{v.replace(chr(34), "")}"' for k, v in labels]
+        parts = [f'{k}="{cls._escape_label_value(v)}"' for k, v in labels]
         return "{" + ",".join(parts) + "}"
 
     def inc_counter(self, name: str, labels: dict[str, str] | None = None, amount: float = 1.0) -> None:

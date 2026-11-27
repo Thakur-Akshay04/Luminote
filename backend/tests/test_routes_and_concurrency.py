@@ -5,9 +5,24 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import groq
+import httpx
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
+
+from app.auth.clerk import get_current_user
+from app.database import get_db
+from app.main import RequestSizeLimitMiddleware, app
+from app.routers.audio import _transcribe_with_retry, transcribe_audio
+from app.routers.payments import (
+    CreateOrderRequest,
+    _atomic_complete_purchase,
+    create_order,
+    get_razorpay_client,
+)
+from app.services.resilience import CircuitBreaker
 
 
 def _make_request(path: str = "/test") -> Request:
@@ -19,17 +34,6 @@ def _make_request(path: str = "/test") -> Request:
         "client": ("127.0.0.1", 12345),
     }
     return Request(scope)
-
-from app.auth.clerk import get_current_user
-from app.database import get_db
-from app.main import RequestSizeLimitMiddleware, app
-from app.routers.audio import transcribe_audio
-from app.routers.payments import (
-    CreateOrderRequest,
-    _atomic_complete_purchase,
-    create_order,
-    get_razorpay_client,
-)
 
 
 class AppMiddlewareAndHealthTests(unittest.TestCase):
@@ -69,7 +73,6 @@ class AppMiddlewareAndHealthTests(unittest.TestCase):
             self.assertEqual(auth.status_code, 200)
 
     def test_request_size_limit_rejects_oversized_content_length_and_chunked(self):
-        # Content-Length header exceeding limit
         res = self.client.post(
             "/search",
             content=b'{"query": "hello"}',
@@ -77,13 +80,8 @@ class AppMiddlewareAndHealthTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 413)
 
-        # Direct ASGI test for chunked body without Content-Length exceeding limit
         async def run_chunked():
-            called = False
-
             async def dummy_app(scope, receive, send):
-                nonlocal called
-                called = True
                 while True:
                     msg = await receive()
                     if not msg.get("more_body", False):
@@ -119,7 +117,6 @@ class PaymentConcurrencyAndSecurityTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("credentials", ctx.exception.detail.lower())
 
     async def test_atomic_complete_purchase_only_credits_first_winner(self):
-        # Simulate two concurrent callers: first UPDATE returns row, second returns None
         db1 = AsyncMock()
         res1 = MagicMock()
         res1.first.return_value = (500, uuid.uuid4())
@@ -137,29 +134,96 @@ class PaymentConcurrencyAndSecurityTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(ok2)
         self.assertIsNone(amt2)
 
-    async def test_create_order_idempotency_key_returns_cached(self):
-        cached = json.dumps({
-            "order_id": "order_cached_1",
-            "amount": 4900,
-            "currency": "INR",
-            "razorpay_key_id": "rzp_test",
-        })
+    async def test_create_order_reserves_durable_db_record_and_replays_without_redis(self):
+        uid = str(uuid.uuid4())
+        req = _make_request("/payments/create-order")
+
+        # 1) First request reserves in DB before calling Razorpay and commits order + completed payload
+        db1 = AsyncMock()
+        db1.add = MagicMock()
+        db1.commit = AsyncMock()
+        db1.execute = AsyncMock()
+
+        fake_rzp = MagicMock()
+        fake_rzp.order.create.return_value = {"id": "order_rzp_1"}
+
+        with (
+            patch("app.routers.payments.redis_get_safe", new=AsyncMock(return_value=None)),
+            patch("app.routers.payments.redis_setex_safe", new=AsyncMock()),
+            patch("app.routers.payments.get_razorpay_client", return_value=fake_rzp),
+        ):
+            resp1 = await create_order(
+                request=req,
+                body=CreateOrderRequest(credit_package="starter"),
+                user_id=uid,
+                db=db1,
+                idempotency_key="idem-key-1",
+            )
+            self.assertEqual(resp1.order_id, "order_rzp_1")
+            self.assertEqual(db1.commit.await_count, 2)  # 1st: reservation before gateway, 2nd: order+completed
+
+        # 2) Retry when Redis missed (or after crash before Redis write) hits DB IntegrityError and replays
+        completed_record = SimpleNamespace(
+            status="completed",
+            response_payload={
+                "order_id": "order_rzp_1",
+                "amount": 4900,
+                "currency": "INR",
+                "razorpay_key_id": "rzp_test",
+            },
+        )
+        db2 = AsyncMock()
+        db2.add = MagicMock()
+        db2.commit = AsyncMock(side_effect=IntegrityError("dup", {}, Exception("unique")))
+        db2.rollback = AsyncMock()
+        db2.expire_all = MagicMock()
+        db2.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: completed_record))
+
+        with (
+            patch("app.routers.payments.redis_get_safe", new=AsyncMock(return_value=None)),
+            patch("app.routers.payments.redis_setex_safe", new=AsyncMock()),
+            patch("app.routers.payments.get_razorpay_client") as mock_rzp,
+        ):
+            resp2 = await create_order(
+                request=req,
+                body=CreateOrderRequest(credit_package="starter"),
+                user_id=uid,
+                db=db2,
+                idempotency_key="idem-key-1",
+            )
+            mock_rzp.assert_not_called()
+            self.assertEqual(resp2.order_id, "order_rzp_1")
+
+    async def test_create_order_releases_reservation_if_gateway_fails(self):
+        uid = str(uuid.uuid4())
         req = _make_request("/payments/create-order")
         db = AsyncMock()
-        with patch("app.routers.payments.redis_get_safe", new=AsyncMock(return_value=cached)):
-            with patch("app.routers.payments.get_razorpay_client") as mock_client:
-                resp = await create_order(
-                    request=req,  # type: ignore[arg-type]
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.rollback = AsyncMock()
+        db.execute = AsyncMock()
+
+        fake_rzp = MagicMock()
+        fake_rzp.order.create.side_effect = RuntimeError("gateway error")
+
+        with (
+            patch("app.routers.payments.redis_get_safe", new=AsyncMock(return_value=None)),
+            patch("app.routers.payments.get_razorpay_client", return_value=fake_rzp),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await create_order(
+                    request=req,
                     body=CreateOrderRequest(credit_package="starter"),
-                    user_id=str(uuid.uuid4()),
+                    user_id=uid,
                     db=db,
-                    idempotency_key="idem-abc-123",
+                    idempotency_key="idem-fail-1",
                 )
-                mock_client.assert_not_called()
-                self.assertEqual(resp.order_id, "order_cached_1")
+            self.assertEqual(ctx.exception.status_code, 502)
+            # Release deleted the in-progress reservation row
+            db.execute.assert_awaited_once()
 
 
-class AudioCreditSafetyTests(unittest.IsolatedAsyncioTestCase):
+class AudioCreditAndRetrySafetyTests(unittest.IsolatedAsyncioTestCase):
     async def test_transcribe_does_not_deduct_credits_when_whisper_fails(self):
         note_id = uuid.uuid4()
         user_id = str(uuid.uuid4())
@@ -182,7 +246,7 @@ class AudioCreditSafetyTests(unittest.IsolatedAsyncioTestCase):
 
             with self.assertRaises(HTTPException) as ctx:
                 await transcribe_audio(
-                    request=req,  # type: ignore[arg-type]
+                    request=req,
                     note_id=note_id,
                     user_id=user_id,
                     db=db,
@@ -191,30 +255,85 @@ class AudioCreditSafetyTests(unittest.IsolatedAsyncioTestCase):
             mock_ensure.assert_awaited_once()
             mock_deduct.assert_not_awaited()
 
+    async def test_transcribe_retry_excludes_cancellation_and_400_bad_request(self):
+        http_req = httpx.Request("POST", "https://api.groq.com/audio")
+        bad_req = groq.BadRequestError("bad audio", response=httpx.Response(400, request=http_req), body=None)
+
+        mock_create = AsyncMock(side_effect=bad_req)
+        with (
+            patch("app.routers.audio.client.audio.transcriptions.create", mock_create),
+            patch("app.routers.audio.groq_breaker", CircuitBreaker("audio_t", failure_threshold=2)),
+        ):
+            with self.assertRaises(groq.BadRequestError):
+                await _transcribe_with_retry(b"data", "a.webm")
+            self.assertEqual(mock_create.await_count, 1)
+
+        cancel_create = AsyncMock(side_effect=asyncio.CancelledError())
+        with (
+            patch("app.routers.audio.client.audio.transcriptions.create", cancel_create),
+            patch("app.routers.audio.groq_breaker", CircuitBreaker("audio_c", failure_threshold=2)),
+        ):
+            with self.assertRaises(asyncio.CancelledError):
+                await _transcribe_with_retry(b"data", "a.webm")
+            self.assertEqual(cancel_create.await_count, 1)
+
 
 class SearchAndPaginationRouteTests(unittest.TestCase):
     def setUp(self):
         self.uid = str(uuid.uuid4())
         app.dependency_overrides[get_current_user] = lambda: self.uid
 
-        async def override_db():
-            yield AsyncMock()
-
-        app.dependency_overrides[get_db] = override_db
-        self.client = TestClient(app, raise_server_exceptions=False)
-
     def tearDown(self):
         app.dependency_overrides.clear()
 
     def test_search_hides_internal_embedding_error_details(self):
+        async def override_db():
+            yield AsyncMock()
+
+        app.dependency_overrides[get_db] = override_db
+        client = TestClient(app, raise_server_exceptions=False)
+
         with (
             patch("app.routers.search.get_search_version", new=AsyncMock(return_value="1")),
             patch("app.routers.search.redis_get_safe", new=AsyncMock(return_value=None)),
             patch("app.routers.search.get_embedding", new=AsyncMock(return_value=["bad-non-numeric"])),
         ):
-            res = self.client.post("/search", json={"query": "project roadmap"})
+            res = client.post("/search", json={"query": "project roadmap"})
             self.assertEqual(res.status_code, 500)
             self.assertNotIn("non-numeric", res.json()["detail"].lower())
+
+    def test_search_sets_iterative_scan_and_orders_fts_candidates(self):
+        executed_sqls: list[str] = []
+
+        class FakeDB:
+            def begin_nested(self):
+                cm = MagicMock()
+                cm.__aenter__ = AsyncMock(return_value=None)
+                cm.__aexit__ = AsyncMock(return_value=False)
+                return cm
+
+            async def execute(self, stmt, params=None):
+                executed_sqls.append(str(stmt))
+                return SimpleNamespace(fetchall=lambda: [])
+
+        async def override_db():
+            yield FakeDB()
+
+        app.dependency_overrides[get_db] = override_db
+        client = TestClient(app, raise_server_exceptions=False)
+
+        with (
+            patch("app.routers.search.get_search_version", new=AsyncMock(return_value="1")),
+            patch("app.routers.search.redis_get_safe", new=AsyncMock(return_value=None)),
+            patch("app.routers.search.redis_setex_safe", new=AsyncMock()),
+            patch("app.routers.search.get_embedding", new=AsyncMock(return_value=[0.1, 0.2, 0.3])),
+        ):
+            res = client.post("/search", json={"query": "roadmap"})
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(len(executed_sqls), 2)
+            self.assertIn("SET LOCAL hnsw.iterative_scan = relaxed_order", executed_sqls[0])
+            self.assertIn("ORDER BY ts_rank(", executed_sqls[1])
+            self.assertIn("DESC, id DESC", executed_sqls[1])
 
 
 if __name__ == "__main__":

@@ -3,16 +3,17 @@
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 import { notesApi, BASE_URL } from "@/lib/api";
 import type { Note, ChecklistItem } from "@/types";
 import AIPanel from "@/components/AIPanel";
 import ConfirmModal from "@/components/ConfirmModal";
 import ChecklistEditor from "@/components/ChecklistEditor";
+import NoteEditorSidebar from "@/components/NoteEditorSidebar";
+import NoteRichTextToolbar, { type ClipboardItem } from "@/components/NoteRichTextToolbar";
 
-const AudioRecorder = dynamic(() => import("@/components/AudioRecorder"), { ssr: false });
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -33,26 +34,6 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 
-const TextStyleExtended = TextStyle.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      fontSize: {
-        default: null,
-        parseHTML: element => element.style.fontSize,
-        renderHTML: attributes => {
-          if (!attributes.fontSize) {
-            return {}
-          }
-          return {
-            style: `font-size: ${attributes.fontSize}`,
-          }
-        },
-      },
-    }
-  },
-});
-
 import {
   ArrowLeft,
   Save,
@@ -65,53 +46,53 @@ import {
   ChevronRight,
   ChevronLeft,
   FileText,
-  Palette,
   Mic,
   ListTodo,
-  Plus,
-  Undo,
-  Redo,
-  Scissors,
-  Copy,
-  Clipboard,
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Strikethrough,
-  Subscript as SubscriptIcon,
-  Superscript as SuperscriptIcon,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Outdent,
-  Indent,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  Table as TableIcon,
-  Minus,
-  Eraser,
-  Printer,
-  Upload,
-  MoreVertical,
-  Pin,
-  PinOff,
-  Star,
 } from "lucide-react";
-import Link from "next/link";
+
+const AudioRecorder = dynamic(() => import("@/components/AudioRecorder"), { ssr: false });
+
+const TextStyleExtended = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: (element) => element.style.fontSize,
+        renderHTML: (attributes) => {
+          if (!attributes.fontSize) return {};
+          return { style: `font-size: ${attributes.fontSize}` };
+        },
+      },
+    };
+  },
+});
 
 const generateSecureId = (): string => {
-  const cryptoObj = typeof window !== "undefined" ? (window.crypto || (window as any)?.msCrypto) : null;
+  const cryptoObj = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
   if (cryptoObj?.getRandomValues) {
     const array = new Uint32Array(1);
     cryptoObj.getRandomValues(array);
     return array[0].toString();
   }
-  return "fallback-id-" + Date.now();
+  return `fallback-id-${Date.now()}`;
+};
+
+const isImageText = (text: string): boolean =>
+  text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
+
+const parseEditorInitialContent = (rawContent: string): unknown => {
+  if (!rawContent) return "";
+  try {
+    const parsed = JSON.parse(rawContent);
+    if (parsed && typeof parsed === "object") {
+      if (parsed.type === "doc") return parsed;
+      if ("description" in parsed || "ai_context" in parsed) return parsed.description || "";
+    }
+  } catch {
+    return rawContent;
+  }
+  return rawContent;
 };
 
 const ResizableImageNodeView = (props: NodeViewProps) => {
@@ -153,26 +134,16 @@ const ResizableImageNodeView = (props: NodeViewProps) => {
             display: "block",
             maxWidth: "100%",
           }}
-          className={`rounded-lg transition-all duration-200 border-2 ${selected
-            ? "border-brand-500 shadow-lg ring-2 ring-brand-500/20"
-            : "border-transparent"
+          className={`rounded-lg transition-all duration-200 border-2 ${selected ? "border-brand-500 shadow-lg ring-2 ring-brand-500/20" : "border-transparent"
             }`}
         />
-        {/* Resizer Handle at bottom-right edge */}
         <button
           type="button"
           onMouseDown={onMouseDown}
           aria-label="Resize image"
           className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 bg-brand-500 hover:bg-brand-400 rounded flex items-center justify-center cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-md border border-white/20 select-none"
         >
-          <svg
-            aria-hidden="true"
-            className="w-2.5 h-2.5 text-white"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
+          <svg aria-hidden="true" className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="22" y1="6" x2="6" y2="22" />
             <line x1="22" y1="14" x2="14" y2="22" />
           </svg>
@@ -189,11 +160,7 @@ const ResizableImage = ImageExtension.extend({
       width: {
         default: "100%",
         parseHTML: (element) => element.getAttribute("width"),
-        renderHTML: (attributes) => {
-          return {
-            width: attributes.width,
-          };
-        },
+        renderHTML: (attributes) => ({ width: attributes.width }),
       },
     };
   },
@@ -207,20 +174,6 @@ function getEditorPanelClass(noteType: string, previewMode: boolean): string {
   if (noteType === "checklist") return `flex flex-col ${display} w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto`;
   if (noteType === "text" || noteType === "audio") return `flex flex-col ${display} w-full overflow-y-auto`;
   return `flex flex-col ${display} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`;
-}
-
-function getNoteTypeLabel(noteType: string): string {
-  if (noteType === "text") return "Text Notes";
-  if (noteType === "audio") return "Voice Notes";
-  if (noteType === "checklist") return "Checklists";
-  return "Notes";
-}
-
-function SidebarNoteTypeIcon({ noteType }: Readonly<{ noteType: string }>) {
-  if (noteType === "text") return <FileText className="w-3.5 h-3.5 text-[#6ed6de] shrink-0" />;
-  if (noteType === "audio") return <Mic className="w-3.5 h-3.5 text-[#f58c24] shrink-0" />;
-  if (noteType === "checklist") return <ListTodo className="w-3.5 h-3.5 text-[#e3af35] shrink-0" />;
-  return null;
 }
 
 function ChecklistDescriptionField({
@@ -259,21 +212,323 @@ function ChecklistDescriptionField({
   );
 }
 
-function TableSubToolbar({ editor }: Readonly<{ editor: any }>) {
-  if (!editor?.isActive("table")) return null;
+const NOTE_TYPE_OPTIONS = [
+  { id: "text", label: "Text", icon: FileText },
+  { id: "audio", label: "Voice", icon: Mic },
+  { id: "checklist", label: "Task", icon: ListTodo },
+] as const;
+
+function SaveStatusIndicator({
+  hasUnsavedChanges,
+  saving,
+  saved,
+  error,
+}: Readonly<{
+  hasUnsavedChanges: boolean;
+  saving: boolean;
+  saved: boolean;
+  error: string | null;
+}>) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/20 rounded-md text-brand-300 text-xs font-semibold animate-fade-in mt-1 select-none">
-      <span className="uppercase tracking-wider mr-2 text-[9px] text-brand-400 font-bold select-none">Table Tools:</span>
-      <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Above</button>
-      <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Below</button>
-      <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Row</button>
-      <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
-      <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Left</button>
-      <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Right</button>
-      <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Col</button>
-      <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
-      <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-semibold bg-red-500/20 border-red-500/40 text-red-100 hover:bg-red-500/30">Delete Table</button>
+    <div className="shrink-0 flex items-center">
+      {hasUnsavedChanges && !saving && (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Unsaved
+        </span>
+      )}
+      {saving && (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+          <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" /> Saving
+        </span>
+      )}
+      {saved && !saving && (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Saved
+        </span>
+      )}
+      {error && (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
+          Error
+        </span>
+      )}
     </div>
+  );
+}
+
+function NoteEditorHeader({
+  title,
+  noteType,
+  hasUnsavedChanges,
+  saving,
+  saved,
+  deleting,
+  error,
+  previewMode,
+  showAI,
+  onTitleChange,
+  onNoteTypeChange,
+  onTogglePreview,
+  onManualSave,
+  onDelete,
+  onToggleAI,
+}: Readonly<{
+  title: string;
+  noteType: string;
+  hasUnsavedChanges: boolean;
+  saving: boolean;
+  saved: boolean;
+  deleting: boolean;
+  error: string | null;
+  previewMode: boolean;
+  showAI: boolean;
+  onTitleChange: (value: string) => void;
+  onNoteTypeChange: (type: string) => void;
+  onTogglePreview: () => void;
+  onManualSave: () => void;
+  onDelete: () => void;
+  onToggleAI: () => void;
+}>) {
+  return (
+    <div className="no-print flex flex-wrap items-center gap-4 px-5 py-3.5 border-b border-sidebar-border bg-sidebar/85 backdrop-blur-xl shadow-lg relative z-30 select-none">
+      <Link
+        href="/notes"
+        className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 transition-all shrink-0"
+        id="back-to-notes"
+        title="Back to Notes"
+      >
+        <ArrowLeft className="w-4 h-4" />
+      </Link>
+
+      <div className="h-4 w-px bg-white/10 shrink-0" />
+
+      <input
+        type="text"
+        id="note-title"
+        className="flex-1 bg-transparent text-white font-bold text-base placeholder-neutral-600 focus:outline-none min-w-[140px] tracking-tight py-1 transition-all"
+        placeholder="Untitled Note…"
+        value={title}
+        onChange={(e) => onTitleChange(e.target.value)}
+      />
+
+      <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-xl p-1 shrink-0 select-none items-center gap-1">
+        {NOTE_TYPE_OPTIONS.map((type) => {
+          const Icon = type.icon;
+          const isSelected = noteType === type.id;
+          return (
+            <button
+              key={type.id}
+              type="button"
+              onClick={() => onNoteTypeChange(type.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isSelected
+                ? "bg-gradient-to-tr from-[#f58c24] to-[#f9a748] text-[#1a0f05] shadow-md shadow-brand-500/15 scale-102 border border-brand-400/30"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+                }`}
+              title={`${type.label} Note`}
+              id={`note-type-${type.id}`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{type.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <SaveStatusIndicator
+        hasUnsavedChanges={hasUnsavedChanges}
+        saving={saving}
+        saved={saved}
+        error={error}
+      />
+
+      <div className="flex items-center gap-2.5 ml-auto shrink-0">
+        {noteType !== "text" && (
+          <button
+            type="button"
+            onClick={onTogglePreview}
+            className="sm:hidden w-9 h-9 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 text-gray-300 flex items-center justify-center text-xs active:scale-95 transition-all"
+            id="preview-toggle"
+          >
+            {previewMode ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        )}
+
+        <button
+          type="button"
+          id="save-note-btn"
+          onClick={onManualSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 hover:border-white/[0.15] text-white text-xs font-semibold shadow-md active:scale-95 transition-all"
+        >
+          <Save className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Save</span>
+        </button>
+
+        <button
+          type="button"
+          id="delete-note-btn"
+          onClick={onDelete}
+          disabled={deleting}
+          className="flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/25 text-red-400 hover:text-red-300 shadow-md active:scale-95 transition-all"
+        >
+          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        </button>
+
+        {noteType === "text" && (
+          <button
+            type="button"
+            onClick={onToggleAI}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all ${showAI
+              ? "bg-gradient-to-tr from-[#f58c24] to-[#e3af35] text-[#1a0f05] border border-brand-400/30 shadow-lg shadow-brand-500/15"
+              : "bg-neutral-900 border border-brand-500/20 text-brand-400 hover:bg-brand-500/10 hover:border-brand-500/35"
+              }`}
+            id="ai-panel-toggle"
+          >
+            <Brain className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">AI</span>
+            {showAI ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChecklistGeneratorPanel({
+  previewMode,
+  aiContext,
+  extractError,
+  extractingTasks,
+  onAiContextChange,
+  onExtractTasks,
+}: Readonly<{
+  previewMode: boolean;
+  aiContext: string;
+  extractError: string | null;
+  extractingTasks: boolean;
+  onAiContextChange: (value: string) => void;
+  onExtractTasks: () => void;
+}>) {
+  return (
+    <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-[35%] overflow-y-auto`}>
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04] bg-surface-900/40">
+        <Brain className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
+        <span className="text-xs text-gray-200 font-semibold uppercase tracking-wider">AI Task Generator</span>
+      </div>
+      <div className="p-5 flex-1 flex flex-col gap-4">
+        <div className="text-xs text-neutral-400 leading-relaxed">
+          Type or paste context, meeting notes, project briefs, or general thoughts below. The AI will extract actionable checklist items and add them to your checklist items.
+        </div>
+
+        <textarea
+          id="note-checklist-content"
+          className="flex-1 min-h-[180px] bg-surface-900/40 border border-white/[0.04] focus:border-brand-500/50 rounded-xl p-4 text-sm text-gray-200 font-mono leading-relaxed placeholder-gray-700 focus:outline-none transition-all resize-none"
+          placeholder="e.g. 'Must call the plumber to fix the kitchen sink by Tuesday. Also send final slides to the team and schedule a sync with the marketing lead.'..."
+          value={aiContext}
+          onChange={(e) => onAiContextChange(e.target.value)}
+          spellCheck
+        />
+
+        {extractError && (
+          <div className="px-3.5 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium">
+            {extractError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onExtractTasks}
+          disabled={extractingTasks || !aiContext.trim()}
+          className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 transition-all font-semibold"
+        >
+          {extractingTasks ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Wand2 className="w-4 h-4 text-white" />}
+          <span>{extractingTasks ? "Extracting Tasks..." : "Generate AI Checklist Items"}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PrintDocumentHeader({ title, createdAt }: Readonly<{ title: string; createdAt?: string }>) {
+  const dateObj = createdAt ? new Date(createdAt) : new Date();
+  return (
+    <div className="only-print flex-col items-center justify-center border-b-2 border-neutral-300 pb-4 mb-6 w-full text-center">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Luminote</span>
+      <h2 className="text-2xl font-bold text-black">{title || "Untitled Note"}</h2>
+      <div className="flex gap-4 mt-2 text-xs text-neutral-500 justify-center font-medium">
+        <span>Date: {dateObj.toLocaleDateString()}</span>
+        <span>Time: {dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+    </div>
+  );
+}
+
+function AudioNotePanel({
+  noteId,
+  mediaUrl,
+  transcript,
+  onTranscriptUpdate,
+  onMediaUrlUpdate,
+  onSaveBeforeAction,
+}: Readonly<{
+  noteId: string;
+  mediaUrl: string | null;
+  transcript: string | null;
+  onTranscriptUpdate: (newTranscript: string) => void;
+  onMediaUrlUpdate: (newUrl: string) => void;
+  onSaveBeforeAction: () => Promise<string>;
+}>) {
+  return (
+    <>
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+        <Mic className="w-3.5 h-3.5 text-gray-600" />
+        <span className="text-xs text-gray-600 font-medium">Audio Transcriber</span>
+      </div>
+      <div className="p-4 sm:p-6 flex-1">
+        <AudioRecorder
+          noteId={noteId}
+          mediaUrl={mediaUrl}
+          transcript={transcript}
+          onTranscriptUpdate={onTranscriptUpdate}
+          onMediaUrlUpdate={onMediaUrlUpdate}
+          onSaveBeforeAction={onSaveBeforeAction}
+        />
+      </div>
+    </>
+  );
+}
+
+function ChecklistNotePanel({
+  noteId,
+  checklistDescription,
+  checklistItems,
+  onDescriptionChange,
+  onItemsUpdate,
+  onSaveBeforeAction,
+}: Readonly<{
+  noteId: string;
+  checklistDescription: string;
+  checklistItems: ChecklistItem[];
+  onDescriptionChange: (nextVal: string) => void;
+  onItemsUpdate: (items: ChecklistItem[]) => void;
+  onSaveBeforeAction: () => Promise<string>;
+}>) {
+  return (
+    <>
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+        <ListTodo className="w-3.5 h-3.5 text-gray-600" />
+        <span className="text-xs text-gray-600 font-medium">Checklist Planner</span>
+      </div>
+      <div className="p-4 sm:p-6 flex-1 flex flex-col gap-5 overflow-y-auto">
+        <ChecklistDescriptionField value={checklistDescription} onChange={onDescriptionChange} />
+        <div className="h-px bg-white/[0.04] shrink-0" />
+        <ChecklistEditor
+          noteId={noteId}
+          items={checklistItems}
+          onItemsUpdate={onItemsUpdate}
+          onSaveBeforeAction={onSaveBeforeAction}
+        />
+      </div>
+    </>
   );
 }
 
@@ -302,39 +557,120 @@ function NoteEditorContent() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [extractingTasks, setExtractingTasks] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([]);
+  const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
+  const [openMenuNoteId, setOpenMenuNoteId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const isDirty = useRef(false);
   const titleRef = useRef("");
   const contentRef = useRef("");
   const descriptionRef = useRef("");
   const aiContextRef = useRef("");
+  const sidebarFetchTypeRef = useRef("");
+  const isEditorInitialized = useRef(false);
+  const debouncedSave = useRef<NodeJS.Timeout | null>(null);
+  const pollAttempts = useRef(0);
 
-  // Tabbed Rich Text Toolbar
-  const [activeToolbarTab, setActiveToolbarTab] = useState<string>("Formatting");
+  const markDirty = useCallback(() => {
+    isDirty.current = true;
+    setHasUnsavedChanges(true);
+  }, []);
 
-  // Popover States
-  const [showFontDropdown, setShowFontDropdown] = useState(false);
-  const [showSizeDropdown, setShowSizeDropdown] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
-  const [showLinkPopover, setShowLinkPopover] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [showImagePopover, setShowImagePopover] = useState(false);
-  const [imageUrl, setImageUrl] = useState("");
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showTablePopover, setShowTablePopover] = useState(false);
-  const [hoveredGrid, setHoveredGrid] = useState<{ r: number; c: number } | null>(null);
-  const [showClipboardPopover, setShowClipboardPopover] = useState(false);
-  const [clipboardHistory, setClipboardHistory] = useState<{ id: string; type: "text" | "image"; content: string }[]>([]);
+  const flashSavedIndicator = useCallback(() => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }, []);
 
-  // Sidebar Notes list state for specific type
-  const [sidebarNotes, setSidebarNotes] = useState<Note[]>([]);
-  const [sidebarLoading, setSidebarLoading] = useState(false);
-  const [openMenuNoteId, setOpenMenuNoteId] = useState<string | null>(null);
-  // Tracks the last-requested type so out-of-order responses are discarded
-  const sidebarFetchTypeRef = useRef<string>("");
+  const persistCurrentNote = useCallback(
+    async (forceUpdate = false): Promise<string> => {
+      if (noteId === "new") {
+        const res = await notesApi.create({
+          title: titleRef.current || undefined,
+          content: contentRef.current || "",
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        flashSavedIndicator();
+        window.history.replaceState(null, "", `/notes/${res.data.id}`);
+        router.replace(`/notes/${res.data.id}`);
+        return res.data.id;
+      }
+      if (isDirty.current || forceUpdate) {
+        const res = await notesApi.update(noteId, {
+          title: titleRef.current || undefined,
+          content: contentRef.current,
+          note_type: noteType,
+        });
+        setNote(res.data);
+        isDirty.current = false;
+        setHasUnsavedChanges(false);
+        flashSavedIndicator();
+        return res.data.id;
+      }
+      return noteId;
+    },
+    [flashSavedIndicator, noteId, noteType, router]
+  );
+
+  const ensureNoteSaved = useCallback(async (): Promise<string> => {
+    if (noteId !== "new" && !isDirty.current) return noteId;
+    setSaving(true);
+    setError(null);
+    try {
+      return await persistCurrentNote(false);
+    } catch {
+      setError(noteId === "new" ? "Failed to create note." : "Failed to save note.");
+      throw new Error(noteId === "new" ? "Init note failed" : "Save note failed");
+    } finally {
+      setSaving(false);
+    }
+  }, [noteId, persistCurrentNote]);
+
+  const saveNote = useCallback(async (force = false) => {
+    if (!isDirty.current && !force) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistCurrentNote(force);
+    } catch {
+      setError("Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }, [persistCurrentNote]);
+
+  const fetchSidebarNotes = useCallback(async (type: string) => {
+    sidebarFetchTypeRef.current = type;
+    setSidebarNotes([]);
+    setSidebarLoading(true);
+    try {
+      const res = await notesApi.list(undefined, type);
+      if (sidebarFetchTypeRef.current === type) {
+        setSidebarNotes(res.data);
+      }
+    } catch {
+      // silent fallback
+    } finally {
+      if (sidebarFetchTypeRef.current === type) {
+        setSidebarLoading(false);
+      }
+    }
+  }, []);
+
+  const addClipboardItem = useCallback((text: string, isImage = false) => {
+    if (!text?.trim()) return;
+    setClipboardHistory((prev) => {
+      if (prev.some((x) => x.content === text)) return prev;
+      const itemType: "text" | "image" = isImage || isImageText(text) ? "image" : "text";
+      return [{ id: generateSecureId(), type: itemType, content: text }, ...prev].slice(0, 10);
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -345,223 +681,7 @@ function NoteEditorContent() {
     return () => window.removeEventListener("click", handleClickOutside);
   }, []);
 
-  const handleSelectSidebarNote = async (targetId: string) => {
-    if (targetId === noteId) return;
-    if (isDirty.current) {
-      await saveNote();
-    }
-    router.push(`/notes/${targetId}`);
-  };
-
-  const handleTogglePinNote = async (targetNote: Note) => {
-    setOpenMenuNoteId(null);
-    const newPinned = !targetNote.is_pinned;
-    try {
-      setSidebarNotes((prev) =>
-        prev.map((item) => (item.id === targetNote.id ? { ...item, is_pinned: newPinned } : item))
-      );
-      if (targetNote.id === noteId && note) {
-        setNote({ ...note, is_pinned: newPinned });
-      }
-      await notesApi.update(targetNote.id, { is_pinned: newPinned });
-      void fetchSidebarNotes(noteType);
-    } catch {
-      void fetchSidebarNotes(noteType);
-    }
-  };
-
-  const handleToggleFavoriteNote = async (targetNote: Note) => {
-    setOpenMenuNoteId(null);
-    const newFav = !targetNote.is_favorite;
-    try {
-      setSidebarNotes((prev) =>
-        prev.map((item) => (item.id === targetNote.id ? { ...item, is_favorite: newFav } : item))
-      );
-      if (targetNote.id === noteId && note) {
-        setNote({ ...note, is_favorite: newFav });
-      }
-      await notesApi.update(targetNote.id, { is_favorite: newFav });
-    } catch {
-      void fetchSidebarNotes(noteType);
-    }
-  };
-
-  // Popover Refs
-  const fontDropdownRef = useRef<HTMLDivElement>(null);
-  const sizeDropdownRef = useRef<HTMLDivElement>(null);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
-  const highlightPickerRef = useRef<HTMLDivElement>(null);
-  const linkPopoverRef = useRef<HTMLDivElement>(null);
-  const imagePopoverRef = useRef<HTMLDivElement>(null);
-  const tablePopoverRef = useRef<HTMLDivElement>(null);
-  const clipboardPopoverRef = useRef<HTMLDivElement>(null);
-
-  const isEditorInitialized = useRef(false);
-  const debouncedSave = useRef<NodeJS.Timeout | null>(null);
-
-  const markDirty = useCallback(() => {
-    isDirty.current = true;
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const ensureNoteSaved = useCallback(async (): Promise<string> => {
-    if (noteId === "new") {
-      setSaving(true);
-      setError(null);
-      try {
-        const res = await notesApi.create({
-          title: titleRef.current || undefined,
-          content: contentRef.current || "",
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        window.history.replaceState(null, "", `/notes/${res.data.id}`);
-        router.replace(`/notes/${res.data.id}`);
-        return res.data.id;
-      } catch {
-        setError("Failed to create note.");
-        throw new Error("Init note failed");
-      } finally {
-        setSaving(false);
-      }
-    } else if (isDirty.current) {
-      setSaving(true);
-      setError(null);
-      try {
-        const res = await notesApi.update(noteId, {
-          title: titleRef.current || undefined,
-          content: contentRef.current,
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        return res.data.id;
-      } catch {
-        setError("Failed to save note.");
-        throw new Error("Save note failed");
-      } finally {
-        setSaving(false);
-      }
-    }
-    return noteId;
-  }, [noteId, noteType, router]);
-
-  const saveNote = useCallback(async () => {
-    if (!isDirty.current) return;
-    setSaving(true);
-    setError(null);
-    try {
-      if (noteId === "new") {
-        const res = await notesApi.create({
-          title: titleRef.current || undefined,
-          content: contentRef.current || "",
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        window.history.replaceState(null, "", `/notes/${res.data.id}`);
-        router.replace(`/notes/${res.data.id}`);
-      } else {
-        const res = await notesApi.update(noteId, {
-          title: titleRef.current || undefined,
-          content: contentRef.current,
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      }
-    } catch {
-      setError("Failed to save.");
-    } finally {
-      setSaving(false);
-    }
-  }, [noteId, noteType, router]);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingImage(true);
-    setImageUploadError(null);
-    try {
-      const res = await notesApi.uploadImage(file);
-      const relativeUrl = res.data.url;
-      const fullUrl = relativeUrl.startsWith("http") ? relativeUrl : `${BASE_URL}${relativeUrl}`;
-      editor?.chain().focus().setImage({ src: fullUrl }).run();
-      setShowImagePopover(false);
-      setImageUrl("");
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || "Failed to upload image. Make sure it is a valid image file.";
-      setImageUploadError(msg);
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const onContentChange = useCallback((json: any) => {
-    const jsonStr = JSON.stringify(json);
-    contentRef.current = jsonStr;
-    setContent(jsonStr);
-    markDirty();
-
-    if (debouncedSave.current) {
-      clearTimeout(debouncedSave.current);
-    }
-
-    debouncedSave.current = setTimeout(() => {
-      void saveNote();
-    }, 800);
-  }, [saveNote, markDirty]);
-
-  // Click Outside Popovers handler
   useEffect(() => {
-    const refs = [
-      [fontDropdownRef, setShowFontDropdown],
-      [sizeDropdownRef, setShowSizeDropdown],
-      [colorPickerRef, setShowColorPicker],
-      [highlightPickerRef, setShowHighlightPicker],
-      [linkPopoverRef, setShowLinkPopover],
-      [imagePopoverRef, setShowImagePopover],
-      [tablePopoverRef, setShowTablePopover],
-      [clipboardPopoverRef, setShowClipboardPopover],
-    ] as const;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      for (const [r, setter] of refs) {
-        if (r.current && !r.current.contains(target)) {
-          setter(false);
-        }
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Listen for copy, cut, paste events to build custom clipboard history
-  useEffect(() => {
-    const addClipboardItem = (text: string, isImage = false) => {
-      if (!text?.trim()) return;
-      setClipboardHistory((prev) => {
-        if (prev.some((x) => x.content === text)) return prev;
-        const isImg = isImage || text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-        return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
-      });
-    };
-
     const handleGlobalCopy = () => {
       const text = window.getSelection()?.toString();
       if (text) addClipboardItem(text);
@@ -582,7 +702,7 @@ function NoteEditorContent() {
             reader.readAsDataURL(file);
           }
         } else if (item.type === "text/plain") {
-          item.getAsString(addClipboardItem);
+          item.getAsString((val) => addClipboardItem(val));
         }
       }
     };
@@ -595,16 +715,26 @@ function NoteEditorContent() {
       document.removeEventListener("cut", handleGlobalCopy);
       document.removeEventListener("paste", handleGlobalPaste);
     };
-  }, []);
+  }, [addClipboardItem]);
 
-  // Tiptap Editor Setup
+  const onContentChange = useCallback(
+    (json: unknown) => {
+      const jsonStr = JSON.stringify(json);
+      contentRef.current = jsonStr;
+      setContent(jsonStr);
+      markDirty();
+      if (debouncedSave.current) clearTimeout(debouncedSave.current);
+      debouncedSave.current = setTimeout(() => {
+        void saveNote();
+      }, 800);
+    },
+    [saveNote, markDirty]
+  );
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit.configure({
-        link: false,
-        underline: false,
-      }),
+      StarterKit.configure({ link: false, underline: false }),
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       FontFamily,
@@ -623,37 +753,19 @@ function NoteEditorContent() {
       TableCell,
     ],
     content: "",
-    onUpdate: ({ editor }) => {
-      onContentChange(editor.getJSON());
+    onUpdate: ({ editor: activeEditor }) => {
+      onContentChange(activeEditor.getJSON());
     },
   });
 
-  // Load content into editor on mount / when note is loaded
   useEffect(() => {
     if (!editor || !note || isEditorInitialized.current) return;
-
-    // Do not load content into the rich text editor if the note is not a text note
     if (noteType !== "text") {
       isEditorInitialized.current = true;
       return;
     }
 
-    let initialContent: any = "";
-    if (note.content) {
-      try {
-        const parsed = JSON.parse(note.content);
-        if (parsed && typeof parsed === "object" && parsed.type === "doc") {
-          initialContent = parsed;
-        } else if (parsed && typeof parsed === "object" && ("description" in parsed || "ai_context" in parsed)) {
-          initialContent = parsed.description || "";
-        } else {
-          initialContent = note.content;
-        }
-      } catch {
-        initialContent = note.content; // fallback
-      }
-    }
-
+    const initialContent = parseEditorInitialContent(note.content);
     const currentJsonStr = JSON.stringify(editor.getJSON());
     const isSame = note.content === currentJsonStr || (note.content === "" && editor.isEmpty);
 
@@ -661,33 +773,16 @@ function NoteEditorContent() {
     if (!isSame) {
       setTimeout(() => {
         if (editor && !editor.isDestroyed) {
-          editor.commands.setContent(initialContent);
+          editor.commands.setContent(initialContent as Parameters<typeof editor.commands.setContent>[0]);
         }
       }, 0);
     }
   }, [editor, note, noteType]);
 
-  // Reset initialization ref if noteId changes
   useEffect(() => {
     isEditorInitialized.current = false;
+    pollAttempts.current = 0;
   }, [noteId]);
-
-  // Keyboard shortcut Ctrl+K wrapper
-  useEffect(() => {
-    if (noteType !== "text") return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        const currentLinkUrl = editor?.getAttributes("link").href || "";
-        setLinkUrl(currentLinkUrl);
-        setShowLinkPopover(true);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editor, noteType]);
-
-
 
   const fetchNote = useCallback(async () => {
     if (noteId === "new") {
@@ -759,137 +854,122 @@ function NoteEditorContent() {
   }, [noteId, searchParams]);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (noteId) {
-      void fetchNote();
-    }
+    if (!isLoaded || !noteId) return;
+    void fetchNote();
   }, [fetchNote, noteId, isLoaded]);
 
-  const fetchSidebarNotes = useCallback(async (type: string) => {
-    // Register this as the latest request; any earlier in-flight request
-    // that resolves after us will be ignored.
-    sidebarFetchTypeRef.current = type;
-    // Clear immediately so stale notes from the previous type disappear at once
-    setSidebarNotes([]);
-    setSidebarLoading(true);
-    try {
-      const res = await notesApi.list(undefined, type);
-      // Discard result if a newer type was requested while we were awaiting
-      if (sidebarFetchTypeRef.current !== type) return;
-      setSidebarNotes(res.data);
-    } catch {
-      // silent fallback
-    } finally {
-      if (sidebarFetchTypeRef.current === type) {
-        setSidebarLoading(false);
-      }
-    }
-  }, []);
-
   useEffect(() => {
-    if (!isLoaded) return;
-    if (noteType) {
-      void fetchSidebarNotes(noteType);
-    }
+    if (!isLoaded || !noteType) return;
+    void fetchSidebarNotes(noteType);
   }, [noteType, fetchSidebarNotes, isLoaded]);
-
-  // Poll for AI enrichment if not ready yet (max 5 attempts = 15 seconds)
-  const pollAttempts = useRef(0);
-
-  useEffect(() => {
-    pollAttempts.current = 0;
-  }, [noteId]);
 
   useEffect(() => {
     if (!note || noteType !== "text" || noteId === "new") return;
     if (note.summary && note.tags?.length) return;
     if (pollAttempts.current >= 5) return;
 
-    const interval = setInterval(async () => {
+    const interval = setInterval(() => {
       pollAttempts.current += 1;
       if (pollAttempts.current > 5) {
         clearInterval(interval);
         return;
       }
-
-      try {
-        const res = await notesApi.get(noteId);
-        if (res.data.summary || res.data.tags?.length) {
-          setNote(res.data);
+      void notesApi
+        .get(noteId)
+        .then((res) => {
+          if (res.data.summary || res.data.tags?.length) setNote(res.data);
+          if (res.data.summary || res.data.tags?.length) clearInterval(interval);
+        })
+        .catch(() => {
           clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-      }
+        });
     }, 3000);
 
     return () => clearInterval(interval);
   }, [note, noteId, noteType]);
 
+  useEffect(() => {
+    return () => {
+      if (debouncedSave.current) clearTimeout(debouncedSave.current);
+    };
+  }, []);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<boolean> => {
+    const file = e.target.files?.[0];
+    if (!file) return false;
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+    try {
+      const res = await notesApi.uploadImage(file);
+      const relativeUrl = res.data.url;
+      const fullUrl = relativeUrl.startsWith("http") ? relativeUrl : `${BASE_URL}${relativeUrl}`;
+      editor?.chain().focus().setImage({ src: fullUrl }).run();
+      return true;
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setImageUploadError(detail || "Failed to upload image. Make sure it is a valid image file.");
+      return false;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleSelectSidebarNote = async (targetId: string) => {
+    if (targetId === noteId) return;
+    if (isDirty.current) await saveNote();
+    router.push(`/notes/${targetId}`);
+  };
+
+  const handleTogglePinNote = async (targetNote: Note) => {
+    setOpenMenuNoteId(null);
+    const newPinned = !targetNote.is_pinned;
+    try {
+      setSidebarNotes((prev) => prev.map((item) => (item.id === targetNote.id ? { ...item, is_pinned: newPinned } : item)));
+      if (targetNote.id === noteId && note) setNote({ ...note, is_pinned: newPinned });
+      await notesApi.update(targetNote.id, { is_pinned: newPinned });
+      void fetchSidebarNotes(noteType);
+    } catch {
+      void fetchSidebarNotes(noteType);
+    }
+  };
+
+  const handleToggleFavoriteNote = async (targetNote: Note) => {
+    setOpenMenuNoteId(null);
+    const newFav = !targetNote.is_favorite;
+    try {
+      setSidebarNotes((prev) => prev.map((item) => (item.id === targetNote.id ? { ...item, is_favorite: newFav } : item)));
+      if (targetNote.id === noteId && note) setNote({ ...note, is_favorite: newFav });
+      await notesApi.update(targetNote.id, { is_favorite: newFav });
+    } catch {
+      void fetchSidebarNotes(noteType);
+    }
+  };
+
   const handleExtractTasks = async () => {
     setExtractingTasks(true);
     setExtractError(null);
     try {
-      let activeId = noteId;
-      if (noteId === "new") {
-        const res = await notesApi.create({
-          title: titleRef.current || undefined,
-          content: contentRef.current || "",
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        activeId = res.data.id;
-        window.history.replaceState(null, "", `/notes/${activeId}`);
-        router.replace(`/notes/${activeId}`);
-      } else if (isDirty.current) {
-        const res = await notesApi.update(noteId, {
-          title: titleRef.current || undefined,
-          content: contentRef.current,
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-      }
-
+      const activeId = await persistCurrentNote(false);
       const res = await notesApi.extractTasks(activeId);
       const extracted = res.data.tasks || [];
-
       if (extracted.length === 0) {
         setExtractError("No action items found in this note's content.");
         return;
       }
 
       const existingTexts = new Set(checklistItems.map((item) => item.text.toLowerCase()));
-      const newItems = extracted.filter(
-        (item) => !existingTexts.has(item.text.toLowerCase())
-      );
-
-      const merged = [...checklistItems, ...newItems];
+      const merged = [...checklistItems, ...extracted.filter((item) => !existingTexts.has(item.text.toLowerCase()))];
       setChecklistItems(merged);
-      if (note) {
-        setNote({ ...note, checklist_items: merged });
-      }
+      if (note) setNote({ ...note, checklist_items: merged });
 
       await notesApi.update(activeId, { checklist_items: merged });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err: any) {
-      console.error("AI task extraction error:", err);
-      setExtractError(
-        err.response?.data?.detail || "AI task extraction failed. Make sure to enter context details first."
-      );
+      flashSavedIndicator();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setExtractError(detail || "AI task extraction failed. Make sure to enter context details first.");
     } finally {
       setExtractingTasks(false);
     }
-  };
-
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-
-  const handleOpenDeleteConfirm = (id?: string) => {
-    setDeleteTargetId(id || noteId);
   };
 
   const handleConfirmDeleteNote = async () => {
@@ -898,112 +978,14 @@ function NoteEditorContent() {
     setDeleting(true);
     try {
       await notesApi.delete(targetId);
-      if (targetId === noteId) {
-        router.push("/notes");
-      } else {
-        setSidebarNotes((prev) => prev.filter((item) => item.id !== targetId));
-      }
+      if (targetId === noteId) router.push("/notes");
+      else setSidebarNotes((prev) => prev.filter((item) => item.id !== targetId));
     } catch {
       setError("Failed to delete note.");
     } finally {
       setDeleting(false);
       setDeleteTargetId(null);
     }
-  };
-
-  const handleManualSave = async () => {
-    let activeId = noteId;
-    if (noteId === "new") {
-      setSaving(true);
-      setError(null);
-      try {
-        const res = await notesApi.create({
-          title: titleRef.current || undefined,
-          content: contentRef.current || "",
-          note_type: noteType,
-        });
-        setNote(res.data);
-        isDirty.current = false;
-        setHasUnsavedChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        activeId = res.data.id;
-        window.history.replaceState(null, "", `/notes/${activeId}`);
-        router.replace(`/notes/${activeId}`);
-      } catch {
-        setError("Failed to create note.");
-        setSaving(false);
-        return;
-      }
-    }
-
-    isDirty.current = true;
-    void saveNote();
-  };
-
-  const handleNoteTypeChange = (type: string) => {
-    if (noteId === "new") {
-      setNoteType(type);
-      window.history.replaceState(null, "", `/notes/new?type=${type}`);
-    } else {
-      router.push(`/notes?type=${type}`);
-    }
-  };
-
-  const handleTranscriptUpdate = (newTranscript: string) => {
-    if (!note) return;
-    setNote({ ...note, transcript: newTranscript });
-    const updatedContent = content ? `${content}\n\nTranscript:\n${newTranscript}` : newTranscript;
-    setContent(updatedContent);
-    contentRef.current = updatedContent;
-    isDirty.current = true;
-    void saveNote();
-  };
-
-  const handleChecklistUpdate = (newItems: ChecklistItem[]) => {
-    setChecklistItems(newItems);
-    if (note) {
-      setNote({ ...note, checklist_items: newItems });
-    }
-  };
-
-  const getBtnClass = (isActive: boolean) => {
-    return `p-1.5 rounded-md text-xs font-medium transition-all ${isActive
-      ? "bg-brand-500/20 text-brand-300 border border-brand-500/40"
-      : "text-gray-400 hover:text-gray-200 hover:bg-white/[0.04] border border-transparent"
-      }`;
-  };
-
-  const getActiveFontFamily = () => {
-    return editor?.getAttributes("textStyle").fontFamily || "Inter";
-  };
-
-  const getActiveFontSize = () => {
-    const size = editor?.getAttributes("textStyle").fontSize;
-    if (size) return size.replace("px", "");
-    return "16";
-  };
-
-  const setTextColor = (color: string) => {
-    if (editor) {
-      if (color === "#e5e7eb") {
-        editor.chain().focus().unsetColor().run();
-      } else {
-        editor.chain().focus().setColor(color).run();
-      }
-    }
-    setShowColorPicker(false);
-  };
-
-  const setHighlightColor = (color: string) => {
-    if (editor) {
-      if (color === "transparent") {
-        editor.chain().focus().unsetHighlight().run();
-      } else {
-        editor.chain().focus().toggleHighlight({ color }).run();
-      }
-    }
-    setShowHighlightPicker(false);
   };
 
   const handleCut = () => {
@@ -1020,45 +1002,8 @@ function NoteEditorContent() {
     if (!editor) return;
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
-    if (selectedText) {
-      void navigator.clipboard.writeText(selectedText);
-    }
+    if (selectedText) void navigator.clipboard.writeText(selectedText);
   };
-
-  const COLORS = [
-    { name: "Default", value: "#e5e7eb" },
-    { name: "Black", value: "#000000" },
-    { name: "White", value: "#ffffff" },
-    { name: "Red", value: "#f87171" },
-    { name: "Orange", value: "#fb923c" },
-    { name: "Yellow", value: "#facc15" },
-    { name: "Green", value: "#4ade80" },
-    { name: "Blue", value: "#60a5fa" },
-    { name: "Purple", value: "#c084fc" },
-    { name: "Pink", value: "#f472b6" },
-  ];
-
-  const HIGHLIGHTS = [
-    { name: "None", value: "transparent" },
-    { name: "Yellow", value: "#facc15" },
-    { name: "Green", value: "#4ade80" },
-    { name: "Blue", value: "#60a5fa" },
-    { name: "Red", value: "#f87171" },
-    { name: "Purple", value: "#c084fc" },
-    { name: "Pink", value: "#f472b6" },
-    { name: "Orange", value: "#fb923c" },
-  ];
-
-  const wordCount = editor?.storage.characterCount.words() || 0;
-  const charCount = editor?.storage.characterCount.characters() || 0;
-
-  useEffect(() => {
-    return () => {
-      if (debouncedSave.current) {
-        clearTimeout(debouncedSave.current);
-      }
-    };
-  }, []);
 
   if (loading || !isLoaded) {
     return (
@@ -1072,1036 +1017,163 @@ function NoteEditorContent() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <p className="text-red-400">{error}</p>
-        <Link href="/notes" className="btn-secondary">← Back to notes</Link>
+        <Link href="/notes" className="btn-secondary">
+          ← Back to notes
+        </Link>
       </div>
     );
   }
 
+  const showAIPanel = noteType === "text" && showAI && note !== null;
+
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
-      {/* Toolbar */}
-      <div className="no-print flex flex-wrap items-center gap-4 px-5 py-3.5 border-b border-sidebar-border bg-sidebar/85 backdrop-blur-xl shadow-lg relative z-30 select-none">
-        <Link
-          href="/notes"
-          className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 transition-all shrink-0"
-          id="back-to-notes"
-          title="Back to Notes"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
+      <NoteEditorHeader
+        title={title}
+        noteType={noteType}
+        hasUnsavedChanges={hasUnsavedChanges}
+        saving={saving}
+        saved={saved}
+        deleting={deleting}
+        error={error}
+        previewMode={previewMode}
+        showAI={showAI}
+        onTitleChange={(val) => {
+          setTitle(val);
+          titleRef.current = val;
+          markDirty();
+        }}
+        onNoteTypeChange={(type) => {
+          if (noteId === "new") {
+            setNoteType(type);
+            window.history.replaceState(null, "", `/notes/new?type=${type}`);
+          } else {
+            router.push(`/notes?type=${type}`);
+          }
+        }}
+        onTogglePreview={() => setPreviewMode((prev) => !prev)}
+        onManualSave={() => void saveNote(true)}
+        onDelete={() => setDeleteTargetId(noteId)}
+        onToggleAI={() => setShowAI((prev) => !prev)}
+      />
 
-        <div className="h-4 w-px bg-white/10 shrink-0" />
-
-        {/* Title input */}
-        <input
-          type="text"
-          id="note-title"
-          className="flex-1 bg-transparent text-white font-bold text-base placeholder-neutral-600
-                     focus:outline-none min-w-[140px] tracking-tight py-1 transition-all"
-          placeholder="Untitled Note…"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            titleRef.current = e.target.value;
-            markDirty();
+      <div className="flex flex-1 overflow-hidden animate-fade-in">
+        <NoteEditorSidebar
+          noteType={noteType}
+          noteId={noteId}
+          currentTitle={title}
+          sidebarNotes={sidebarNotes}
+          sidebarLoading={sidebarLoading}
+          openMenuNoteId={openMenuNoteId}
+          onToggleMenu={setOpenMenuNoteId}
+          onCreateNew={() => {
+            isDirty.current = false;
+            setHasUnsavedChanges(false);
+            router.push(`/notes/new?type=${noteType}`);
           }}
+          onSelectNote={(id) => void handleSelectSidebarNote(id)}
+          onTogglePin={(item) => void handleTogglePinNote(item)}
+          onToggleFavorite={(item) => void handleToggleFavoriteNote(item)}
+          onDeleteRequest={(id) => setDeleteTargetId(id)}
         />
 
-        {/* Note Type Selector Tabs */}
-        <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-xl p-1 shrink-0 select-none items-center gap-1">
-          {[
-            { id: "text", label: "Text", icon: FileText },
-            { id: "audio", label: "Voice", icon: Mic },
-            { id: "checklist", label: "Task", icon: ListTodo },
-          ].map((type) => {
-            const Icon = type.icon;
-            const isSelected = noteType === type.id;
-            return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => handleNoteTypeChange(type.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300
-                  ${isSelected
-                    ? "bg-gradient-to-tr from-[#f58c24] to-[#f9a748] text-[#1a0f05] shadow-md shadow-brand-500/15 scale-102 border border-brand-400/30"
-                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
-                  }`}
-                title={`${type.label} Note`}
-                id={`note-type-${type.id}`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{type.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Save indicator */}
-        <div className="shrink-0 flex items-center">
-          {hasUnsavedChanges && !saving && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              {" "}Unsaved
-            </span>
-          )}
-          {saving && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
-              <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />
-              {" "}Saving
-            </span>
-          )}
-          {saved && !saving && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              {" "}Saved
-            </span>
-          )}
-          {error && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-bold uppercase tracking-wider animate-fade-in">
-              Error
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2.5 ml-auto shrink-0">
-          {/* Preview toggle (mobile) - hidden for text notes */}
-          {noteType !== "text" && (
-            <button
-              onClick={() => setPreviewMode(!previewMode)}
-              className="sm:hidden w-9 h-9 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 text-gray-300 flex items-center justify-center text-xs active:scale-95 transition-all"
-              id="preview-toggle"
-            >
-              {previewMode ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
-          )}
-
-          {/* Save */}
-          <button
-            id="save-note-btn"
-            onClick={handleManualSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/[0.08] hover:bg-neutral-800 hover:border-white/[0.15] text-white text-xs font-semibold shadow-md active:scale-95 transition-all"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Save</span>
-          </button>
-
-          {/* Delete */}
-          <button
-            id="delete-note-btn"
-            onClick={() => handleOpenDeleteConfirm(noteId)}
-            disabled={deleting}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/25 text-red-400 hover:text-red-300 shadow-md active:scale-95 transition-all"
-          >
-            {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* AI Panel toggle */}
-          {noteType === "text" && (
-            <button
-              onClick={() => setShowAI(!showAI)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all
-                ${showAI
-                  ? "bg-gradient-to-tr from-[#f58c24] to-[#e3af35] text-[#1a0f05] border border-brand-400/30 shadow-lg shadow-brand-500/15"
-                  : "bg-neutral-900 border border-brand-500/20 text-brand-400 hover:bg-brand-500/10 hover:border-brand-500/35"
-                }`}
-              id="ai-panel-toggle"
-            >
-              <Brain className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">AI</span>
-              {showAI ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden animate-fade-in">
-        {/* Left side-notes list navbar */}
-        <aside className="no-print w-64 border-r border-sidebar-border bg-sidebar/70 backdrop-blur-xl flex flex-col shrink-0 select-none">
-          {/* Sidebar Header */}
-          <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
-            <div className="flex flex-col min-w-0 pr-2">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-neutral-500">
-                  Workspace
-                </span>
-                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded-full bg-white/[0.06] text-neutral-400">
-                  {sidebarNotes.filter((n) => n.note_type === noteType || n.id === noteId).length}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <SidebarNoteTypeIcon noteType={noteType} />
-                <span className="text-sm font-bold text-white tracking-tight truncate">
-                  {getNoteTypeLabel(noteType)}
-                </span>
-              </div>
-            </div>
-            {/* Create new note of current type */}
-            <button
-              type="button"
-              onClick={() => {
-                isDirty.current = false;
-                setHasUnsavedChanges(false);
-                router.push(`/notes/new?type=${noteType}`);
-              }}
-              title={`New ${noteType === "checklist" ? "checklist" : noteType + " note"}`}
-              className="w-7 h-7 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-brand-500/20 hover:border-brand-500/30 hover:text-brand-300 active:scale-95 text-neutral-400 flex items-center justify-center transition-all shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Notes list items */}
-          <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-1.5 scrollbar-thin">
-            {(() => {
-              const filteredSidebarNotes = sidebarNotes.filter(
-                (n) => n.note_type === noteType || n.id === noteId
-              );
-
-              if (sidebarLoading && filteredSidebarNotes.length === 0) {
-                return (
-                  <div className="flex flex-col gap-2 p-1">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-11 w-full bg-white/[0.02] border border-white/[0.04] rounded-xl animate-pulse" />
-                    ))}
-                  </div>
-                );
-              }
-
-              if (filteredSidebarNotes.length === 0) {
-                return (
-                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                    <p className="text-xs text-neutral-500 font-medium mb-1">
-                      No {noteType === "checklist" ? "checklists" : `${noteType} notes`} yet
-                    </p>
-                    <p className="text-[10px] text-neutral-600">
-                      Click the + button above to create one.
-                    </p>
-                  </div>
-                );
-              }
-
-              return filteredSidebarNotes.map((n) => {
-                const isActive = n.id === noteId;
-                const noteTitle = n.id === noteId ? (title || "Untitled Note") : (n.title || "Untitled Note");
-                const isMenuOpen = openMenuNoteId === n.id;
-
-                // Date formatting
-                let displayDate = "";
-                try {
-                  const date = new Date(n.updated_at);
-                  displayDate = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-                } catch { }
-
-                return (
-                  <div key={n.id} className="relative group w-full flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => void handleSelectSidebarNote(n.id)}
-                      className={`w-full flex items-center justify-between gap-2 pl-3 pr-9 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${isActive
-                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(245,140,36,0.12)]"
-                        : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
-                        }`}
-                    >
-                      {isActive && (
-                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
-                      )}
-
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#6ed6de]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#f58c24]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#e3af35]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-
-                        {n.is_pinned && (
-                          <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 shrink-0 transform -rotate-45" />
-                        )}
-
-                        <span className="truncate text-xs font-medium tracking-tight leading-none">{noteTitle}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {n.is_favorite && (
-                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-                        )}
-
-                        {displayDate && (
-                          <span className={`text-[10px] font-medium select-none ${isActive ? "text-brand-300/80" : "text-neutral-500 group-hover:text-neutral-400"}`}>
-                            {displayDate}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      data-note-menu
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuNoteId(isMenuOpen ? null : n.id);
-                      }}
-                      title="Note options"
-                      className={`absolute right-2 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isMenuOpen
-                        ? "bg-white/10 text-white"
-                        : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
-                        }`}
-                    >
-                      <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Popover Dropdown Menu */}
-                    {isMenuOpen && (
-                      <div
-                        data-note-menu
-                        className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-popover border border-border shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
-                      >
-                        {/* Pin / Unpin option */}
-                        <button
-                          type="button"
-                          onClick={() => void handleTogglePinNote(n)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
-                        >
-                          {n.is_pinned ? (
-                            <>
-                              <PinOff className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Unpin note</span>
-                            </>
-                          ) : (
-                            <>
-                              <Pin className="w-3.5 h-3.5 text-neutral-400" />
-                              <span>Pin to top</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* Favorite / Unfavorite option */}
-                        <button
-                          type="button"
-                          onClick={() => void handleToggleFavoriteNote(n)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
-                        >
-                          <Star className={`w-3.5 h-3.5 ${n.is_favorite ? "fill-amber-400 text-amber-400" : "text-neutral-400"}`} />
-                          <span>{n.is_favorite ? "Remove from Favorites" : "Add to Favorites"}</span>
-                        </button>
-
-                        <div className="h-px bg-white/[0.06] my-1" />
-
-                        {/* Delete option */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenMenuNoteId(null);
-                            handleOpenDeleteConfirm(n.id);
-                          }}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors rounded-lg text-left"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                          <span>Delete note</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </aside>
-
-        {/* Editor + Preview (split) */}
         <div className="flex flex-1 overflow-hidden flex-col">
-
-          {/* TIPTAP RICH TEXT TOOLBAR (Sticky at top of text note) */}
           {noteType === "text" && (
-            <div className="no-print sticky top-0 z-20 bg-neutral-900 border-b border-white/[0.06] p-2 flex flex-col gap-1.5 select-none shrink-0">
-
-              {/* Category tabs aligned horizontally */}
-              <div
-                className="flex items-center gap-2 overflow-x-auto pb-1.5 mb-1 border-b border-white/[0.04] scrollbar-none"
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-              >
-                {[
-                  "History & Clipboard",
-                  "Formatting",
-                  "Paragraph & Align",
-                  "Lists & Indent",
-                  "Insert & Clear",
-                  "Print & Utilities"
-                ].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveToolbarTab(tab)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeToolbarTab === tab
-                      ? "bg-brand-500/15 text-brand-300 border border-brand-500/30"
-                      : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02] border border-transparent"
-                      }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* Selected heading tools row */}
-              <div className="min-h-[40px] flex items-center px-1">
-                {activeToolbarTab === "History & Clipboard" && (
-                  <div className="flex items-center gap-1.5 animate-fade-in">
-                    <button type="button" onClick={() => editor?.chain().focus().undo().run()} className={getBtnClass(false)} title="Undo (Ctrl+Z)"><Undo className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().redo().run()} className={getBtnClass(false)} title="Redo (Ctrl+Shift+Z)"><Redo className="w-4 h-4" /></button>
-                    <div className="h-5 w-px bg-white/10 mx-1.5" />
-                    <button type="button" onClick={handleCut} className={getBtnClass(false)} title="Cut"><Scissors className="w-4 h-4" /></button>
-                    <button type="button" onClick={handleCopy} className={getBtnClass(false)} title="Copy"><Copy className="w-4 h-4" /></button>
-                    {/* Clipboard History Popover */}
-                    <div className="relative" ref={clipboardPopoverRef}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.readText().then(text => {
-                            if (text?.trim()) {
-                              setClipboardHistory((prev) => {
-                                if (prev.some(item => item.content === text)) return prev;
-                                const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
-                                return [{ id: generateSecureId(), type: isImg ? ("image" as const) : ("text" as const), content: text }, ...prev].slice(0, 10);
-                              });
-                            }
-                          }).catch(() => { });
-                          setShowClipboardPopover(!showClipboardPopover);
-                        }}
-                        className={getBtnClass(showClipboardPopover)}
-                        title="Clipboard History (Text & Images)"
-                      >
-                        <Clipboard className="w-4 h-4" />
-                      </button>
-                      {showClipboardPopover && (
-                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2.5 max-h-72 overflow-y-auto">
-                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Clipboard History</span>
-
-                          {clipboardHistory.length === 0 ? (
-                            <span className="text-xs text-neutral-600 italic text-center py-4">History is empty. Copy some text or images first.</span>
-                          ) : (
-                            <div className="flex flex-col gap-3">
-                              {/* Text items */}
-                              {clipboardHistory.some(item => item.type === "text") && (
-                                <div className="flex flex-col gap-1.5">
-                                  <span className="text-[9px] font-bold uppercase text-brand-400">Copied Text</span>
-                                  <div className="flex flex-col gap-1">
-                                    {clipboardHistory.filter(item => item.type === "text").map((item) => (
-                                      <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => {
-                                          editor?.chain().focus().insertContent(item.content).run();
-                                          setShowClipboardPopover(false);
-                                        }}
-                                        className="w-full text-left p-2 rounded-lg bg-neutral-900 border border-white/[0.04] hover:bg-neutral-800 hover:border-brand-500/30 text-xs text-gray-300 truncate transition-colors"
-                                        title={item.content}
-                                      >
-                                        {item.content}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Image items */}
-                              {clipboardHistory.some(item => item.type === "image") && (
-                                <div className="flex flex-col gap-1.5 mt-1.5 border-t border-white/[0.04] pt-2">
-                                  <span className="text-[9px] font-bold uppercase text-brand-400">Copied Images</span>
-                                  <div className="grid grid-cols-2 gap-1.5">
-                                    {clipboardHistory.filter(item => item.type === "image").map((item) => (
-                                      <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => {
-                                          editor?.chain().focus().setImage({ src: item.content }).run();
-                                          setShowClipboardPopover(false);
-                                        }}
-                                        className="p-1 rounded-lg bg-neutral-900 border border-white/[0.04] hover:bg-neutral-800 hover:border-brand-500/30 transition-all aspect-video overflow-hidden flex items-center justify-center relative"
-                                        title="Click to paste image"
-                                      >
-                                        <img src={item.content} className="max-h-full max-w-full object-cover rounded-md" alt="Clipboard Preview" />
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeToolbarTab === "Formatting" && (
-                  <div className="flex items-center gap-2 animate-fade-in flex-wrap">
-                    {/* Font Family Dropdown */}
-                    <div className="relative" ref={fontDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowFontDropdown(!showFontDropdown)}
-                        className="px-2.5 py-1.5 rounded-lg bg-neutral-950 border border-white/[0.08] text-xs text-gray-300 flex items-center gap-2 hover:bg-neutral-900 transition-all font-medium min-w-[130px]"
-                      >
-                        <span className="truncate max-w-[90px]">{getActiveFontFamily()}</span>
-                        <span className="text-[8px] text-gray-500 ml-auto">▼</span>
-                      </button>
-                      {showFontDropdown && (
-                        <div className="absolute left-0 mt-1 w-44 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
-                          {["Inter", "Georgia", "Courier New", "Arial", "Times New Roman"].map((font) => (
-                            <button
-                              key={font}
-                              type="button"
-                              onClick={() => {
-                                editor?.chain().focus().setFontFamily(font).run();
-                                setShowFontDropdown(false);
-                              }}
-                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${getActiveFontFamily() === font ? "text-brand-400 font-bold" : "text-gray-300"
-                                }`}
-                              style={{ fontFamily: font }}
-                            >
-                              {font}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {/* Font Size Dropdown */}
-                    <div className="relative" ref={sizeDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                        className="px-2.5 py-1.5 rounded-lg bg-neutral-950 border border-white/[0.08] text-xs text-gray-300 flex items-center gap-2 hover:bg-neutral-900 transition-all font-medium min-w-[80px]"
-                      >
-                        <span>{getActiveFontSize()} px</span>
-                        <span className="text-[8px] text-gray-500 ml-auto">▼</span>
-                      </button>
-                      {showSizeDropdown && (
-                        <div className="absolute left-0 mt-1 w-24 max-h-48 overflow-y-auto rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 py-1">
-                          {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => (
-                            <button
-                              key={size}
-                              type="button"
-                              onClick={() => {
-                                editor?.chain().focus().setMark("textStyle", { fontSize: size + "px" }).run();
-                                setShowSizeDropdown(false);
-                              }}
-                              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.05] ${getActiveFontSize() === String(size) ? "text-brand-400 font-bold" : "text-gray-300"
-                                }`}
-                            >
-                              {size}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="h-5 w-px bg-white/10 mx-1" />
-                    <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={getBtnClass(editor?.isActive("bold") || false)} title="Bold (Ctrl+B)"><Bold className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={getBtnClass(editor?.isActive("italic") || false)} title="Italic (Ctrl+I)"><Italic className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className={getBtnClass(editor?.isActive("underline") || false)} title="Underline (Ctrl+U)"><UnderlineIcon className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className={getBtnClass(editor?.isActive("strike") || false)} title="Strikethrough"><Strikethrough className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className={getBtnClass(editor?.isActive("subscript") || false)} title="Subscript"><SubscriptIcon className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className={getBtnClass(editor?.isActive("superscript") || false)} title="Superscript"><SuperscriptIcon className="w-4 h-4" /></button>
-                    <div className="h-5 w-px bg-white/10 mx-1.5" />
-
-                    {/* Text Color Picker */}
-                    <div className="relative" ref={colorPickerRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowColorPicker(!showColorPicker)}
-                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${showColorPicker ? "bg-white/[0.05] border-white/10" : ""
-                          }`}
-                        title="Text Color"
-                      >
-                        <div className="flex flex-col items-center justify-center">
-                          <span className="text-xs font-bold font-serif leading-none mt-[-2px]">A</span>
-                          <div
-                            className="w-4 h-0.5 mt-0.5 rounded-full"
-                            style={{ backgroundColor: editor?.getAttributes("textStyle").color || "#e5e7eb" }}
-                          />
-                        </div>
-                      </button>
-                      {showColorPicker && (
-                        <div className="absolute left-0 mt-1 p-2 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
-                          <div className="grid grid-cols-5 gap-1.5">
-                            {COLORS.map((c) => (
-                              <button
-                                key={c.value}
-                                type="button"
-                                onClick={() => setTextColor(c.value)}
-                                className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
-                                style={{ backgroundColor: c.value }}
-                                title={c.name}
-                              >
-                                {editor?.getAttributes("textStyle").color === c.value && (
-                                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white mix-blend-difference">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Highlight Color Picker */}
-                    <div className="relative" ref={highlightPickerRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-                        className={`p-1.5 rounded-md hover:bg-white/[0.04] border border-transparent transition-all flex items-center gap-1.5 ${showHighlightPicker ? "bg-white/[0.05] border-white/10" : ""
-                          }`}
-                        title="Highlight Color"
-                      >
-                        <Palette className="w-4 h-4" />
-                      </button>
-                      {showHighlightPicker && (
-                        <div className="absolute left-0 mt-1 p-2 rounded-lg bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-36">
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {HIGHLIGHTS.map((c) => (
-                              <button
-                                key={c.value}
-                                type="button"
-                                onClick={() => setHighlightColor(c.value)}
-                                className="w-5 h-5 rounded border border-white/10 relative transition-transform hover:scale-110 active:scale-95"
-                                style={{ backgroundColor: c.value }}
-                                title={c.name}
-                              >
-                                {editor?.isActive("highlight", { color: c.value }) && (
-                                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-black">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeToolbarTab === "Paragraph & Align" && (
-                  <div className="flex items-center gap-1.5 animate-fade-in">
-                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 1 }) || false)} title="Heading 1">H1</button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 2 }) || false)} title="Heading 2">H2</button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} className={getBtnClass(editor?.isActive("heading", { level: 3 }) || false)} title="Heading 3">H3</button>
-                    <button type="button" onClick={() => editor?.chain().focus().setParagraph().run()} className={getBtnClass(editor?.isActive("paragraph") || false)} title="Normal text">P</button>
-                    <div className="h-5 w-px bg-white/10 mx-1.5" />
-                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className={getBtnClass(editor?.isActive({ textAlign: "left" }) || false)} title="Align Left"><AlignLeft className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className={getBtnClass(editor?.isActive({ textAlign: "center" }) || false)} title="Align Center"><AlignCenter className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className={getBtnClass(editor?.isActive({ textAlign: "right" }) || false)} title="Align Right"><AlignRight className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().setTextAlign("justify").run()} className={getBtnClass(editor?.isActive({ textAlign: "justify" }) || false)} title="Justify"><AlignJustify className="w-4 h-4" /></button>
-                  </div>
-                )}
-
-                {activeToolbarTab === "Lists & Indent" && (
-                  <div className="flex items-center gap-1.5 animate-fade-in">
-                    <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className={getBtnClass(editor?.isActive("bulletList") || false)} title="Bullet List"><List className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={getBtnClass(editor?.isActive("orderedList") || false)} title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={getBtnClass(editor?.isActive("blockquote") || false)} title="Blockquote"><Quote className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={getBtnClass(editor?.isActive("codeBlock") || false)} title="Code Block"><Code className="w-4 h-4" /></button>
-                    <div className="h-5 w-px bg-white/10 mx-1.5" />
-                    <button type="button" onClick={() => editor?.chain().focus().liftListItem("listItem").run()} className={getBtnClass(false)} title="Decrease Indent (Shift+Tab)"><Outdent className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().sinkListItem("listItem").run()} className={getBtnClass(false)} title="Increase Indent (Tab)"><Indent className="w-4 h-4" /></button>
-                  </div>
-                )}
-
-                {activeToolbarTab === "Insert & Clear" && (
-                  <div className="flex items-center gap-1.5 animate-fade-in">
-                    {/* Link Insertion */}
-                    <div className="relative" ref={linkPopoverRef}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const activeUrl = editor?.getAttributes("link").href || "";
-                          setLinkUrl(activeUrl);
-                          setShowLinkPopover(!showLinkPopover);
-                        }}
-                        className={getBtnClass(editor?.isActive("link") || false)}
-                        title="Link (Ctrl+K)"
-                      >
-                        <LinkIcon className="w-4 h-4" />
-                      </button>
-                      {showLinkPopover && (
-                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-64 flex flex-col gap-2">
-                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert/Edit Link</span>
-                          <input
-                            type="text"
-                            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
-                            placeholder="https://example.com"
-                            value={linkUrl}
-                            onChange={(e) => setLinkUrl(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                if (linkUrl) {
-                                  editor?.chain().focus().setLink({ href: linkUrl }).run();
-                                } else {
-                                  editor?.chain().focus().unsetLink().run();
-                                }
-                                setShowLinkPopover(false);
-                              }
-                            }}
-                          />
-                          <div className="flex justify-between items-center gap-1.5 mt-1">
-                            {editor?.isActive("link") && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  editor?.chain().focus().unsetLink().run();
-                                  setShowLinkPopover(false);
-                                }}
-                                className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors"
-                              >
-                                Remove Link
-                              </button>
-                            )}
-                            <div className="flex gap-1 ml-auto">
-                              <button
-                                type="button"
-                                onClick={() => setShowLinkPopover(false)}
-                                className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (linkUrl) {
-                                    editor?.chain().focus().setLink({ href: linkUrl }).run();
-                                  } else {
-                                    editor?.chain().focus().unsetLink().run();
-                                  }
-                                  setShowLinkPopover(false);
-                                }}
-                                className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Image Insertion */}
-                    <div className="relative" ref={imagePopoverRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowImagePopover(!showImagePopover)}
-                        className={getBtnClass(false)}
-                        title="Insert Image"
-                      >
-                        <ImageIcon className="w-4 h-4" />
-                      </button>
-                      {showImagePopover && (
-                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 w-72 flex flex-col gap-3">
-                          <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Insert Image URL</span>
-                            <input
-                              type="text"
-                              className="w-full bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500"
-                              placeholder="https://example.com/image.jpg"
-                              value={imageUrl}
-                              onChange={(e) => setImageUrl(e.target.value)}
-                              disabled={isUploadingImage}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && !isUploadingImage) {
-                                  if (imageUrl) {
-                                    editor?.chain().focus().setImage({ src: imageUrl }).run();
-                                  }
-                                  setShowImagePopover(false);
-                                  setImageUrl("");
-                                }
-                              }}
-                            />
-                            <div className="flex gap-1 ml-auto mt-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (imageUrl) {
-                                    editor?.chain().focus().setImage({ src: imageUrl }).run();
-                                  }
-                                  setShowImagePopover(false);
-                                  setImageUrl("");
-                                }}
-                                disabled={isUploadingImage || !imageUrl}
-                                className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-400 text-white rounded transition-colors disabled:opacity-50"
-                              >
-                                Insert URL
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="relative flex py-1 items-center">
-                            <div className="flex-grow border-t border-white/[0.06]"></div>
-                            <span className="flex-shrink mx-2 text-[9px] text-gray-600 font-bold uppercase">OR</span>
-                            <div className="flex-grow border-t border-white/[0.06]"></div>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider">Upload from computer</span>
-                            <input
-                              type="file"
-                              ref={fileInputRef}
-                              onChange={handleImageUpload}
-                              accept="image/*"
-                              disabled={isUploadingImage}
-                              className="hidden"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={isUploadingImage}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-neutral-800 hover:border-brand-500/50 hover:bg-neutral-900 rounded-lg text-xs font-semibold text-gray-300 hover:text-white transition-all duration-200"
-                            >
-                              {isUploadingImage ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-500" />
-                                  <span>Uploading image...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="w-3.5 h-3.5 text-neutral-500" />
-                                  <span>Choose local picture</span>
-                                </>
-                              )}
-                            </button>
-                            {imageUploadError && (
-                              <p className="text-[10px] text-red-400 mt-1 leading-normal">
-                                {imageUploadError}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex border-t border-white/[0.04] pt-2 mt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowImagePopover(false);
-                                setImageUrl("");
-                                setImageUploadError(null);
-                              }}
-                              disabled={isUploadingImage}
-                              className="ml-auto px-2.5 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-200 transition-colors"
-                            >
-                              Close
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Table Grid Picker */}
-                    <div className="relative" ref={tablePopoverRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowTablePopover(!showTablePopover)}
-                        className={getBtnClass(editor?.isActive("table") || false)}
-                        title="Insert Table"
-                      >
-                        <TableIcon className="w-4 h-4" />
-                      </button>
-                      {showTablePopover && (
-                        <div className="absolute left-0 mt-1 p-3 rounded-xl bg-neutral-950 border border-white/[0.08] shadow-lg z-30 flex flex-col gap-2.5 select-none w-[166px]">
-                          <span className="text-[10px] font-bold uppercase text-gray-500 tracking-wider font-sans text-gray-400">Insert Table Grid</span>
-                          <div
-                            className="grid grid-cols-6 gap-1"
-                            onMouseLeave={() => setHoveredGrid(null)}
-                          >
-                            {Array.from({ length: 36 }).map((_, index) => {
-                              const row = Math.floor(index / 6) + 1;
-                              const col = (index % 6) + 1;
-                              const isSelected = hoveredGrid && row <= hoveredGrid.r && col <= hoveredGrid.c;
-                              return (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  onMouseEnter={() => setHoveredGrid({ r: row, c: col })}
-                                  onClick={() => {
-                                    editor?.chain().focus().insertTable({ rows: row, cols: col, withHeaderRow: true }).run();
-                                    setShowTablePopover(false);
-                                    setHoveredGrid(null);
-                                  }}
-                                  className={`w-5 h-5 rounded transition-colors border ${isSelected
-                                    ? "bg-brand-500/80 border-brand-500"
-                                    : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
-                                    }`}
-                                />
-                              );
-                            })}
-                          </div>
-                          <span className="text-[10px] font-bold text-center text-gray-400 font-sans">
-                            {hoveredGrid ? `${hoveredGrid.r} x ${hoveredGrid.c} Table` : "Hover to choose size"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className={getBtnClass(false)} title="Horizontal Rule"><Minus className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()} className={getBtnClass(false)} title="Clear Formatting"><Eraser className="w-4 h-4" /></button>
-                  </div>
-                )}
-
-                {activeToolbarTab === "Print & Utilities" && (
-                  <div className="flex flex-wrap items-center gap-2.5 animate-fade-in w-full">
-                    <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Words: {wordCount}</span>
-                    <span className="text-xs text-gray-400 bg-neutral-950 border border-white/[0.08] px-3 py-1.5 rounded-lg font-mono select-none">Characters: {charCount}</span>
-                    <button type="button" onClick={() => window.print()} className="ml-auto btn-secondary py-1.5 px-3.5 text-xs flex items-center gap-1.5 border-neutral-800 hover:border-neutral-700 font-medium" title="Print Document"><Printer className="w-4 h-4" /> Print</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Table Sub-Toolbar (Active when cursor is inside table) */}
-              <TableSubToolbar editor={editor} />
-            </div>
+            <NoteRichTextToolbar
+              editor={editor}
+              clipboardHistory={clipboardHistory}
+              onCut={handleCut}
+              onCopy={handleCopy}
+              onReadClipboard={(text) => addClipboardItem(text)}
+              onUploadImage={handleImageUpload}
+              isUploadingImage={isUploadingImage}
+              imageUploadError={imageUploadError}
+              onClearImageError={() => setImageUploadError(null)}
+            />
           )}
 
           <div className="flex flex-1 overflow-hidden">
-
-            {/* EDITOR PANEL (LEFT) */}
             <div className={getEditorPanelClass(noteType, previewMode)}>
-
               {noteType === "text" && (
                 <div className="flex-1 flex flex-col min-h-0 print-content overflow-y-auto">
-                  {/* Centered Heading visible only in print */}
-                  <div className="only-print flex-col items-center justify-center border-b-2 border-neutral-300 pb-4 mb-6 w-full text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Luminote</span>
-                    <h2 className="text-2xl font-bold text-black">{title || "Untitled Note"}</h2>
-                    <div className="flex gap-4 mt-2 text-xs text-neutral-500 justify-center font-medium">
-                      <span>Date: {note ? new Date(note.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</span>
-                      <span>Time: {note ? new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  </div>
-
+                  <PrintDocumentHeader title={title} createdAt={note?.created_at} />
                   <EditorContent editor={editor} className="flex-1" />
                 </div>
               )}
 
               {noteType === "audio" && (
-                <>
-                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                    <Mic className="w-3.5 h-3.5 text-gray-600" />
-                    <span className="text-xs text-gray-600 font-medium">Audio Transcriber</span>
-                  </div>
-                  <div className="p-4 sm:p-6 flex-1">
-                    <AudioRecorder
-                      noteId={noteId}
-                      mediaUrl={note?.media_url || null}
-                      transcript={note?.transcript || null}
-                      onTranscriptUpdate={handleTranscriptUpdate}
-                      onMediaUrlUpdate={(newUrl) => {
-                        if (note) {
-                          setNote({ ...note, media_url: newUrl });
-                        }
-                      }}
-                      onSaveBeforeAction={ensureNoteSaved}
-                    />
-                  </div>
-                </>
+                <AudioNotePanel
+                  noteId={noteId}
+                  mediaUrl={note?.media_url ?? null}
+                  transcript={note?.transcript ?? null}
+                  onTranscriptUpdate={(newTranscript) => {
+                    if (!note) return;
+                    setNote({ ...note, transcript: newTranscript });
+                    const updated = content ? `${content}\n\nTranscript:\n${newTranscript}` : newTranscript;
+                    setContent(updated);
+                    contentRef.current = updated;
+                    isDirty.current = true;
+                    void saveNote();
+                  }}
+                  onMediaUrlUpdate={(newUrl) => {
+                    if (note) setNote({ ...note, media_url: newUrl });
+                  }}
+                  onSaveBeforeAction={ensureNoteSaved}
+                />
               )}
 
               {noteType === "checklist" && (
-                <>
-                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
-                    <ListTodo className="w-3.5 h-3.5 text-gray-600" />
-                    <span className="text-xs text-gray-600 font-medium">Checklist Planner</span>
-                  </div>
-                  <div className="p-4 sm:p-6 flex-1 flex flex-col gap-5 overflow-y-auto">
-                    {/* Description Box */}
-                    <ChecklistDescriptionField
-                      value={checklistDescription}
-                      onChange={(nextVal) => {
-                        setChecklistDescription(nextVal);
-                        descriptionRef.current = nextVal;
-                        contentRef.current = JSON.stringify({
-                          description: nextVal,
-                          ai_context: aiContextRef.current,
-                        });
-                        markDirty();
-                      }}
-                    />
-
-                    <div className="h-px bg-white/[0.04] shrink-0" />
-
-                    <ChecklistEditor
-                      noteId={noteId}
-                      items={checklistItems}
-                      onItemsUpdate={handleChecklistUpdate}
-                      onSaveBeforeAction={ensureNoteSaved}
-                    />
-                  </div>
-                </>
+                <ChecklistNotePanel
+                  noteId={noteId}
+                  checklistDescription={checklistDescription}
+                  checklistItems={checklistItems}
+                  onDescriptionChange={(nextVal) => {
+                    setChecklistDescription(nextVal);
+                    descriptionRef.current = nextVal;
+                    contentRef.current = JSON.stringify({
+                      description: nextVal,
+                      ai_context: aiContextRef.current,
+                    });
+                    markDirty();
+                  }}
+                  onItemsUpdate={(newItems) => {
+                    setChecklistItems(newItems);
+                    if (note) setNote({ ...note, checklist_items: newItems });
+                  }}
+                  onSaveBeforeAction={ensureNoteSaved}
+                />
               )}
             </div>
 
-            {/* PREVIEW PANEL (RIGHT) - Only active for checklist type */}
             {noteType === "checklist" && (
-              <div className={`flex flex-col ${previewMode ? "flex" : "hidden sm:flex"} w-full sm:w-[35%] overflow-y-auto`}>
-
-                {noteType === "checklist" && (
-                  <>
-                    <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04] bg-surface-900/40">
-                      <Brain className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
-                      <span className="text-xs text-gray-200 font-semibold uppercase tracking-wider">AI Task Generator</span>
-                    </div>
-                    <div className="p-5 flex-1 flex flex-col gap-4">
-                      <div className="text-xs text-neutral-400 leading-relaxed">
-                        Type or paste context, meeting notes, project briefs, or general thoughts below. The AI will extract actionable checklist items and add them to your checklist items.
-                      </div>
-
-                      <textarea
-                        id="note-checklist-content"
-                        className="flex-1 min-h-[180px] bg-surface-900/40 border border-white/[0.04] focus:border-brand-500/50 rounded-xl p-4 text-sm text-gray-200
-                                   font-mono leading-relaxed placeholder-gray-700
-                                   focus:outline-none transition-all resize-none"
-                        placeholder="e.g. 'Must call the plumber to fix the kitchen sink by Tuesday. Also send final slides to the team and schedule a sync with the marketing lead.'..."
-                        value={aiContext}
-                        onChange={(e) => {
-                          setAiContext(e.target.value);
-                          aiContextRef.current = e.target.value;
-                          contentRef.current = JSON.stringify({
-                            description: descriptionRef.current,
-                            ai_context: e.target.value,
-                          });
-                          markDirty();
-                        }}
-                        spellCheck
-                      />
-
-                      {extractError && (
-                        <div className="px-3.5 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium">
-                          {extractError}
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleExtractTasks}
-                        disabled={extractingTasks || !aiContext.trim()}
-                        className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 transition-all font-semibold"
-                      >
-                        {extractingTasks ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        ) : (
-                          <Wand2 className="w-4 h-4 text-white" />
-                        )}
-                        <span>{extractingTasks ? "Extracting Tasks..." : "Generate AI Checklist Items"}</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <ChecklistGeneratorPanel
+                previewMode={previewMode}
+                aiContext={aiContext}
+                extractError={extractError}
+                extractingTasks={extractingTasks}
+                onAiContextChange={(val) => {
+                  setAiContext(val);
+                  aiContextRef.current = val;
+                  contentRef.current = JSON.stringify({
+                    description: descriptionRef.current,
+                    ai_context: val,
+                  });
+                  markDirty();
+                }}
+                onExtractTasks={() => void handleExtractTasks()}
+              />
             )}
           </div>
         </div>
 
-        {/* AI Panel */}
-        {noteType === "text" && showAI && note && (
+        {showAIPanel && (
           <div className="hidden lg:flex flex-col w-80 xl:w-96 border-l border-white/[0.06] overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
             <AIPanel note={note} onUpdateNote={setNote} editor={editor} onSaveBeforeAction={ensureNoteSaved} />
           </div>
         )}
       </div>
 
-      {/* Mobile AI panel (bottom sheet) */}
-      {noteType === "text" && showAI && note && (
+      {showAIPanel && (
         <div className="lg:hidden border-t border-white/[0.06] max-h-64 overflow-y-auto p-4 select-none bg-surface-900/40 backdrop-blur-sm">
           <AIPanel note={note} onUpdateNote={setNote} editor={editor} onSaveBeforeAction={ensureNoteSaved} />
         </div>
@@ -2110,7 +1182,7 @@ function NoteEditorContent() {
       <ConfirmModal
         isOpen={deleteTargetId !== null}
         loading={deleting}
-        onConfirm={handleConfirmDeleteNote}
+        onConfirm={() => void handleConfirmDeleteNote()}
         onCancel={() => setDeleteTargetId(null)}
       />
     </div>
@@ -2119,11 +1191,13 @@ function NoteEditorContent() {
 
 export default function NoteEditorPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-surface-800">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-surface-800">
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+        </div>
+      }
+    >
       <NoteEditorContent />
     </Suspense>
   );

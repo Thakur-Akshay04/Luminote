@@ -20,7 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 from app.config import settings
-from app.database import AsyncSessionLocal, check_db_health, init_db
+from app.database import AsyncSessionLocal, check_db_health, init_db, sample_pool_metrics
 from app.limiter import limiter
 from app.models.alert import Alert
 from app.models.note import Note
@@ -505,4 +505,5 @@ async def prometheus_metrics(request: Request):
         expected = f"Bearer {settings.metrics_token}"
         if not secrets.compare_digest(auth_header, expected):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    sample_pool_metrics()
     return PlainTextResponse(metrics.render_prometheus(), media_type="text/plain; version=0.0.4")

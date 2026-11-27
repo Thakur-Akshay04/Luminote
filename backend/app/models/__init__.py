@@ -5,6 +5,7 @@ from app.models.credit_transaction import (
     CreditTransaction,
     CreditTransactionType,
     CreditTransactionStatus,
+    PaymentIdempotencyKey,
 )
 
 __all__ = [
@@ -14,5 +15,5 @@ __all__ = [
     "CreditTransaction",
     "CreditTransactionType",
     "CreditTransactionStatus",
+    "PaymentIdempotencyKey",
 ]
-

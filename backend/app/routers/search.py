@@ -75,8 +75,20 @@ async def semantic_search(
             detail="Search failed due to invalid embedding data",
         )
 
+    # Enable iterative HNSW scan (requires PostgreSQL pgvector >= 0.8.0) so per-user
+    # filtered vector candidate retrieval does not truncate early at hnsw.ef_search.
+    try:
+        async with db.begin_nested():
+            await db.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+    except Exception as exc:
+        logger.warning(
+            "Could not enable hnsw.iterative_scan (requires pgvector >= 0.8.0): %s",
+            exc,
+        )
+
     # Hybrid pgvector HNSW + GIN FTS search:
-    # Candidate CTE restricts scoring to top semantic & top FTS matches so indexes are utilized.
+    # - vec_candidates leverages iterative HNSW scan (>= pgvector 0.8.0) for per-user recall.
+    # - fts_candidates orders matches by weighted ts_rank before LIMIT 50.
     stmt = text(
         """
         WITH vec_candidates AS (
@@ -95,6 +107,12 @@ async def semantic_search(
                 setweight(to_tsvector('english', coalesce(content, '')), 'B') ||
                 setweight(to_tsvector('english', coalesce(immutable_array_to_string(tags, ' '), '')), 'A')
               ) @@ websearch_to_tsquery('english', :query)
+            ORDER BY ts_rank(
+                setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+                setweight(to_tsvector('english', coalesce(content, '')), 'B') ||
+                setweight(to_tsvector('english', coalesce(immutable_array_to_string(tags, ' '), '')), 'A'),
+                websearch_to_tsquery('english', :query)
+            ) DESC, id DESC
             LIMIT 50
         ),
         candidate_ids AS (

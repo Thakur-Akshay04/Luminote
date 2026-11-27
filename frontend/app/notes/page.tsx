@@ -39,7 +39,7 @@ function NotesContent() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    fetchNotes();
+    void fetchNotes();
   }, [fetchNotes, isLoaded]);
 
   const allTags = Array.from(

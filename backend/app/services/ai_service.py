@@ -34,6 +34,7 @@ def _sanitize_user_content(text: str) -> str:
 
 
 def _extract_json_content(raw: str) -> str:
+    """Extract a complete JSON object or array, preserving plain arrays and fenced blocks."""
     raw = raw.strip()
     if "```" in raw:
         for part in raw.split("```"):
@@ -42,10 +43,24 @@ def _extract_json_content(raw: str) -> str:
                 part = part[4:].strip()
             if (part.startswith("{") and part.endswith("}")) or (part.startswith("[") and part.endswith("]")):
                 return part
-    start_idx = raw.find("{")
-    end_idx = raw.rfind("}")
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        return raw[start_idx : end_idx + 1]
+
+    try:
+        json.loads(raw)
+        return raw
+    except Exception:
+        pass
+
+    obj_start = raw.find("{")
+    arr_start = raw.find("[")
+    if arr_start != -1 and (obj_start == -1 or arr_start < obj_start):
+        arr_end = raw.rfind("]")
+        if arr_end > arr_start:
+            return raw[arr_start : arr_end + 1]
+    elif obj_start != -1:
+        obj_end = raw.rfind("}")
+        if obj_end > obj_start:
+            return raw[obj_start : obj_end + 1]
+
     return raw
 
 

@@ -7,7 +7,7 @@ from typing import Annotated, Literal, Optional
 import razorpay
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.models.credit_transaction import (
     CreditTransaction,
     CreditTransactionStatus,
     CreditTransactionType,
+    PaymentIdempotencyKey,
 )
 from app.models.user import User
 from app.observability import audit_log, sanitize_log_value
@@ -131,6 +132,81 @@ async def _atomic_complete_purchase(
         return False, None, None
 
 
+async def _reserve_or_replay_idempotency(
+    db: AsyncSession,
+    uid: uuid.UUID,
+    credit_package: str,
+    idempotency_key: str,
+) -> tuple[uuid.UUID | None, CreateOrderResponse | None]:
+    """
+    Atomically reserve a durable idempotency record before invoking Razorpay.
+
+    Returns (reservation_id, None) for the winner that may proceed to the gateway,
+    or (None, cached_response) when an existing completed order is replayed.
+    Concurrent in-flight duplicates wait briefly for completion or raise 409 Conflict.
+    """
+    reservation_id = uuid.uuid4()
+    record = PaymentIdempotencyKey(
+        id=reservation_id,
+        user_id=uid,
+        credit_package=credit_package,
+        idempotency_key=idempotency_key,
+        status="in_progress",
+    )
+    db.add(record)
+    try:
+        await db.commit()
+        return reservation_id, None
+    except IntegrityError:
+        await db.rollback()
+
+    deadline = asyncio.get_running_loop().time() + min(settings.razorpay_timeout_seconds + 2.0, 17.0)
+    while True:
+        db.expire_all()
+        existing = (
+            await db.execute(
+                select(PaymentIdempotencyKey).where(
+                    PaymentIdempotencyKey.user_id == uid,
+                    PaymentIdempotencyKey.credit_package == credit_package,
+                    PaymentIdempotencyKey.idempotency_key == idempotency_key,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Previous order attempt did not complete; please retry",
+            )
+        if existing.status == "completed" and existing.response_payload:
+            return None, CreateOrderResponse(**existing.response_payload)
+        if asyncio.get_running_loop().time() >= deadline:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Order creation already in progress; please retry shortly",
+            )
+        await asyncio.sleep(0.2)
+
+
+async def _release_idempotency_reservation(
+    db: AsyncSession,
+    reservation_id: uuid.UUID | None,
+) -> None:
+    if reservation_id is None:
+        return
+    try:
+        await db.rollback()
+        await db.execute(
+            delete(PaymentIdempotencyKey).where(
+                PaymentIdempotencyKey.id == reservation_id,
+                PaymentIdempotencyKey.status == "in_progress",
+            )
+        )
+        await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to release payment idempotency reservation %s: %s", reservation_id, exc)
+
+
 @router.get("/packages")
 @limiter.limit("60/minute")
 async def get_packages(request: Request):
@@ -150,37 +226,48 @@ async def create_order(
     db: Annotated[AsyncSession, Depends(get_db)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)] = None,
 ):
-    """Create a Razorpay order and pending CreditTransaction with optional Idempotency-Key support."""
+    """Create a Razorpay order with durable DB-backed idempotency reservation before the gateway call."""
     package = PACKAGES.get(body.credit_package)
     if not package:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid package selected")
 
+    uid = uuid.UUID(user_id)
     idem_cache_key: str | None = None
+    reservation_id: uuid.UUID | None = None
+
     if idempotency_key:
         idem_cache_key = f"user:{user_id}:order_idem:{body.credit_package}:{idempotency_key}"
         cached = await redis_get_safe(idem_cache_key, cache_name="payment_idem")
         if cached:
             return CreateOrderResponse(**json.loads(cached))
 
-    client = get_razorpay_client()
-    uid = uuid.UUID(user_id)
-
-    order_payload = {
-        "amount": package["amount_paise"],
-        "currency": "INR",
-        "receipt": f"rcpt_{uuid.uuid4().hex[:12]}",
-        "notes": {
-            "user_id": user_id,
-            "credit_package": body.credit_package,
-            "credits": str(package["credits"]),
-        },
-    }
+        reservation_id, replayed = await _reserve_or_replay_idempotency(
+            db, uid, body.credit_package, idempotency_key
+        )
+        if replayed is not None:
+            await redis_setex_safe(
+                idem_cache_key, 24 * 60 * 60, replayed.model_dump_json(), cache_name="payment_idem"
+            )
+            return replayed
 
     try:
+        client = get_razorpay_client()
+        order_payload = {
+            "amount": package["amount_paise"],
+            "currency": "INR",
+            "receipt": f"rcpt_{uuid.uuid4().hex[:12]}",
+            "notes": {
+                "user_id": user_id,
+                "credit_package": body.credit_package,
+                "credits": str(package["credits"]),
+            },
+        }
         razorpay_order = await _run_razorpay_call(client.order.create, data=order_payload)  # type: ignore[attr-defined]
     except HTTPException:
+        await _release_idempotency_reservation(db, reservation_id)
         raise
     except Exception as exc:
+        await _release_idempotency_reservation(db, reservation_id)
         logger.exception("Failed to create Razorpay order for user %s: %s", user_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -188,6 +275,12 @@ async def create_order(
         )
 
     order_id = razorpay_order["id"]
+    response_payload = CreateOrderResponse(
+        order_id=order_id,
+        amount=package["amount_paise"],
+        currency="INR",
+        razorpay_key_id=settings.razorpay_key_id,
+    )
 
     pending_tx = CreditTransaction(
         id=uuid.uuid4(),
@@ -198,14 +291,20 @@ async def create_order(
         status=CreditTransactionStatus.PENDING,
     )
     db.add(pending_tx)
+
+    if reservation_id is not None:
+        await db.execute(
+            update(PaymentIdempotencyKey)
+            .where(PaymentIdempotencyKey.id == reservation_id)
+            .values(
+                status="completed",
+                razorpay_order_id=order_id,
+                response_payload=response_payload.model_dump(),
+            )
+        )
+
     await db.commit()
 
-    response_payload = CreateOrderResponse(
-        order_id=order_id,
-        amount=package["amount_paise"],
-        currency="INR",
-        razorpay_key_id=settings.razorpay_key_id,
-    )
     if idem_cache_key:
         await redis_setex_safe(
             idem_cache_key, 24 * 60 * 60, response_payload.model_dump_json(), cache_name="payment_idem"
@@ -261,7 +360,6 @@ async def verify_payment(
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment signature")
 
-    # Fast-path idempotency check
     existing = (
         await db.execute(
             select(CreditTransaction).where(

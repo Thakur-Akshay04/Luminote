@@ -9,6 +9,7 @@ import uuid
 from typing import Annotated
 
 import aiofiles
+import groq
 import magic
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
@@ -26,7 +27,7 @@ from app.redis_client import bump_search_version, redis_delete_safe, redis_get_s
 from app.services.credit_service import check_and_deduct_credits, ensure_sufficient_credits
 from app.services.file_security import ALLOWED_AUDIO_TYPES, MAX_FILE_SIZE, validate_file
 from app.services.note_service import get_note
-from app.services.resilience import CircuitBreakerOpenError, groq_breaker
+from app.services.resilience import CircuitBreakerOpenError, groq_breaker, is_retryable_provider_error
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def get_audio_extension(mime: str, filename: str) -> str:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=8),
-    retry=retry_if_exception(lambda exc: not isinstance(exc, CircuitBreakerOpenError)),
+    retry=retry_if_exception(is_retryable_provider_error),
     reraise=True,
 )
 async def _transcribe_with_retry(audio_bytes: bytes, filename: str = "recording.webm"):
@@ -187,6 +188,11 @@ async def transcribe_audio(
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="AI service timed out")
+    except (groq.BadRequestError, groq.UnprocessableEntityError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported or invalid audio payload for transcription",
+        )
     except Exception as exc:
         logger.exception("Groq Whisper transcription error: %s", exc)
         raise HTTPException(

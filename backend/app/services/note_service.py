@@ -291,13 +291,17 @@ async def get_notes(
 
     if cursor:
         c_pinned, c_updated, c_id = decode_note_cursor(cursor)
-        stmt = stmt.where(
+        same_group = and_(
+            Note.is_pinned == c_pinned,
             or_(
-                Note.is_pinned < c_pinned,
-                and_(Note.is_pinned == c_pinned, Note.updated_at < c_updated),
-                and_(Note.is_pinned == c_pinned, Note.updated_at == c_updated, Note.id < c_id),
-            )
+                Note.updated_at < c_updated,
+                and_(Note.updated_at == c_updated, Note.id < c_id),
+            ),
         )
+        if c_pinned:
+            stmt = stmt.where(or_(Note.is_pinned == False, same_group))
+        else:
+            stmt = stmt.where(same_group)
 
     if limit is not None:
         stmt = stmt.limit(limit + 1)
