@@ -10,27 +10,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: [
-          "Nunito",
-          "Inter",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          "Roboto",
-          "Oxygen",
-          "Ubuntu",
-          "Cantarell",
-          "Fira Sans",
-          "Droid Sans",
-          "Helvetica Neue",
-          "sans-serif"
-        ],
-        display: [
-          "Quicksand",
-          "Nunito",
-          "sans-serif"
-        ],
-        mono: ["JetBrains Mono", "Fira Code", "monospace"],
+        sans: ["var(--font-sans)", "DM Sans", "sans-serif"],
+        display: ["var(--font-sans)", "DM Sans", "sans-serif"],
+        serif: ["var(--font-serif)", "ui-serif", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "Roboto Mono", "monospace"],
       },
       fontSize: {
         xs: "12px",
@@ -55,54 +38,103 @@ const config: Config = {
         "radius-sm": "9999px",
         xs: "4px",
         sm: "9999px",
+        theme: "var(--radius)",
       },
       transitionDuration: {
         instant: "100ms",
       },
       colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
+        },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
+        },
+        primary: {
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
+        },
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
+        },
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
+        },
+        input: "var(--input)",
+        ring: "var(--ring)",
+        sidebar: {
+          DEFAULT: "var(--sidebar)",
+          foreground: "var(--sidebar-foreground)",
+          primary: "var(--sidebar-primary)",
+          "primary-foreground": "var(--sidebar-primary-foreground)",
+          accent: "var(--sidebar-accent)",
+          "accent-foreground": "var(--sidebar-accent-foreground)",
+          border: "var(--sidebar-border)",
+          ring: "var(--sidebar-ring)",
+        },
+        chart: {
+          1: "var(--chart-1)",
+          2: "var(--chart-2)",
+          3: "var(--chart-3)",
+          4: "var(--chart-4)",
+          5: "var(--chart-5)",
+        },
         text: {
-          primary: "#f4f4f5",
-          secondary: "#a1a1aa",
-          tertiary: "#71717a",
-          inverse: "#030303",
+          primary: "var(--foreground)",
+          secondary: "var(--muted-foreground)",
+          tertiary: "#78716c",
+          inverse: "var(--primary-foreground)",
         },
         surface: {
-          base: "#030303",
-          raised: "#0c0c0e",
-          strong: "#18181b",
-          900: "#0c0c0e", // raised card/sidebar
-          800: "#030303", // base background
-          700: "#18181b", // strong (hover states)
-          600: "#16161a", // border muted
-          500: "#71717a", // tertiary text
+          base: "var(--background)",
+          raised: "var(--sidebar)",
+          strong: "var(--sidebar-accent)",
+          900: "var(--sidebar)",
+          800: "var(--background)",
+          700: "var(--sidebar-accent)",
+          600: "var(--popover)",
+          500: "var(--muted-foreground)",
         },
         border: {
-          muted: "#16161a",
+          DEFAULT: "var(--border)",
+          muted: "var(--sidebar-border)",
         },
         brand: {
-          50:  "#f5f3ff",
-          100: "#ede9fe",
-          200: "#ddd6fe",
-          300: "#c084fc",
-          400: "#a855f7",
-          500: "#8b5cf6",
-          600: "#7c3aed",
-          700: "#6d28d9",
-          800: "#5b21b6",
-          900: "#4c1d95",
-          950: "#2e1065",
+          50:  "#fff8eb",
+          100: "#ffedd1",
+          200: "#fcd79f",
+          300: "#f9a748",
+          400: "#f9a748",
+          500: "#f58c24",
+          600: "#d97316",
+          700: "#b4590f",
+          800: "#8f4412",
+          900: "#733812",
+          950: "#1a0f05",
         },
         accent: {
-          violet: "#8b5cf6",
-          cyan:   "#06b6d4",
-          pink:   "#db2777",
-          amber:  "#f59e0b",
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
+          violet: "#f58c24",
+          cyan:   "#1faab7",
+          pink:   "#f9a748",
+          amber:  "#e3af35",
         },
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "hero-gradient":
-          "linear-gradient(135deg, #030303 0%, #0c0c0e 100%)",
+          "linear-gradient(135deg, var(--background) 0%, var(--sidebar) 100%)",
       },
       animation: {
         "fade-in":    "fadeIn 0.4s ease-out",

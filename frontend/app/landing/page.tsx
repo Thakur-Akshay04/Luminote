@@ -127,20 +127,20 @@ function SpotlightCard({ children, className = "" }: Readonly<{ children: React.
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0c0c0e]/80 backdrop-blur-md p-6 transition-all duration-300 hover:border-brand-500/20 hover:-translate-y-1 hover:shadow-2xl ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar/80 backdrop-blur-md p-6 transition-all duration-300 hover:border-brand-500/25 hover:-translate-y-1 hover:shadow-2xl ${className}`}
     >
       <div
         className="pointer-events-none absolute -inset-px transition-opacity duration-300"
         style={{
           opacity: isHovered ? 1 : 0,
-          background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(139, 92, 246, 0.05), transparent 80%)`,
+          background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(245, 140, 36, 0.06), transparent 80%)`,
         }}
       />
       <div
         className="pointer-events-none absolute -inset-px transition-opacity duration-300"
         style={{
           opacity: isHovered ? 1 : 0,
-          background: `radial-gradient(120px circle at ${coords.x}px ${coords.y}px, rgba(139, 92, 246, 0.15), transparent 80%)`,
+          background: `radial-gradient(120px circle at ${coords.x}px ${coords.y}px, rgba(245, 140, 36, 0.18), transparent 80%)`,
           border: '1px solid transparent',
           WebkitMaskImage: `radial-gradient(120px circle at ${coords.x}px ${coords.y}px, black, transparent)`,
         }}
@@ -294,14 +294,14 @@ export default function LandingPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
-        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#030303] text-zinc-300 relative flex flex-col font-sans">
+    <div className="min-h-screen bg-background text-foreground relative flex flex-col font-sans">
 
       {/* Parallax animated pixel sparkle mountain background */}
       <SparkleMountainBackground densityMultiplier={2.5} />
@@ -345,7 +345,7 @@ export default function LandingPage() {
               <Link
                 href="/sign-up"
                 id="landing-cta-register"
-                className="px-8 py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold flex items-center justify-center gap-2 group text-sm sm:text-base shadow-lg hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_25px_rgba(139,92,246,0.35)] btn-smooth-hover text-center"
+                className="px-8 py-3.5 rounded-xl bg-primary text-primary-foreground hover:bg-brand-300 font-bold flex items-center justify-center gap-2 group text-sm sm:text-base shadow-lg hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_25px_rgba(245,140,36,0.4)] btn-smooth-hover text-center"
               >
                 Get Started Free
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -353,7 +353,7 @@ export default function LandingPage() {
               <Link
                 href="/sign-in"
                 id="landing-cta-login"
-                className="px-8 py-3.5 rounded-xl border border-white/[0.08] hover:border-brand-500/40 hover:bg-white/[0.02] text-neutral-300 hover:text-white font-bold text-sm sm:text-base hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_15px_rgba(139,92,246,0.15)] btn-smooth-hover flex items-center justify-center text-center"
+                className="px-8 py-3.5 rounded-xl border border-border hover:border-brand-500/40 hover:bg-white/[0.03] text-neutral-300 hover:text-white font-bold text-sm sm:text-base hover:-translate-y-1 hover:scale-102 hover:shadow-[0_0_15px_rgba(245,140,36,0.18)] btn-smooth-hover flex items-center justify-center text-center"
               >
                 Sign In
               </Link>
@@ -365,7 +365,7 @@ export default function LandingPage() {
 
             {/* Interactive Navigation Tabs */}
             <div className="flex justify-center w-full mb-1">
-              <div className="inline-flex gap-1 p-1 bg-[#0c0c0f]/60 border border-white/[0.06] rounded-full backdrop-blur-xl shadow-xl">
+              <div className="inline-flex gap-1 p-1 bg-sidebar/70 border border-sidebar-border rounded-full backdrop-blur-xl shadow-xl">
                 <button
                   type="button"
                   onClick={() => handleTabClick("capture")}
@@ -409,9 +409,9 @@ export default function LandingPage() {
               <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[90%] h-[60%] rounded-full bg-brand-500/[0.04] blur-[100px] pointer-events-none -z-10 animate-pulse-slow" style={{ animationDuration: '8s' }} />
 
               <TiltMockup>
-                <div className="w-full rounded-2xl border border-white/[0.08] bg-gradient-to-b from-[#0e0e12]/90 to-[#07070a]/90 backdrop-blur-xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),0_0_50px_rgba(139,92,246,0.03)] overflow-hidden aspect-[16/10.5] sm:aspect-[16/9.5] flex flex-col transition-all duration-500 hover:border-white/[0.16] hover:shadow-[0_40px_80px_-15px_rgba(0,0,0,0.95),0_0_60px_rgba(139,92,246,0.08)] animate-book-open">
+                <div className="w-full rounded-2xl border border-border bg-gradient-to-b from-popover/90 to-background/95 backdrop-blur-xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),0_0_50px_rgba(245,140,36,0.05)] overflow-hidden aspect-[16/10.5] sm:aspect-[16/9.5] flex flex-col transition-all duration-500 hover:border-white/[0.18] hover:shadow-[0_40px_80px_-15px_rgba(0,0,0,0.95),0_0_60px_rgba(245,140,36,0.1)] animate-book-open">
                   {/* Title Bar */}
-                  <div className="h-11 border-b border-white/[0.06] bg-[#08080b]/80 px-4 flex items-center justify-between shrink-0">
+                  <div className="h-11 border-b border-sidebar-border bg-sidebar/80 px-4 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-full bg-white/[0.12]" />
                       <div className="w-2.5 h-2.5 rounded-full bg-white/[0.12]" />
@@ -430,11 +430,11 @@ export default function LandingPage() {
                     <div className="absolute top-0 bottom-0 left-[60px] sm:left-[80px] w-[6px] shadow-inner bg-gradient-to-r from-black/35 via-white/[0.03] to-black/35 z-20 pointer-events-none" />
 
                     {/* App Sidebar Mockup */}
-                    <div className="w-12 sm:w-16 border-r border-white/[0.06] bg-[#07070a]/40 flex flex-col items-center py-4 gap-4 shrink-0 z-10">
+                    <div className="w-12 sm:w-16 border-r border-sidebar-border bg-sidebar/50 flex flex-col items-center py-4 gap-4 shrink-0 z-10">
                       <div className="w-8 h-8 rounded-xl bg-white/[0.03] border border-white/[0.06] text-neutral-400 flex items-center justify-center shrink-0">
                         <Notebook className="w-4 h-4" />
                       </div>
-                      <div className="w-8 h-8 rounded-xl bg-brand-600 border border-brand-400/30 flex items-center justify-center text-white shadow-[0_0_15px_rgba(139,92,246,0.35)] shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-primary border border-brand-400/30 flex items-center justify-center text-primary-foreground shadow-[0_0_15px_rgba(245,140,36,0.35)] shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="w-8 h-8 rounded-xl hover:bg-white/[0.04] flex items-center justify-center text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
@@ -465,7 +465,7 @@ export default function LandingPage() {
                           </p>
 
                           {/* Pending Action Items Section */}
-                          <div className="space-y-2.5 bg-[#121217]/60 border border-white/[0.06] p-4 rounded-2xl backdrop-blur-md shadow-xl" style={{ transform: "translateZ(15px)" }}>
+                          <div className="space-y-2.5 bg-popover/60 border border-sidebar-border p-4 rounded-2xl backdrop-blur-md shadow-xl" style={{ transform: "translateZ(15px)" }}>
                             <div className="font-bold text-white text-[10px] sm:text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-neutral-400" />
                               <span>Pending Action Items</span>
@@ -489,7 +489,7 @@ export default function LandingPage() {
                           {/* Multimodal Rich Media Attachments */}
                           <div className="grid grid-cols-2 gap-3 mt-2 shrink-0">
                             {/* Audio Attachment */}
-                            <div className="border border-white/[0.06] bg-[#121217]/40 p-3 rounded-2xl flex items-center gap-3" style={{ transform: "translateZ(25px)" }}>
+                            <div className="border border-sidebar-border bg-popover/50 p-3 rounded-2xl flex items-center gap-3" style={{ transform: "translateZ(25px)" }}>
                               <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 shadow-lg">
                                 <Mic className="w-4 h-4" />
                               </div>
@@ -499,7 +499,7 @@ export default function LandingPage() {
                                 <div className="flex items-end gap-[2px] h-6 mt-1 overflow-hidden">
                                   {waveformHeights.map((h, i) => (
                                     <div
-                                      key={`wave-bar-bento-${i}`}
+                                      key={`wave-bar-bento-${i + 1}-${h}`}
                                       className="flex-1 bg-gradient-to-t from-brand-600 to-brand-400 rounded-sm transition-all duration-150"
                                       style={{ height: `${h}px` }}
                                     />
@@ -509,14 +509,14 @@ export default function LandingPage() {
                             </div>
 
                             {/* Checklist Attachment */}
-                            <div className="border border-white/[0.06] bg-[#121217]/40 p-3 rounded-2xl flex flex-col justify-between" style={{ transform: "translateZ(25px)" }}>
+                            <div className="border border-sidebar-border bg-popover/50 p-3 rounded-2xl flex flex-col justify-between" style={{ transform: "translateZ(25px)" }}>
                               <div className="flex items-center gap-2 mb-1.5">
                                 <div className="w-6 h-6 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
                                   <ListTodo className="w-3.5 h-3.5" />
                                 </div>
                                 <span className="text-[10px] font-bold text-white truncate">Sprint Tasks</span>
                               </div>
-                              <div className="bg-[#030303]/60 border border-white/[0.05] rounded-xl p-2 h-10 flex flex-col justify-center gap-1 overflow-hidden">
+                              <div className="bg-background/70 border border-sidebar-border rounded-xl p-2 h-10 flex flex-col justify-center gap-1 overflow-hidden">
                                 <div className="flex items-center gap-1.5">
                                   <div className="w-2.5 h-2.5 rounded bg-brand-500/30 shrink-0" />
                                   <span className="text-[9px] text-neutral-400 truncate">Core API integration</span>
@@ -530,7 +530,7 @@ export default function LandingPage() {
                       {/* AI Copilot Side Panel (Visible in SUMMARIZE Mode with Typing Effect) */}
                       <div
                         style={{ transform: "translateZ(40px)" }}
-                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#09090c]/95 border-l border-white/[0.06] p-4 flex flex-col gap-4 shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "summarize" ? "translate-x-0 opacity-100 font-sans" : "translate-x-full opacity-0 pointer-events-none"
+                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-sidebar/95 border-l border-sidebar-border p-4 flex flex-col gap-4 shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "summarize" ? "translate-x-0 opacity-100 font-sans" : "translate-x-full opacity-0 pointer-events-none"
                           }`}
                       >
                         <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 shrink-0">
@@ -543,7 +543,7 @@ export default function LandingPage() {
                         <div className="flex-1 flex flex-col gap-4 text-left overflow-y-auto pr-0.5">
                           <div className="space-y-1.5">
                             <div className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wide font-bold">Auto Summary</div>
-                            <p className="text-[11px] sm:text-xs text-neutral-300 leading-relaxed bg-[#121217]/60 border border-white/[0.04] p-3 rounded-xl min-h-[90px] relative font-mono select-none">
+                            <p className="text-[11px] sm:text-xs text-neutral-300 leading-relaxed bg-popover/60 border border-white/[0.04] p-3 rounded-xl min-h-[90px] relative font-mono select-none">
                               {typedSummary}
                               <span className="w-1.5 h-3.5 bg-brand-400 inline-block animate-pulse ml-0.5 align-middle" />
                             </p>
@@ -560,7 +560,7 @@ export default function LandingPage() {
 
                           <div className="space-y-1.5">
                             <div className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wide font-bold">Extracted Reminders</div>
-                            <div className="flex items-center gap-2 text-[11px] sm:text-xs text-neutral-300 bg-[#121217]/60 p-3 rounded-xl border border-white/[0.04]">
+                            <div className="flex items-center gap-2 text-[11px] sm:text-xs text-neutral-300 bg-popover/60 p-3 rounded-xl border border-white/[0.04]">
                               <Bell className="w-3.5 h-3.5 text-brand-400 shrink-0" />
                               <span>Notify: Next Friday (Release Date)</span>
                             </div>
@@ -571,7 +571,7 @@ export default function LandingPage() {
                       {/* AI Assistant Chat Panel (Visible in ASK AI Mode with Typing Effect) */}
                       <div
                         style={{ transform: "translateZ(40px)" }}
-                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-[#09090c]/95 border-l border-white/[0.06] p-4 flex flex-col shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "ask" ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
+                        className={`absolute top-0 right-0 bottom-0 w-60 sm:w-64 md:w-72 bg-sidebar/95 border-l border-sidebar-border p-4 flex flex-col shadow-2xl transition-all duration-300 transform backdrop-blur-lg z-30 ${activeTab === "ask" ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
                           }`}
                       >
                         {/* Chat Panel Header */}
@@ -584,10 +584,10 @@ export default function LandingPage() {
 
                         {/* Chat Content Messages */}
                         <div className="flex-1 flex flex-col gap-3 py-3 overflow-y-auto text-left text-[11px] sm:text-xs min-h-0 pr-0.5">
-                          <div className="self-end max-w-[85%] bg-white text-black px-3.5 py-2.5 rounded-2xl rounded-tr-none leading-normal shadow-lg font-bold select-none">
+                          <div className="self-end max-w-[85%] bg-primary text-primary-foreground px-3.5 py-2.5 rounded-2xl rounded-tr-none leading-normal shadow-lg font-bold select-none">
                             What are the remaining tasks and deadlines?
                           </div>
-                          <div className="self-start max-w-[85%] bg-[#121217]/60 border border-white/[0.06] text-neutral-200 p-3 rounded-2xl rounded-tl-none leading-relaxed space-y-1.5 shadow-lg">
+                          <div className="self-start max-w-[85%] bg-popover/60 border border-sidebar-border text-neutral-200 p-3 rounded-2xl rounded-tl-none leading-relaxed space-y-1.5 shadow-lg">
                             <div className="font-bold text-brand-300 text-[10px] uppercase tracking-wide">Assistant Response</div>
                             <p className="whitespace-pre-line min-h-[90px] select-none font-mono">
                               {typedChat}
@@ -601,7 +601,7 @@ export default function LandingPage() {
 
                         {/* Chat Panel Input */}
                         <div className="pt-2 border-t border-white/[0.04] shrink-0 flex gap-1.5">
-                          <div className="flex-1 bg-[#121217]/60 border border-white/[0.06] rounded-xl px-3 py-2 text-[10px] sm:text-xs text-neutral-500 text-left select-none cursor-text">
+                          <div className="flex-1 bg-popover/60 border border-sidebar-border rounded-xl px-3 py-2 text-[10px] sm:text-xs text-neutral-500 text-left select-none cursor-text">
                             Ask follow-up question...
                           </div>
                           <button type="button" className="bg-white hover:bg-neutral-200 text-black rounded-xl p-2 transition-colors shrink-0 shadow-[0_4px_12px_rgba(255,255,255,0.15)]">
@@ -646,15 +646,15 @@ export default function LandingPage() {
                 </div>
 
                 {/* Visual Mockup: Search Node Map */}
-                <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 flex flex-col gap-3 font-sans">
+                <div className="mt-6 bg-background/70 border border-sidebar-border rounded-xl p-4 flex flex-col gap-3 font-sans">
                   {/* Mock Search Input */}
-                  <div className="flex items-center gap-2 bg-[#0c0c0f] border border-white/[0.06] rounded-lg px-3 py-1.5 text-xs text-neutral-400">
+                  <div className="flex items-center gap-2 bg-sidebar border border-sidebar-border rounded-lg px-3 py-1.5 text-xs text-neutral-400">
                     <Search className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                     <span>Search: "PH product wireframes and sprint plans"</span>
                   </div>
                   {/* Results preview */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="bg-[#0c0c0f]/80 border border-white/[0.06] p-2.5 rounded-lg flex items-center justify-between gap-2">
+                    <div className="bg-sidebar/80 border border-sidebar-border p-2.5 rounded-lg flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-[11px] font-bold text-white truncate">🎨 PH Wireframe.png</div>
                         <div className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-0.5">#design-assets</div>
@@ -664,7 +664,7 @@ export default function LandingPage() {
                         <span>94% Match</span>
                       </div>
                     </div>
-                    <div className="bg-[#0c0c0f]/80 border border-white/[0.06] p-2.5 rounded-lg flex items-center justify-between gap-2">
+                    <div className="bg-sidebar/80 border border-sidebar-border p-2.5 rounded-lg flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-[11px] font-bold text-white truncate">🚀 Launch Roadmap</div>
                         <div className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-0.5">#product-hunt</div>
@@ -693,7 +693,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Visual Mockup: Audio Recording Indicator */}
-                <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 flex flex-col gap-3 h-[106px] justify-between">
+                <div className="mt-6 bg-background/70 border border-sidebar-border rounded-xl p-4 flex flex-col gap-3 h-[106px] justify-between">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
@@ -705,7 +705,7 @@ export default function LandingPage() {
                   <div className="flex items-end gap-[3px] h-9 overflow-hidden">
                     {waveformHeights.map((h, i) => (
                       <div
-                        key={`wave-bar-dictation-${i}`}
+                        key={`wave-bar-dictation-${i + 1}-${h}`}
                         className="flex-1 bg-brand-500/40 rounded-sm transition-all duration-150"
                         style={{ height: `${h * 1.2}px` }}
                       />
@@ -729,7 +729,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Visual Mockup: AI Action Summary bubble */}
-                <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 flex flex-col gap-2.5 text-[11px] h-[106px] overflow-hidden text-neutral-300">
+                <div className="mt-6 bg-background/70 border border-sidebar-border rounded-xl p-4 flex flex-col gap-2.5 text-[11px] h-[106px] overflow-hidden text-neutral-300">
                   <div className="flex items-center gap-1.5 text-brand-300 font-bold uppercase tracking-wider text-[9px]">
                     <Wand2 className="w-3.5 h-3.5 text-brand-400" />
                     <span>Extracted Insights</span>
@@ -762,7 +762,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Visual Mockup: Split Checklist and Tasks */}
-                <div className="mt-6 bg-[#030303]/60 border border-white/[0.05] rounded-xl p-4 grid grid-cols-2 gap-4 h-[106px]">
+                <div className="mt-6 bg-background/70 border border-sidebar-border rounded-xl p-4 grid grid-cols-2 gap-4 h-[106px]">
                   {/* Left Side: Checklist */}
                   <div className="flex flex-col justify-center gap-2 border-r border-white/[0.04] pr-2">
                     <div className="flex items-center gap-2">
@@ -776,7 +776,7 @@ export default function LandingPage() {
                   </div>
 
                   {/* Right Side: Notes Preview */}
-                  <div className="flex flex-col justify-center gap-1.5 bg-[#0c0c0f]/80 border border-white/[0.06] rounded-lg p-2.5 overflow-hidden h-full">
+                  <div className="flex flex-col justify-center gap-1.5 bg-sidebar/80 border border-sidebar-border rounded-lg p-2.5 overflow-hidden h-full">
                     <span className="text-[10px] font-bold text-neutral-300 truncate">Sprint Documentation</span>
                     <span className="text-[9px] text-neutral-500 line-clamp-2">Architecture diagrams and API specs finalized for v2 release.</span>
                   </div>
@@ -823,7 +823,7 @@ export default function LandingPage() {
 
           {/* Steps Visualizer */}
           <FadeUp delay={150} className="w-full lg:max-w-md">
-            <div className="bg-[#0c0c0e]/80 border border-white/[0.08] p-6 sm:p-8 rounded-2xl flex flex-col gap-6 text-left shadow-2xl backdrop-blur-md relative overflow-hidden group">
+            <div className="bg-sidebar/80 border border-border p-6 sm:p-8 rounded-2xl flex flex-col gap-6 text-left shadow-2xl backdrop-blur-md relative overflow-hidden group">
               <h3 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
                 <Workflow className="w-4.5 h-4.5 text-neutral-400" />
                 <span>How It Works</span>

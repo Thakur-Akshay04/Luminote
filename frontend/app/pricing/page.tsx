@@ -42,9 +42,9 @@ const PACKAGES = [
     badge: null,
     savings: null,
     icon: Feather,
-    cardHover: "hover:border-blue-500/50 hover:shadow-[0_15px_35px_rgba(59,130,246,0.12)]",
-    iconBg: "bg-blue-500/10 text-blue-400 border-blue-500/20 group-hover:bg-blue-500/20 group-hover:border-blue-500/40",
-    btnStyle: "bg-zinc-800 hover:bg-blue-600 text-zinc-100 hover:text-white border border-zinc-700/50 hover:border-blue-500",
+    cardHover: "hover:border-[#1faab7]/50 hover:shadow-[0_15px_35px_rgba(31,170,183,0.14)]",
+    iconBg: "bg-[#1faab7]/15 text-[#6ed6de] border-[#1faab7]/25 group-hover:bg-[#1faab7]/25 group-hover:border-[#1faab7]/45",
+    btnStyle: "bg-sidebar-accent hover:bg-[#1faab7] text-foreground hover:text-[#0c0a08] border border-border hover:border-[#1faab7]",
     description: "Great for quick AI summaries, targeted Q&A, and casual note-taking.",
     features: [
       "100 AI Credits added instantly",
@@ -64,9 +64,9 @@ const PACKAGES = [
     badge: "MOST POPULAR",
     savings: "SAVE 20%",
     icon: Rocket,
-    cardHover: "hover:border-violet-400 hover:shadow-[0_20px_50px_rgba(139,92,246,0.3)] hover:-translate-y-3",
-    iconBg: "bg-violet-500/15 text-violet-300 border-violet-500/30 group-hover:bg-violet-500/25 group-hover:border-violet-400",
-    btnStyle: "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/25 active:scale-[0.99]",
+    cardHover: "hover:border-[#f58c24] hover:shadow-[0_20px_50px_rgba(245,140,36,0.3)] hover:-translate-y-3",
+    iconBg: "bg-[#f58c24]/15 text-[#f9a748] border-[#f58c24]/30 group-hover:bg-[#f58c24]/25 group-hover:border-[#f58c24]",
+    btnStyle: "bg-primary hover:bg-brand-300 text-primary-foreground shadow-lg shadow-brand-500/25 active:scale-[0.99]",
     description: "Ideal for active students, researchers, and daily note-takers.",
     features: [
       "500 AI Credits added instantly",
@@ -87,9 +87,9 @@ const PACKAGES = [
     badge: "BEST VALUE",
     savings: "SAVE 33%",
     icon: Flame,
-    cardHover: "hover:border-amber-500/50 hover:shadow-[0_15px_35px_rgba(245,158,11,0.12)]",
-    iconBg: "bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:bg-amber-500/20 group-hover:border-amber-500/40",
-    btnStyle: "bg-zinc-800 hover:bg-amber-600 text-zinc-100 hover:text-white border border-zinc-700/50 hover:border-amber-500",
+    cardHover: "hover:border-[#e3af35]/50 hover:shadow-[0_15px_35px_rgba(227,175,53,0.14)]",
+    iconBg: "bg-[#e3af35]/15 text-[#e3af35] border-[#e3af35]/25 group-hover:bg-[#e3af35]/25 group-hover:border-[#e3af35]/45",
+    btnStyle: "bg-sidebar-accent hover:bg-[#e3af35] text-foreground hover:text-[#0c0a08] border border-border hover:border-[#e3af35]",
     description: "For heavy workflows with long documents, audio logs, and deep research.",
     features: [
       "1,500 AI Credits added instantly",
@@ -108,35 +108,35 @@ const COST_MATRIX = [
     icon: BookOpenCheck,
     cost: "5 Credits",
     description: "Generates structured summaries and key takeaways from raw notes.",
-    color: "bg-blue-500/10 border-blue-500/20 text-blue-400 group-hover:bg-blue-500/20 group-hover:border-blue-500/40",
+    color: "bg-[#1faab7]/15 border-[#1faab7]/25 text-[#6ed6de] group-hover:bg-[#1faab7]/25 group-hover:border-[#1faab7]/45",
   },
   {
     feature: "Q&A Assistant Chat",
     icon: BrainCircuit,
     cost: "2 Credits",
     description: "Answers questions across your workspace notes using context-aware retrieval.",
-    color: "bg-purple-500/10 border-purple-500/20 text-purple-400 group-hover:bg-purple-500/20 group-hover:border-purple-500/40",
+    color: "bg-[#f58c24]/15 border-[#f58c24]/25 text-[#f9a748] group-hover:bg-[#f58c24]/25 group-hover:border-[#f58c24]/45",
   },
   {
     feature: "AI Writing Actions",
     icon: Wand2,
     cost: "3 Credits",
     description: "Transforms text tone, expands outlines, or fixes formatting.",
-    color: "bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:bg-pink-500/20 group-hover:border-pink-500/40",
+    color: "bg-[#f9a748]/15 border-[#f9a748]/25 text-[#f9a748] group-hover:bg-[#f9a748]/25 group-hover:border-[#f9a748]/45",
   },
   {
     feature: "Voice Transcription",
     icon: AudioWaveform,
     cost: "10 Credits",
     description: "Transcribes audio recordings into clean text with auto task parsing.",
-    color: "bg-amber-500/10 border-amber-500/20 text-amber-400 group-hover:bg-amber-500/20 group-hover:border-amber-500/40",
+    color: "bg-[#e3af35]/15 border-[#e3af35]/25 text-[#e3af35] group-hover:bg-[#e3af35]/25 group-hover:border-[#e3af35]/45",
   },
   {
     feature: "Task Extraction",
     icon: CalendarCheck,
     cost: "3 Credits",
     description: "Parses action items, deadlines, and dates into calendar tasks.",
-    color: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/40",
+    color: "bg-[#0e6a81]/20 border-[#0e6a81]/35 text-[#6ed6de] group-hover:bg-[#0e6a81]/30 group-hover:border-[#1faab7]/50",
   },
 ];
 
@@ -180,8 +180,12 @@ export default function PricingPage() {
   const [audioCount, setAudioCount] = useState(5);
 
   const estimatedCredits = summariesCount * 5 + qaCount * 2 + audioCount * 10;
-  const recommendedPack =
-    estimatedCredits <= 100 ? PACKAGES[0] : estimatedCredits <= 500 ? PACKAGES[1] : PACKAGES[2];
+  let recommendedPack = PACKAGES[2];
+  if (estimatedCredits <= 100) {
+    recommendedPack = PACKAGES[0];
+  } else if (estimatedCredits <= 500) {
+    recommendedPack = PACKAGES[1];
+  }
 
   // Load Razorpay script
   useEffect(() => {
@@ -216,7 +220,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     if (mounted && isLoaded) {
-      fetchData();
+      void fetchData();
     }
   }, [mounted, isLoaded]);
 
@@ -258,7 +262,7 @@ export default function PricingPage() {
             if (userProfile) {
               setUserProfile({ ...userProfile, credit_balance: newBalance });
             }
-            fetchData();
+            void fetchData();
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("luminote:refresh_credits"));
             }
@@ -278,8 +282,8 @@ export default function PricingPage() {
           package: packageId,
         },
         theme: {
-          color: "#8b5cf6",
-          backdrop_color: "rgba(9, 9, 11, 0.9)",
+          color: "#f58c24",
+          backdrop_color: "rgba(12, 10, 8, 0.9)",
         },
         modal: {
           ondismiss: function () {
@@ -310,9 +314,9 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen pb-20 pt-6 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto font-sans antialiased text-zinc-100 animate-fade-in">
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <header className="relative mb-12 p-8 sm:p-10 rounded-3xl bg-zinc-900/70 border border-zinc-800 backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+      <header className="relative mb-12 p-8 sm:p-10 rounded-3xl bg-sidebar/80 border border-border backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
         <div>
-          <div className="flex items-center gap-2 text-violet-400 text-xs font-semibold uppercase tracking-wider mb-2">
+          <div className="flex items-center gap-2 text-brand-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5" />
             <span>AI Credit System</span>
           </div>
@@ -326,17 +330,18 @@ export default function PricingPage() {
 
         {/* Integrated Right-Side Balance Card */}
         {userProfile && (
-          <div className="shrink-0 p-5 rounded-2xl bg-zinc-950/80 border border-zinc-800 flex flex-col items-start md:items-end gap-1.5 min-w-[210px] hover:border-violet-500/40 transition-colors">
+          <div className="shrink-0 p-5 rounded-2xl bg-background/80 border border-border flex flex-col items-start md:items-end gap-1.5 min-w-[210px] hover:border-brand-500/40 transition-colors">
             <div className="flex items-center gap-2 text-zinc-400 text-[11px] font-semibold uppercase tracking-wider">
-              <Coins className="w-3.5 h-3.5 text-violet-400" />
+              <Coins className="w-3.5 h-3.5 text-brand-400" />
               <span>Available Balance</span>
             </div>
             <div className="text-2xl font-black text-white tracking-tight">
-              {userProfile.credit_balance} <span className="text-xs font-bold text-violet-400">Credits</span>
+              {userProfile.credit_balance}{" "}
+              <span className="text-xs font-bold text-brand-400">Credits</span>
             </div>
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Account Active
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#6ed6de] bg-[#1faab7]/15 px-2 py-0.5 rounded-md border border-[#1faab7]/25 mt-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#6ed6de] animate-pulse" />
+              <span>Account Active</span>
             </span>
           </div>
         )}
@@ -379,15 +384,15 @@ export default function PricingPage() {
               className={clsx(
                 "group relative flex flex-col justify-between p-7 sm:p-8 rounded-2xl border transition-all duration-300 hover:-translate-y-2 cursor-pointer backdrop-blur-sm",
                 pkg.popular
-                  ? "bg-gradient-to-b from-zinc-900/90 via-purple-950/20 to-zinc-900/90 border-violet-500/80 shadow-[0_0_35px_rgba(139,92,246,0.15)] md:-translate-y-2"
-                  : "bg-zinc-950/60 border-zinc-800",
+                  ? "bg-gradient-to-b from-sidebar/90 via-[#f58c24]/10 to-sidebar/90 border-brand-500/80 shadow-[0_0_35px_rgba(245,140,36,0.18)] md:-translate-y-2"
+                  : "bg-sidebar/60 border-border",
                 pkg.cardHover
               )}
             >
               {/* Popular Badge */}
               {pkg.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md">
+                  <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-[#f58c24] to-[#e3af35] text-[#1a0f05] shadow-md">
                     {pkg.badge}
                   </span>
                 </div>
@@ -412,7 +417,7 @@ export default function PricingPage() {
                   )}
                 </div>
 
-                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">
+                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-brand-300 transition-colors">
                   {pkg.name}
                 </h3>
 
@@ -426,7 +431,7 @@ export default function PricingPage() {
                     ₹{pkg.priceRupees}
                   </span>
                   <span className="text-xs text-zinc-500">one-time</span>
-                  <span className="ml-auto text-xs font-bold text-violet-400">
+                  <span className="ml-auto text-xs font-bold text-brand-400">
                     {pkg.credits} Credits
                   </span>
                 </div>
@@ -471,9 +476,9 @@ export default function PricingPage() {
       </div>
 
       {/* ── INTERACTIVE CREDIT ESTIMATOR ─────────────────────────────────── */}
-      <section className="mb-20 p-6 sm:p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-colors">
+      <section className="mb-20 p-6 sm:p-8 rounded-2xl bg-sidebar/70 border border-border hover:border-white/20 transition-colors">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-violet-600/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-brand-500/15 border border-brand-500/25 text-brand-400 flex items-center justify-center shrink-0">
             <SlidersHorizontal className="w-5 h-5" />
           </div>
           <div>
@@ -484,12 +489,12 @@ export default function PricingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Slider 1: Summaries */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors">
+          <div className="p-4 rounded-xl bg-background/70 border border-border hover:border-white/20 transition-colors">
             <div className="flex justify-between text-xs font-medium mb-2">
               <span className="text-zinc-300 flex items-center gap-1.5">
-                <BookOpenCheck className="w-3.5 h-3.5 text-blue-400" /> Note Summaries
+                <BookOpenCheck className="w-3.5 h-3.5 text-[#6ed6de]" /> Note Summaries
               </span>
-              <span className="text-violet-400 font-bold">{summariesCount} notes/mo</span>
+              <span className="text-brand-400 font-bold">{summariesCount} notes/mo</span>
             </div>
             <input
               type="range"
@@ -497,18 +502,18 @@ export default function PricingPage() {
               max="50"
               value={summariesCount}
               onChange={(e) => setSummariesCount(Number(e.target.value))}
-              className="w-full accent-violet-500 cursor-pointer"
+              className="w-full accent-[#f58c24] cursor-pointer"
             />
             <span className="text-[10px] text-zinc-500 mt-1 block">5 credits per summary</span>
           </div>
 
           {/* Slider 2: Q&A Queries */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors">
+          <div className="p-4 rounded-xl bg-background/70 border border-border hover:border-white/20 transition-colors">
             <div className="flex justify-between text-xs font-medium mb-2">
               <span className="text-zinc-300 flex items-center gap-1.5">
-                <BrainCircuit className="w-3.5 h-3.5 text-purple-400" /> Q&A Chat Queries
+                <BrainCircuit className="w-3.5 h-3.5 text-[#f9a748]" /> Q&A Chat Queries
               </span>
-              <span className="text-violet-400 font-bold">{qaCount} queries/mo</span>
+              <span className="text-brand-400 font-bold">{qaCount} queries/mo</span>
             </div>
             <input
               type="range"
@@ -516,18 +521,18 @@ export default function PricingPage() {
               max="200"
               value={qaCount}
               onChange={(e) => setQaCount(Number(e.target.value))}
-              className="w-full accent-violet-500 cursor-pointer"
+              className="w-full accent-[#f58c24] cursor-pointer"
             />
             <span className="text-[10px] text-zinc-500 mt-1 block">2 credits per query</span>
           </div>
 
           {/* Slider 3: Audio Transcriptions */}
-          <div className="p-4 rounded-xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors">
+          <div className="p-4 rounded-xl bg-background/70 border border-border hover:border-white/20 transition-colors">
             <div className="flex justify-between text-xs font-medium mb-2">
               <span className="text-zinc-300 flex items-center gap-1.5">
-                <AudioWaveform className="w-3.5 h-3.5 text-amber-400" /> Voice Transcriptions
+                <AudioWaveform className="w-3.5 h-3.5 text-[#e3af35]" /> Voice Transcriptions
               </span>
-              <span className="text-violet-400 font-bold">{audioCount} recordings/mo</span>
+              <span className="text-brand-400 font-bold">{audioCount} recordings/mo</span>
             </div>
             <input
               type="range"
@@ -535,14 +540,14 @@ export default function PricingPage() {
               max="30"
               value={audioCount}
               onChange={(e) => setAudioCount(Number(e.target.value))}
-              className="w-full accent-violet-500 cursor-pointer"
+              className="w-full accent-[#f58c24] cursor-pointer"
             />
             <span className="text-[10px] text-zinc-500 mt-1 block">10 credits per recording</span>
           </div>
         </div>
 
         {/* Calculation Summary Bar */}
-        <div className="p-4 rounded-xl bg-violet-600/10 border border-violet-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="p-4 rounded-xl bg-brand-500/10 border border-brand-500/25 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
             <span className="text-xs text-zinc-400 block">Estimated Monthly Requirement</span>
             <span className="text-xl font-black text-white">~{estimatedCredits} Credits / month</span>
@@ -553,7 +558,7 @@ export default function PricingPage() {
             <button
               type="button"
               onClick={() => handleCheckout(recommendedPack.id)}
-              className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer group"
+              className="px-4 py-2 rounded-xl bg-primary hover:bg-brand-300 text-primary-foreground text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer group"
             >
               <span>{recommendedPack.name} (₹{recommendedPack.priceRupees})</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -583,10 +588,10 @@ export default function PricingPage() {
                 >
                   <Icon className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold text-white mb-1 group-hover:text-violet-300 transition-colors">
+                <h3 className="text-xs font-bold text-white mb-1 group-hover:text-brand-300 transition-colors">
                   {item.feature}
                 </h3>
-                <span className="text-xs font-semibold text-violet-400 block mb-2">{item.cost}</span>
+                <span className="text-xs font-semibold text-brand-400 block mb-2">{item.cost}</span>
                 <p className="text-[11px] text-zinc-400 leading-tight">{item.description}</p>
               </div>
             );
@@ -599,7 +604,7 @@ export default function PricingPage() {
         <section className="mb-20 p-6 sm:p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2.5">
-              <Receipt className="w-5 h-5 text-violet-400" />
+              <Receipt className="w-5 h-5 text-brand-400" />
               <h2 className="text-base sm:text-lg font-bold text-white">Credit History</h2>
             </div>
             <button
@@ -660,7 +665,7 @@ export default function PricingPage() {
       {/* ── FREQUENTLY ASKED QUESTIONS ACCORDION ─────────────────────────── */}
       <section className="p-6 sm:p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800">
         <div className="flex items-center gap-2.5 mb-6">
-          <HelpCircle className="w-5 h-5 text-violet-400" />
+          <HelpCircle className="w-5 h-5 text-brand-400" />
           <h2 className="text-base sm:text-lg font-bold text-white">Frequently Asked Questions</h2>
         </div>
 
@@ -680,7 +685,7 @@ export default function PricingPage() {
                 >
                   <span>{faq.question}</span>
                   {isOpen ? (
-                    <ChevronUp className="w-4 h-4 text-violet-400 shrink-0" />
+                    <ChevronUp className="w-4 h-4 text-brand-400 shrink-0" />
                   ) : (
                     <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />
                   )}

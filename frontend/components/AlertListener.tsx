@@ -46,7 +46,7 @@ function playChime(audioCtx: AudioContext) {
 
 async function startNotificationChime(
   alertId: string,
-  activeAudios: React.MutableRefObject<{ [id: string]: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number } }>
+  activeAudios: React.RefObject<{ [id: string]: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number } }>
 ) {
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -57,14 +57,14 @@ async function startNotificationChime(
     playChime(audioCtx);
 
     let playCount = 1;
-    const intervalId = setInterval(async () => {
+    const intervalId = setInterval(() => {
       if (playCount >= 9) {
         clearInterval(intervalId);
-        audioCtx.close().catch(() => {});
+        void audioCtx.close().catch(() => {});
         delete activeAudios.current[alertId];
       } else {
         if (audioCtx.state === "suspended") {
-          await audioCtx.resume().catch(() => {});
+          void audioCtx.resume().catch(() => {});
         }
         playChime(audioCtx);
         playCount++;
@@ -94,7 +94,7 @@ function addUniqueToast(prev: ToastAlert[], newAlert: ToastAlert): ToastAlert[] 
 
 function stopAudio(active: { audioCtx: AudioContext; intervalId?: NodeJS.Timeout | number }) {
   if (active.intervalId) clearInterval(active.intervalId);
-  active.audioCtx.close().catch(() => {});
+  void active.audioCtx.close().catch(() => {});
 }
 
 export default function AlertListener() {
@@ -115,9 +115,9 @@ export default function AlertListener() {
         if (AudioContextClass) {
           const dummyCtx = new AudioContextClass();
           if (dummyCtx.state === "suspended") {
-            dummyCtx.resume().catch(() => {});
+            void dummyCtx.resume().catch(() => {});
           }
-          setTimeout(() => dummyCtx.close().catch(() => {}), 100);
+          setTimeout(() => void dummyCtx.close().catch(() => {}), 100);
         }
       } catch {}
     };
@@ -138,7 +138,7 @@ export default function AlertListener() {
     const active = activeAudios.current[id];
     if (active) {
       if (active.intervalId) clearInterval(active.intervalId);
-      active.audioCtx.close().catch(() => {});
+      void active.audioCtx.close().catch(() => {});
       delete activeAudios.current[id];
     }
   };
@@ -149,7 +149,7 @@ export default function AlertListener() {
     notifiedAlertIdsRef.current.add(alertId);
 
     const newAlert = buildToastAlert(data);
-    startNotificationChime(newAlert.id, activeAudios);
+    void startNotificationChime(newAlert.id, activeAudios);
 
     setToasts((prev) => addUniqueToast(prev, newAlert));
 
@@ -178,7 +178,7 @@ export default function AlertListener() {
       if (!token) {
         // Retry connection in 3s if token isn't ready yet
         connectingRef.current = false;
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+        reconnectTimeoutRef.current = setTimeout(() => void connectWebSocket(), 3000);
         return;
       }
 
@@ -213,14 +213,14 @@ export default function AlertListener() {
       ws.onclose = () => {
         wsRef.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 4000);
+        reconnectTimeoutRef.current = setTimeout(() => void connectWebSocket(), 4000);
       };
 
       ws.onerror = () => {
         ws.close();
       };
     } catch {
-      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 4000);
+      reconnectTimeoutRef.current = setTimeout(() => void connectWebSocket(), 4000);
     } finally {
       connectingRef.current = false;
     }
@@ -238,21 +238,21 @@ export default function AlertListener() {
           const alertTimeMs = new Date(alert.alert_time).getTime();
           if (!alert.is_notified && alertTimeMs <= now + 2000) {
             triggerAlertNotification(alert);
-            alertsApi.markNotified(alert.id).catch(() => {});
+            void alertsApi.markNotified(alert.id).catch(() => {});
           }
         }
       } catch {}
     };
 
-    checkDueAlertsFallback();
-    const fallbackInterval = setInterval(checkDueAlertsFallback, 8000);
+    void checkDueAlertsFallback();
+    const fallbackInterval = setInterval(() => void checkDueAlertsFallback(), 8000);
 
     return () => clearInterval(fallbackInterval);
   }, [isSignedIn, triggerAlertNotification]);
 
   useEffect(() => {
     if (isSignedIn) {
-      connectWebSocket();
+      void connectWebSocket();
     }
 
     return () => {
@@ -276,7 +276,7 @@ export default function AlertListener() {
           key={toast.id}
           className="glass border-brand-500/30 p-4 shadow-glow flex items-start gap-3 animate-slide-in relative overflow-hidden"
           style={{
-            backgroundImage: "linear-gradient(to right, rgba(64,96,245,0.06), transparent)",
+            backgroundImage: "linear-gradient(to right, rgba(245, 140, 36, 0.08), transparent)",
           }}
         >
           {/* Pulsing Alert Bell */}

@@ -41,24 +41,24 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
       label: "Text Note",
       description: "Standard document with rich details and formatting.",
       icon: FileText,
-      colorClass: "text-accent-cyan bg-accent-cyan/10",
-      hoverClass: "hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-accent-cyan/40",
+      colorClass: "text-[#6ed6de] bg-[#1faab7]/15",
+      hoverClass: "hover:shadow-[0_0_20px_rgba(31,170,183,0.18)] hover:border-[#1faab7]/40",
     },
     {
       id: "checklist",
       label: "Task Checklist",
       description: "Organized task manager with AI progress tracking.",
       icon: ListTodo,
-      colorClass: "text-accent-violet bg-accent-violet/10",
-      hoverClass: "hover:shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:border-accent-violet/40",
+      colorClass: "text-[#f58c24] bg-[#f58c24]/15",
+      hoverClass: "hover:shadow-[0_0_20px_rgba(245,140,36,0.18)] hover:border-[#f58c24]/40",
     },
     {
       id: "audio",
       label: "Voice Note",
       description: "Record audio and get automated smart transcription.",
       icon: Mic,
-      colorClass: "text-accent-pink bg-accent-pink/10",
-      hoverClass: "hover:shadow-[0_0_20px_rgba(219,39,119,0.15)] hover:border-accent-pink/40",
+      colorClass: "text-[#e3af35] bg-[#e3af35]/15",
+      hoverClass: "hover:shadow-[0_0_20px_rgba(227,175,53,0.18)] hover:border-[#e3af35]/40",
     },
   ];
 
@@ -77,7 +77,7 @@ export default function NoteTypeModal({ isOpen, onClose }: Readonly<NoteTypeModa
       />
 
       {/* Modal Content */}
-      <div className="relative w-full max-w-lg bg-surface-raised border border-border-muted rounded-xl p-6 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg bg-popover border border-border rounded-xl p-6 shadow-2xl z-10 animate-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-border-muted">
           <div className="flex items-center gap-2.5">

@@ -26,31 +26,31 @@ const typeConfig: {
     icon: FileText,
     label: "Text Note",
     subtitle: "Document with key details",
-    glowClass: "bg-blue-500/5 group-hover:bg-blue-500/10",
-    borderClass: "hover:border-blue-500/25 hover:shadow-blue-950/20",
-    iconClass: "bg-blue-500/10 border-blue-500/20 text-blue-400",
-    labelClass: "text-blue-400 bg-blue-500/10 border-blue-500/10",
-    accentLine: "bg-blue-500/30",
+    glowClass: "bg-[#1faab7]/10 group-hover:bg-[#1faab7]/15",
+    borderClass: "hover:border-[#1faab7]/35 hover:shadow-[#0e6a81]/20",
+    iconClass: "bg-[#1faab7]/15 border-[#1faab7]/25 text-[#6ed6de]",
+    labelClass: "text-[#6ed6de] bg-[#1faab7]/15 border-[#1faab7]/20",
+    accentLine: "bg-[#1faab7]/30",
   },
   audio: {
     icon: Mic,
     label: "Voice Note",
     subtitle: "Recording & transcript",
-    glowClass: "bg-rose-500/5 group-hover:bg-rose-500/10",
-    borderClass: "hover:border-rose-500/25 hover:shadow-rose-950/20",
-    iconClass: "bg-rose-500/10 border-rose-500/20 text-rose-400",
-    labelClass: "text-rose-400 bg-rose-500/10 border-rose-500/10",
-    accentLine: "bg-rose-500/30",
+    glowClass: "bg-[#f58c24]/10 group-hover:bg-[#f58c24]/15",
+    borderClass: "hover:border-[#f58c24]/35 hover:shadow-[#f58c24]/10",
+    iconClass: "bg-[#f58c24]/15 border-[#f58c24]/25 text-[#f9a748]",
+    labelClass: "text-[#f9a748] bg-[#f58c24]/15 border-[#f58c24]/20",
+    accentLine: "bg-[#f58c24]/30",
   },
   checklist: {
     icon: ListTodo,
     label: "Checklist",
     subtitle: "AI structured planner",
-    glowClass: "bg-emerald-500/5 group-hover:bg-emerald-500/10",
-    borderClass: "hover:border-emerald-500/25 hover:shadow-emerald-950/20",
-    iconClass: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-    labelClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/10",
-    accentLine: "bg-emerald-500/30",
+    glowClass: "bg-[#e3af35]/10 group-hover:bg-[#e3af35]/15",
+    borderClass: "hover:border-[#e3af35]/35 hover:shadow-[#e3af35]/10",
+    iconClass: "bg-[#e3af35]/15 border-[#e3af35]/25 text-[#e3af35]",
+    labelClass: "text-[#e3af35] bg-[#e3af35]/15 border-[#e3af35]/20",
+    accentLine: "bg-[#e3af35]/30",
   },
 };
 
@@ -149,13 +149,13 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-[10px] font-semibold text-neutral-400">
                   <span className="flex items-center gap-1">Task Progress</span>
-                  <span className="text-emerald-400 font-bold">
+                  <span className="text-[#e3af35] font-bold">
                     {completedItems}/{totalItems} ({progressPct}%)
                   </span>
                 </div>
                 <div className="h-1 w-full bg-neutral-800/80 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
+                    className="h-full bg-[#e3af35] rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -163,17 +163,17 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
             )}
 
             {items.length > 0 ? (
-              <div className="flex flex-col gap-1.5 bg-emerald-500/[0.02] border border-emerald-500/5 rounded-lg p-2.5">
+              <div className="flex flex-col gap-1.5 bg-[#e3af35]/[0.03] border border-[#e3af35]/10 rounded-lg p-2.5">
                 {items.slice(0, 2).map((item) => (
                   <div key={item.id} className="flex items-center gap-2 text-xs text-neutral-300">
                     <div className={clsx(
                       "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0",
                       item.checked
-                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                        ? "bg-[#e3af35]/20 border-[#e3af35]/40 text-[#e3af35]"
                         : "border-neutral-700 bg-neutral-900"
                     )}>
                       {item.checked && (
-                        <svg className="w-2.5 h-2.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg aria-hidden="true" className="w-2.5 h-2.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
@@ -200,19 +200,19 @@ export default function NoteCard({ note, className, onDelete }: Readonly<NoteCar
         return (
           <div className="space-y-3.5 z-10">
             {/* Audio Waveform Mock Visualizer */}
-            <div className="flex items-center gap-3 bg-rose-500/[0.03] border border-rose-500/5 rounded-lg px-3 py-2">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
+            <div className="flex items-center gap-3 bg-[#f58c24]/[0.04] border border-[#f58c24]/10 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-[#f58c24]/15 border border-[#f58c24]/25 text-[#f9a748] shrink-0">
                 <Mic className="w-3.5 h-3.5 animate-pulse" />
               </div>
               <div className="flex items-end gap-[3px] flex-1 h-5 justify-center">
-                <div className="w-[3px] bg-rose-500/40 rounded-full h-2.5 animate-pulse-slow" style={{ animationDelay: "0.1s" }} />
-                <div className="w-[3px] bg-rose-500/60 rounded-full h-4 animate-pulse" style={{ animationDelay: "0.3s" }} />
-                <div className="w-[3px] bg-rose-500/80 rounded-full h-2 animate-pulse-slow" style={{ animationDelay: "0.5s" }} />
-                <div className="w-[3px] bg-rose-500/50 rounded-full h-5 animate-pulse" style={{ animationDelay: "0.2s" }} />
-                <div className="w-[3px] bg-rose-500/70 rounded-full h-3.5 animate-pulse-slow" style={{ animationDelay: "0.7s" }} />
-                <div className="w-[3px] bg-rose-500 rounded-full h-1.5 animate-pulse" style={{ animationDelay: "0.4s" }} />
-                <div className="w-[3px] bg-rose-500/60 rounded-full h-3 animate-pulse-slow" style={{ animationDelay: "0.9s" }} />
-                <div className="w-[3px] bg-rose-500/40 rounded-full h-2 animate-pulse" style={{ animationDelay: "0.6s" }} />
+                <div className="w-[3px] bg-[#f58c24]/40 rounded-full h-2.5 animate-pulse-slow" style={{ animationDelay: "0.1s" }} />
+                <div className="w-[3px] bg-[#f58c24]/60 rounded-full h-4 animate-pulse" style={{ animationDelay: "0.3s" }} />
+                <div className="w-[3px] bg-[#f58c24]/80 rounded-full h-2 animate-pulse-slow" style={{ animationDelay: "0.5s" }} />
+                <div className="w-[3px] bg-[#f58c24]/50 rounded-full h-5 animate-pulse" style={{ animationDelay: "0.2s" }} />
+                <div className="w-[3px] bg-[#f58c24]/70 rounded-full h-3.5 animate-pulse-slow" style={{ animationDelay: "0.7s" }} />
+                <div className="w-[3px] bg-[#f58c24] rounded-full h-1.5 animate-pulse" style={{ animationDelay: "0.4s" }} />
+                <div className="w-[3px] bg-[#f58c24]/60 rounded-full h-3 animate-pulse-slow" style={{ animationDelay: "0.9s" }} />
+                <div className="w-[3px] bg-[#f58c24]/40 rounded-full h-2 animate-pulse" style={{ animationDelay: "0.6s" }} />
               </div>
             </div>
             {preview ? (

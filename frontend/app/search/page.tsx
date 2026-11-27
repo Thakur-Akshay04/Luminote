@@ -19,7 +19,7 @@ export default function SearchPage() {
     inputRef.current?.focus();
   }, []);
 
-  const handleSearch = useCallback(async (e?: React.FormEvent) => {
+  const handleSearch = useCallback(async (e?: React.SyntheticEvent) => {
     e?.preventDefault();
     const q = query.trim();
     if (!q || loading) return;
@@ -42,31 +42,38 @@ export default function SearchPage() {
       label: "Research & Concepts",
       example: "key insights from my books and reading list",
       icon: Brain,
-      color: "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40 hover:bg-purple-500/10",
+      color: "text-[#f58c24] border-[#f58c24]/25 bg-[#f58c24]/5 hover:border-[#f58c24]/45 hover:bg-[#f58c24]/10",
     },
     {
       label: "Meetings & Tasks",
       example: "weekly project meeting notes with tasks",
       icon: Zap,
-      color: "text-amber-400 border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:bg-amber-500/10",
+      color: "text-[#e3af35] border-[#e3af35]/25 bg-[#e3af35]/5 hover:border-[#e3af35]/45 hover:bg-[#e3af35]/10",
     },
     {
       label: "Sketches & Creative",
       example: "UI wireframes and sketch ideas for the landing page",
       icon: Palette,
-      color: "text-pink-400 border-pink-500/20 bg-pink-500/5 hover:border-pink-500/40 hover:bg-pink-500/10",
+      color: "text-[#6ed6de] border-[#1faab7]/25 bg-[#1faab7]/5 hover:border-[#1faab7]/45 hover:bg-[#1faab7]/10",
     },
   ];
+
+  let resultsLabel = `${results.length} results found`;
+  if (results.length === 0) {
+    resultsLabel = "No results found";
+  } else if (results.length === 1) {
+    resultsLabel = "1 result found";
+  }
 
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-16 min-h-[calc(100vh-1px)] flex flex-col justify-center">
       {/* Premium Ambient Background Blur Circle */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-gradient-to-r from-emerald-500/5 via-cyan-500/5 to-indigo-500/5 rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-gradient-to-r from-[#f58c24]/5 via-[#1faab7]/5 to-[#f9a748]/5 rounded-full blur-[140px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
 
       <div className="w-full">
         {/* Header */}
         <div className="text-center mb-12 animate-fade-in flex flex-col items-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-amber-200 via-orange-400 to-pink-600 bg-clip-text text-transparent tracking-tight mb-3">Find your notes</h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-[#f9a748] via-[#f58c24] to-[#6ed6de] bg-clip-text text-transparent tracking-tight mb-3">Find your notes</h1>
           <p className="text-gray-400 text-sm max-w-md leading-relaxed">
             Search by meaning, context, or concepts instead of just exact matching keywords.
           </p>
@@ -127,9 +134,7 @@ export default function SearchPage() {
           <div className="animate-fade-in mb-12">
             <div className="flex items-center justify-between mb-5 border-b border-white/[0.04] pb-3">
               <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                {results.length === 0
-                  ? "No results found"
-                  : `${results.length} result${results.length !== 1 ? "s" : ""} found`}
+                {resultsLabel}
               </h2>
             </div>
 

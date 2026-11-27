@@ -11,7 +11,6 @@ import type { Alert } from "@/types";
 import {
   BookOpen,
   Search,
-  Notebook,
   Calendar,
   LayoutDashboard,
   Settings,
@@ -32,6 +31,112 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
+function SignedOutHeader({
+  scrolled,
+  navRef,
+  showcaseRef,
+  featuresRef,
+  securityRef,
+  pillStyle,
+  activeSection,
+  hoveredSection,
+  setActiveSection,
+  setHoveredSection,
+}: Readonly<{
+  scrolled: boolean;
+  navRef: React.RefObject<HTMLDivElement | null>;
+  showcaseRef: React.RefObject<HTMLAnchorElement | null>;
+  featuresRef: React.RefObject<HTMLAnchorElement | null>;
+  securityRef: React.RefObject<HTMLAnchorElement | null>;
+  pillStyle: { left: number; width: number; opacity: number };
+  activeSection: string;
+  hoveredSection: string | null;
+  setActiveSection: (s: string) => void;
+  setHoveredSection: (s: string | null) => void;
+}>) {
+  const current = hoveredSection ?? activeSection;
+  const scrollTo = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    setActiveSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <header
+      className={clsx(
+        "sticky top-0 z-50 w-full transition-all duration-300 animate-fade-in",
+        scrolled
+          ? "border-b border-sidebar-border bg-background/75 backdrop-blur-md shadow-[0_2px_20px_rgba(0,0,0,0.5)] py-3.5"
+          : "border-b border-transparent bg-transparent py-5"
+      )}
+    >
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+        <Link href="/landing" className="flex items-center group shrink-0 relative top-[10px]">
+          <img
+            src="/webLogo.png"
+            alt="Luminote Logo"
+            className="h-12 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-md"
+          />
+        </Link>
+
+        <nav
+          className="hidden md:flex items-center gap-1 p-1 bg-sidebar/85 border border-sidebar-border rounded-full backdrop-blur-xl relative shadow-lg shadow-black/50"
+          ref={navRef}
+          onMouseLeave={() => setHoveredSection(null)}
+        >
+          <div
+            className="absolute bg-white/[0.12] border border-white/20 rounded-full backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.12)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
+            style={{
+              left: `${pillStyle.left}px`,
+              width: `${pillStyle.width}px`,
+              opacity: pillStyle.opacity,
+              height: "32px",
+              top: "50%",
+              transform: "translateY(-50%)",
+            }}
+          />
+          {[
+            { id: "showcase", label: "Showcase", ref: showcaseRef },
+            { id: "features", label: "Features", ref: featuresRef },
+            { id: "security", label: "Security", ref: securityRef },
+          ].map((item) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              ref={item.ref}
+              onMouseEnter={() => setHoveredSection(item.id)}
+              onClick={scrollTo(item.id)}
+              className={clsx(
+                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
+                current === item.id
+                  ? "text-white font-bold tracking-wide"
+                  : "text-neutral-400 hover:text-white"
+              )}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            href="/sign-in"
+            className="text-[13px] font-medium text-neutral-400 hover:text-white border border-white/[0.1] hover:border-white/30 hover:bg-white/[0.05] transition-all duration-200 px-5 py-1.5 rounded-full"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/sign-up"
+            className="px-5 py-1.5 rounded-full bg-primary text-primary-foreground hover:bg-brand-300 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(245,140,36,0.35)] active:translate-y-0"
+          >
+            Get Started
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function NavbarContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,7 +145,9 @@ function NavbarContent() {
 
   const { user, isLoaded, isSignedIn } = useUser();
 
-  const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
+  const [notesDropdownOpen, setNotesDropdownOpen] = useState(
+    () => pathname.startsWith("/notes")
+  );
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -63,7 +170,7 @@ function NavbarContent() {
 
   useEffect(() => {
     if (!isSignedIn) return;
-    fetchUserProfile();
+    void fetchUserProfile();
 
     // Listen for custom insufficient_credits event triggered by API 402 responses
     const handleInsufficientCredits = (e: any) => {
@@ -73,7 +180,7 @@ function NavbarContent() {
     };
 
     const handleRefreshCredits = () => {
-      fetchUserProfile();
+      void fetchUserProfile();
     };
 
     window.addEventListener("luminote:insufficient_credits", handleInsufficientCredits);
@@ -149,7 +256,7 @@ function NavbarContent() {
   useEffect(() => {
     if (isSignedIn) return;
 
-    const currentSection = hoveredSection !== null ? hoveredSection : activeSection;
+    const currentSection = hoveredSection ?? activeSection;
     let targetRef: React.RefObject<HTMLAnchorElement | null> | null = null;
 
     if (currentSection === "showcase") targetRef = showcaseRef;
@@ -200,8 +307,8 @@ function NavbarContent() {
       }
     };
 
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 25000);
+    void fetchAlerts();
+    const interval = setInterval(() => void fetchAlerts(), 25000);
     return () => clearInterval(interval);
   }, [isSignedIn]);
 
@@ -229,32 +336,6 @@ function NavbarContent() {
     }
   };
 
-  const hasUnread = alerts.some((a) => !readAlertIds.includes(a.id));
-
-  useEffect(() => {
-    if (pathname.startsWith("/notes")) {
-      setNotesDropdownOpen(true);
-    }
-  }, [pathname]);
-
-  const navLinks = isSignedIn
-    ? [
-      { href: "/notes?favorite=true", label: "Favorites", icon: Star },
-      { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-      { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
-      { href: "/calendar", label: "Calendar", icon: Calendar },
-      { href: "/search", label: "Search", icon: Search },
-      { href: "/pricing", label: "Pricing", icon: CreditCard },
-    ]
-    : [];
-
-
-  const dropdownOptions = [
-    { type: "text", label: "Text", icon: FileText },
-    { type: "audio", label: "Voice", icon: Mic },
-    { type: "checklist", label: "Checklist", icon: ListTodo },
-  ];
-
   if (!isLoaded) {
     return null;
   }
@@ -267,122 +348,43 @@ function NavbarContent() {
 
   if (!isSignedIn) {
     return (
-      <header
-        className={clsx(
-          "sticky top-0 z-50 w-full transition-all duration-300 animate-fade-in",
-          scrolled
-            ? "border-b border-white/[0.05] bg-[#030303]/45 backdrop-blur-md shadow-[0_2px_20px_rgba(0,0,0,0.5)] py-3.5"
-            : "border-b border-transparent bg-transparent py-5"
-        )}
-      >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/landing" className="flex items-center group shrink-0 relative top-[10px]">
-            <img
-              src="/webLogo.png"
-              alt="Luminote Logo"
-              className="h-12 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-md"
-            />
-          </Link>
-
-          {/* Landing Navigation Links */}
-          <nav
-            className="hidden md:flex items-center gap-1 p-1 bg-[#0c0c0e]/80 border border-white/[0.08] rounded-full backdrop-blur-xl relative shadow-lg shadow-black/50"
-            ref={navRef}
-            onMouseLeave={() => setHoveredSection(null)}
-          >
-            {/* Animated Capsule Pill */}
-            <div
-              className="absolute bg-white/[0.12] border border-white/20 rounded-full backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.12)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
-              style={{
-                left: `${pillStyle.left}px`,
-                width: `${pillStyle.width}px`,
-                opacity: pillStyle.opacity,
-                height: "32px",
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            />
-            <a
-              href="#showcase"
-              ref={showcaseRef}
-              onMouseEnter={() => setHoveredSection("showcase")}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection("showcase");
-                document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
-                (hoveredSection || activeSection) === "showcase"
-                  ? "text-white font-bold tracking-wide"
-                  : "text-neutral-400 hover:text-white"
-              )}
-            >
-              Showcase
-            </a>
-            <a
-              href="#features"
-              ref={featuresRef}
-              onMouseEnter={() => setHoveredSection("features")}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection("features");
-                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
-                (hoveredSection || activeSection) === "features"
-                  ? "text-white font-bold tracking-wide"
-                  : "text-neutral-400 hover:text-white"
-              )}
-            >
-              Features
-            </a>
-            <a
-              href="#security"
-              ref={securityRef}
-              onMouseEnter={() => setHoveredSection("security")}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection("security");
-                document.getElementById("security")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={clsx(
-                "text-[13px] font-medium px-4 py-1.5 rounded-full transition-colors duration-300 z-10 select-none relative",
-                (hoveredSection || activeSection) === "security"
-                  ? "text-white font-bold tracking-wide"
-                  : "text-neutral-400 hover:text-white"
-              )}
-            >
-              Security
-            </a>
-          </nav>
-
-
-          <div className="flex items-center gap-3 shrink-0">
-            <Link
-              href="/sign-in"
-              className="text-[13px] font-medium text-neutral-400 hover:text-white border border-white/[0.1] hover:border-white/30 hover:bg-white/[0.05] transition-all duration-200 px-5 py-1.5 rounded-full"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/sign-up"
-              className="px-5 py-1.5 rounded-full bg-white text-black hover:bg-neutral-100 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] active:translate-y-0"
-            >
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SignedOutHeader
+        scrolled={scrolled}
+        navRef={navRef}
+        showcaseRef={showcaseRef}
+        featuresRef={featuresRef}
+        securityRef={securityRef}
+        pillStyle={pillStyle}
+        activeSection={activeSection}
+        hoveredSection={hoveredSection}
+        setActiveSection={setActiveSection}
+        setHoveredSection={setHoveredSection}
+      />
     );
   }
+
+  const hasUnread = alerts.some((a) => !readAlertIds.includes(a.id));
+
+  const navLinks = [
+    { href: "/notes?favorite=true", label: "Favorites", icon: Star },
+    { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+    { href: "/notes", label: "Notes", icon: BookOpen, hasDropdown: true },
+    { href: "/calendar", label: "Calendar", icon: Calendar },
+    { href: "/search", label: "Search", icon: Search },
+    { href: "/pricing", label: "Pricing", icon: CreditCard },
+  ];
+
+  const dropdownOptions = [
+    { type: "text", label: "Text", icon: FileText },
+    { type: "audio", label: "Voice", icon: Mic },
+    { type: "checklist", label: "Checklist", icon: ListTodo },
+  ];
 
   const displayName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress || "User";
 
   return (
-    <aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-white/[0.04] bg-[#0c0c0e]/80 backdrop-blur-md flex flex-col justify-between py-8 px-5 shrink-0 sticky top-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)] animate-fade-in z-40">
-      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-brand-500/5 to-transparent rounded-t-2xl pointer-events-none -z-10" />
+    <aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-sidebar-border bg-sidebar/90 backdrop-blur-md flex flex-col justify-between py-8 px-5 shrink-0 sticky top-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)] animate-fade-in z-40">
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-sidebar-primary/10 to-transparent rounded-t-2xl pointer-events-none -z-10" />
 
       <div className="flex flex-col gap-8">
         {/* Profile Card Header */}
@@ -424,7 +426,7 @@ function NavbarContent() {
               setBuyCreditsInitialMessage(undefined);
               setBuyCreditsModalOpen(true);
             }}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-brand-600/15 via-indigo-500/10 to-purple-600/15 border border-brand-500/25 hover:border-brand-500/50 hover:bg-brand-500/20 transition-all duration-200 group cursor-pointer shadow-sm"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-brand-500/15 via-[#f9a748]/10 to-[#1faab7]/15 border border-brand-500/25 hover:border-brand-500/50 hover:bg-brand-500/20 transition-all duration-200 group cursor-pointer shadow-sm"
             title="Click to top up AI Credits"
           >
             <div className="flex items-center gap-2">
@@ -433,7 +435,7 @@ function NavbarContent() {
                 {creditBalance !== null ? `${creditBalance} Credits` : "..."}
               </span>
             </div>
-            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-brand-500 text-white shadow-sm group-hover:bg-brand-400 transition-colors">
+            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-primary text-primary-foreground shadow-sm group-hover:bg-brand-300 transition-colors">
               + Top Up
             </span>
           </button>
@@ -457,8 +459,8 @@ function NavbarContent() {
                     className={clsx(
                       "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2 cursor-pointer w-full text-left",
                       isActive
-                        ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
-                        : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
+                        ? "bg-gradient-to-r from-sidebar-primary/15 to-sidebar-primary/5 text-sidebar-foreground font-semibold border-sidebar-primary"
+                        : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent"
                     )}
                     onClick={() => {
                       if (!pathname.startsWith("/notes")) {
@@ -468,7 +470,7 @@ function NavbarContent() {
                     }}
                   >
                     <span className="flex items-center gap-3">
-                      <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-brand-500" : "text-neutral-500")} />
+                      <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-sidebar-primary" : "text-neutral-500")} />
                       <span>{label}</span>
                     </span>
                     <ChevronDown
@@ -493,11 +495,11 @@ function NavbarContent() {
                             className={clsx(
                               "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 border-l-2",
                               isOptActive
-                                ? "bg-white/[0.03] text-white border-brand-500"
-                                : "text-neutral-400 hover:text-white hover:bg-white/[0.01] border-transparent"
+                                ? "bg-sidebar-accent text-sidebar-foreground border-sidebar-primary"
+                                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/40 border-transparent"
                             )}
                           >
-                            <OptIcon className={clsx("w-3.5 h-3.5", isOptActive ? "text-brand-500" : "text-neutral-500")} />
+                            <OptIcon className={clsx("w-3.5 h-3.5", isOptActive ? "text-sidebar-primary" : "text-neutral-500")} />
                             <span>{opt.label}</span>
                           </Link>
                         );
@@ -515,11 +517,11 @@ function NavbarContent() {
                 className={clsx(
                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-l-2",
                   isActive
-                    ? "bg-gradient-to-r from-brand-500/10 to-brand-500/5 text-white font-semibold border-brand-500"
-                    : "text-neutral-400 hover:text-white hover:bg-white/[0.02] border-transparent"
+                    ? "bg-gradient-to-r from-sidebar-primary/15 to-sidebar-primary/5 text-sidebar-foreground font-semibold border-sidebar-primary"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50 border-transparent"
                 )}
               >
-                <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-brand-500" : "text-neutral-500")} />
+                <Icon className={clsx("w-4.5 h-4.5", isActive ? "text-sidebar-primary" : "text-neutral-500")} />
                 {label}
               </Link>
             );
@@ -545,13 +547,13 @@ function NavbarContent() {
             <Bell className="w-4 h-4 text-neutral-500" />
             <span>Notifications</span>
             {hasUnread && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-pink-500 rounded-full animate-pulse" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
             )}
           </button>
 
           {/* Notifications Popover */}
           {notificationsOpen && (
-            <div className="absolute bottom-full left-0 mb-3 w-80 bg-surface-raised border border-border-muted rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
+            <div className="absolute bottom-full left-0 mb-3 w-80 bg-popover border border-border rounded-xl p-4 shadow-2xl z-50 flex flex-col gap-3 max-h-[350px] overflow-hidden animate-slide-up">
               <div className="flex items-center justify-between border-b border-border-muted pb-2">
                 <span className="text-xs font-bold text-white tracking-wide uppercase">Notifications</span>
                 <div className="flex items-center gap-2">
@@ -596,8 +598,8 @@ function NavbarContent() {
                             className={clsx(
                               "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border mt-0.5",
                               alert.is_notified
-                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                                : "bg-pink-500/10 border-pink-500/20 text-pink-400"
+                                ? "bg-[#1faab7]/15 border-[#1faab7]/30 text-[#6ed6de]"
+                                : "bg-brand-500/15 border-brand-500/30 text-brand-400"
                             )}
                           >
                             <Bell className="w-3.5 h-3.5" />
@@ -670,7 +672,7 @@ function NavbarContent() {
 
 export default function Navbar() {
   return (
-    <Suspense fallback={<aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-white/[0.04] bg-[#0c0c0e]/80 shrink-0 sticky top-4" />}>
+    <Suspense fallback={<aside className="w-[280px] h-[calc(100vh-2rem)] my-4 ml-4 rounded-2xl border border-sidebar-border bg-sidebar/90 shrink-0 sticky top-4" />}>
       <NavbarContent />
     </Suspense>
   );

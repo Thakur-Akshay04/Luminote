@@ -64,9 +64,241 @@ function checkSafetyRefusal(resultText: string, action: string, param?: string):
   return `The AI model refused to process this writing action because the note content contains sensitive terms triggering safety policy guardrails.`;
 }
 
+type SummaryFormat = "paragraph" | "bullets" | "actions";
+type AIPanelTab = "chat" | "insights" | "assistant";
+
+function getStoredAiFormat(): SummaryFormat {
+  if (typeof window === "undefined") return "paragraph";
+  const stored = localStorage.getItem("luminote_ai_format");
+  if (stored === "paragraph" || stored === "bullets" || stored === "actions") {
+    return stored;
+  }
+  return "paragraph";
+}
+
+function extractTextFromTiptapJson(node: any): string {
+  if (!node) return "";
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) {
+    return node.map(extractTextFromTiptapJson).join(" ");
+  }
+  if (typeof node === "object") {
+    if ("text" in node && typeof node.text === "string") {
+      return node.text;
+    }
+    if ("content" in node && Array.isArray(node.content)) {
+      return node.content.map(extractTextFromTiptapJson).join(" ");
+    }
+  }
+  return "";
+}
+
+function computeReadingStats(noteContent: string, editor: any) {
+  let text = "";
+  if (editor) {
+    text = editor.getText();
+  } else {
+    text = noteContent;
+    const trimmed = noteContent.trim();
+    if (trimmed.startsWith('{"') || trimmed.startsWith('[{')) {
+      try {
+        text = extractTextFromTiptapJson(JSON.parse(noteContent));
+      } catch {}
+    }
+  }
+  const chars = text.length;
+  const words = text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+  return { words, chars, readTime: Math.max(1, Math.ceil(words / 200)) };
+}
+
+function renderTabButtonContent(tab: AIPanelTab) {
+  if (tab === "chat") {
+    return (
+      <>
+        <MessageSquare className="w-3.5 h-3.5" />
+        <span>Chat</span>
+      </>
+    );
+  }
+  if (tab === "insights") {
+    return (
+      <>
+        <BookOpen className="w-3.5 h-3.5" />
+        <span>Insights</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <Wand2 className="w-3.5 h-3.5" />
+      <span>Writing</span>
+    </>
+  );
+}
+
+function renderSummaryBody(
+  hasSummary: boolean | string | null | undefined,
+  summarizing: boolean,
+  summary: string | null | undefined,
+  copied: boolean,
+  editor: any,
+  onCopy: () => void,
+  onInsert: (text: string) => void
+) {
+  if (hasSummary && summary) {
+    return (
+      <>
+        <div className="prose-luminote text-xs text-gray-300 leading-relaxed overflow-y-auto max-h-44 pr-1">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
+        </div>
+        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 absolute top-2 right-2 bg-popover/95 px-2 py-1 rounded-md border border-border shadow transition-opacity duration-200">
+          <button
+            type="button"
+            onClick={onCopy}
+            className="p-1 text-[10px] text-neutral-400 hover:text-white flex items-center gap-1"
+            title="Copy Summary"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-green-400" />
+                <span className="text-[9px] text-green-400 font-semibold">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span className="text-[9px]">Copy</span>
+              </>
+            )}
+          </button>
+          {editor && (
+            <button
+              type="button"
+              onClick={() => onInsert(`<div class="ai-summary-block"><h3>Summary</h3><p>${summary}</p></div><hr/>`)}
+              className="p-1 text-[10px] text-neutral-400 hover:text-white border-l border-white/[0.08] pl-1.5 flex items-center gap-1"
+              title="Insert Summary at Cursor"
+            >
+              <CornerUpRight className="w-3 h-3 animate-bounce" />
+              <span className="text-[9px]">Insert</span>
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
+  if (summarizing) {
+    return (
+      <div className="space-y-2.5 w-full py-4 animate-pulse">
+        <div className="h-3 w-full bg-white/10 rounded" />
+        <div className="h-3 w-11/12 bg-white/10 rounded" />
+        <div className="h-3 w-4/5 bg-white/10 rounded" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-neutral-500 gap-2">
+      <Brain className="w-7 h-7 opacity-20 animate-pulse" />
+      <span className="text-xs italic">No summary generated yet.</span>
+    </div>
+  );
+}
+
+interface AssistantOutputBodyProps {
+  assistantLoading: boolean;
+  assistantError: string | null;
+  assistantOutput: string;
+  copied: boolean;
+  editor: any;
+  selectedText: string;
+  onCopy: () => void;
+  onInsert: (text: string) => void;
+}
+
+function renderAssistantOutputBody({
+  assistantLoading,
+  assistantError,
+  assistantOutput,
+  copied,
+  editor,
+  selectedText,
+  onCopy,
+  onInsert,
+}: AssistantOutputBodyProps) {
+  if (assistantLoading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-500 gap-2">
+        <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+        <span className="text-xs animate-pulse">LumiAI is transforming your writing...</span>
+      </div>
+    );
+  }
+  if (assistantError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center py-6 px-4 gap-3 bg-red-950/10 border border-red-500/10 rounded-xl">
+        <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
+          <ShieldAlert className="w-5 h-5 animate-pulse" />
+        </div>
+        <div className="max-w-[280px]">
+          <p className="text-xs font-bold text-red-400">Content Refusal</p>
+          <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">{assistantError}</p>
+        </div>
+      </div>
+    );
+  }
+  if (assistantOutput) {
+    return (
+      <>
+        <div className="prose-luminote text-xs text-gray-300 leading-relaxed overflow-y-auto max-h-56 pr-1">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{assistantOutput}</ReactMarkdown>
+        </div>
+        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 absolute bottom-2 right-2 bg-popover/95 px-2 py-1.5 rounded-lg border border-border shadow transition-opacity duration-200">
+          <button
+            type="button"
+            onClick={onCopy}
+            className="p-1 text-[10px] text-neutral-400 hover:text-white flex items-center gap-1"
+            title="Copy Output"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-green-400 animate-scale-in" />
+                <span className="text-[9px] text-green-400 font-semibold">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span className="text-[9px]">Copy</span>
+              </>
+            )}
+          </button>
+          {editor && (
+            <button
+              type="button"
+              onClick={() => onInsert(assistantOutput)}
+              className="p-1 text-[10px] text-neutral-400 hover:text-white border-l border-white/[0.08] pl-1.5 flex items-center gap-1"
+              title={selectedText ? "Replace selection with AI output" : "Insert AI output at cursor"}
+            >
+              <Plus className="w-3 h-3 text-brand-400" />
+              <span className="text-[9px] text-brand-300 font-semibold">
+                {selectedText ? "Replace" : "Insert"}
+              </span>
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-neutral-500 gap-2">
+      <Wand2 className="w-7 h-7 opacity-20" />
+      <span className="text-xs italic max-w-[200px]">
+        Your AI results will show up here. Select text & trigger an action.
+      </span>
+    </div>
+  );
+}
+
 export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction }: Readonly<AIPanelProps>) {
   // Tabs: 'chat' | 'insights' | 'assistant'
-  const [activeTab, setActiveTab] = useState<"chat" | "insights" | "assistant">("chat");
+  const [activeTab, setActiveTab] = useState<AIPanelTab>("chat");
 
   // Selection detection
   const [selectedText, setSelectedText] = useState("");
@@ -113,7 +345,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
     }
   }, [chatHistory.length, chatLoading, activeTab]);
 
-  const handleAsk = async (e: React.FormEvent) => {
+  const handleAsk = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     const query = question.trim();
     if (!query) return;
@@ -180,24 +412,13 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
   };
 
   // ── 2. INSIGHTS TAB STATE & HANDLERS ──────────────────────────────────────
-  const [format, setFormat] = useState<"paragraph" | "bullets" | "actions">(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("luminote_ai_format");
-      if (stored === "paragraph" || stored === "bullets" || stored === "actions") {
-        return stored;
-      }
-    }
-    return "paragraph";
-  });
+  const [format, setFormat] = useState<SummaryFormat>(getStoredAiFormat);
   const [summarizing, setSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && activeTab === "insights") {
-      const stored = localStorage.getItem("luminote_ai_format");
-      if (stored === "paragraph" || stored === "bullets" || stored === "actions") {
-        setFormat(stored);
-      }
+    if (activeTab === "insights") {
+      setFormat(getStoredAiFormat());
     }
   }, [activeTab]);
 
@@ -213,7 +434,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
         return;
       }
 
-      const activeFormat = (typeof window !== "undefined" && (localStorage.getItem("luminote_ai_format") as "paragraph" | "bullets" | "actions")) || format;
+      const activeFormat = getStoredAiFormat() || format;
       const extractAlerts = typeof window !== "undefined"
         ? localStorage.getItem("luminote_ai_extract_alerts") !== "false"
         : true;
@@ -237,42 +458,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
   };
 
   // Reading Stats
-  const getWordAndCharCount = () => {
-    let text = "";
-    if (editor) {
-      text = editor.getText();
-    } else {
-      text = note.content;
-      if (note.content.trim().startsWith('{"') || note.content.trim().startsWith('[{')) {
-        try {
-          const data = JSON.parse(note.content);
-          text = extractTextFromTiptapJson(data);
-        } catch {}
-      }
-    }
-    const chars = text.length;
-    const words = text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
-    return { words, chars, readTime: Math.max(1, Math.ceil(words / 200)) };
-  };
-
-  const extractTextFromTiptapJson = (node: any): string => {
-    if (!node) return "";
-    if (typeof node === "string") return node;
-    if (typeof node === "object") {
-      if ("text" in node && typeof node.text === "string") {
-        return node.text;
-      }
-      if ("content" in node && Array.isArray(node.content)) {
-        return node.content.map(extractTextFromTiptapJson).join(" ");
-      }
-    }
-    if (Array.isArray(node)) {
-      return node.map(extractTextFromTiptapJson).join(" ");
-    }
-    return "";
-  };
-
-  const stats = getWordAndCharCount();
+  const stats = computeReadingStats(note.content, editor);
   const hasSummary = note.summary && note.summary.length > 0;
 
   // ── 3. WRITING ASSISTANT STATE & HANDLERS ──────────────────────────────────
@@ -338,15 +524,15 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[#131316] border border-white/[0.06] rounded-2xl shadow-2xl relative">
+    <div className="flex flex-col h-full overflow-hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-2xl relative">
       {/* Glow effect at top */}
       <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-brand-500/45 to-transparent blur-[2px]" />
 
       {/* AI Panel Header */}
-      <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-white/[0.06] shrink-0">
+      <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform duration-300">
-            <Brain className="w-4 h-4 text-white animate-pulse" />
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#f58c24] to-[#f9a748] flex items-center justify-center shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform duration-300">
+            <Brain className="w-4 h-4 text-[#1a0f05] animate-pulse" />
           </div>
           <div>
             <h3 className="font-bold text-sm text-white flex items-center gap-1.5">
@@ -383,29 +569,14 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                   : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02]"
                 }`}
             >
-              {tab === "chat" ? (
-                <>
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Chat</span>
-                </>
-              ) : tab === "insights" ? (
-                <>
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Insights</span>
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-3.5 h-3.5" />
-                  <span>Writing</span>
-                </>
-              )}
+              {renderTabButtonContent(tab)}
             </button>
           ))}
         </div>
       </div>
 
       {/* ── TAB CONTENT ── */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4 min-h-0 bg-[#131316]">
+      <div className="flex-1 overflow-hidden flex flex-col p-4 min-h-0 bg-sidebar">
         
         {/* ── 1. CHAT TAB ── */}
         {activeTab === "chat" && (
@@ -454,7 +625,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                   >
                     <div className={`p-3 rounded-2xl text-xs leading-relaxed group relative ${
                       isUser
-                        ? "bg-brand-600/90 border border-brand-500/30 text-white rounded-tr-none shadow-md shadow-brand-600/10"
+                        ? "bg-primary border border-brand-400/30 text-primary-foreground font-medium rounded-tr-none shadow-md shadow-brand-500/10"
                         : "bg-white/[0.03] border border-white/[0.06] text-gray-200 rounded-tl-none shadow-sm"
                     }`}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -464,7 +635,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
 
                       {/* Message actions for AI replies */}
                       {!isUser && (
-                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-1 right-2 flex items-center gap-1.5 bg-[#17171d]/90 px-1.5 py-0.5 rounded-md border border-white/[0.08] shadow transition-opacity duration-200">
+                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-1 right-2 flex items-center gap-1.5 bg-popover/95 px-1.5 py-0.5 rounded-md border border-border shadow transition-opacity duration-200">
                           <button
                             type="button"
                             onClick={() => triggerCopyAlert(msgId, msg.content)}
@@ -526,7 +697,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
               </div>
               <button
                 type="submit"
-                className="btn-primary p-2.5 shrink-0 bg-brand-600 hover:bg-brand-500 text-white rounded-xl shadow-lg shadow-brand-600/10 flex items-center justify-center"
+                className="btn-primary p-2.5 shrink-0 bg-primary hover:bg-brand-300 text-primary-foreground rounded-xl shadow-lg shadow-brand-500/10 flex items-center justify-center"
                 disabled={chatLoading || !question.trim()}
                 id="ai-ask-btn"
               >
@@ -603,58 +774,14 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
 
               {/* Summary display box */}
               <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 min-h-[100px] flex flex-col relative group">
-                {hasSummary ? (
-                  <>
-                    <div className="prose-luminote text-xs text-gray-300 leading-relaxed overflow-y-auto max-h-44 pr-1">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {note.summary!}
-                      </ReactMarkdown>
-                    </div>
-
-                    {/* Summary Quick Actions */}
-                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 absolute top-2 right-2 bg-[#17171d]/90 px-2 py-1 rounded-md border border-white/[0.08] shadow transition-opacity duration-200">
-                      <button
-                        type="button"
-                        onClick={() => triggerCopyAlert("summary-copy", note.summary!)}
-                        className="p-1 text-[10px] text-neutral-400 hover:text-white flex items-center gap-1"
-                        title="Copy Summary"
-                      >
-                        {copiedStates["summary-copy"] ? (
-                          <>
-                            <Check className="w-3 h-3 text-green-400" />
-                            <span className="text-[9px] text-green-400 font-semibold">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span className="text-[9px]">Copy</span>
-                          </>
-                        )}
-                      </button>
-                      {editor && (
-                        <button
-                          type="button"
-                          onClick={() => handleInsertToEditor(`<div class="ai-summary-block"><h3>Summary</h3><p>${note.summary}</p></div><hr/>`)}
-                          className="p-1 text-[10px] text-neutral-400 hover:text-white border-l border-white/[0.08] pl-1.5 flex items-center gap-1"
-                          title="Insert Summary at Cursor"
-                        >
-                          <CornerUpRight className="w-3 h-3 animate-bounce" />
-                          <span className="text-[9px]">Insert</span>
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : summarizing ? (
-                  <div className="space-y-2.5 w-full py-4 animate-pulse">
-                    <div className="h-3 w-full bg-white/10 rounded" />
-                    <div className="h-3 w-11/12 bg-white/10 rounded" />
-                    <div className="h-3 w-4/5 bg-white/10 rounded" />
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-neutral-500 gap-2">
-                    <Brain className="w-7 h-7 opacity-20 animate-pulse" />
-                    <span className="text-xs italic">No summary generated yet.</span>
-                  </div>
+                {renderSummaryBody(
+                  hasSummary,
+                  summarizing,
+                  note.summary,
+                  Boolean(copiedStates["summary-copy"]),
+                  editor,
+                  () => triggerCopyAlert("summary-copy", note.summary!),
+                  handleInsertToEditor
                 )}
               </div>
 
@@ -747,13 +874,13 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                     className="w-full py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-left text-xs font-semibold text-white rounded-xl flex items-center justify-between gap-1 transition-all duration-200"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Wand2 className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                      <Wand2 className="w-3.5 h-3.5 text-[#f58c24] animate-pulse" />
                       <span>Change Tone</span>
                     </span>
                     <ChevronDown className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${toneDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                   {toneDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#17171d] border border-white/[0.08] rounded-xl shadow-xl p-1 flex flex-col animate-fade-in">
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-xl shadow-xl p-1 flex flex-col animate-fade-in">
                       {tones.map((t) => (
                         <button
                           key={t}
@@ -780,13 +907,13 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                     className="w-full py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-left text-xs font-semibold text-white rounded-xl flex items-center justify-between gap-1 transition-all duration-200"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Languages className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                      <Languages className="w-3.5 h-3.5 text-[#6ed6de] animate-pulse" />
                       <span>Translate</span>
                     </span>
                     <ChevronDown className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${translateDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                   {translateDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[#17171d] border border-white/[0.08] rounded-xl shadow-xl p-1 flex flex-col animate-fade-in">
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-xl shadow-xl p-1 flex flex-col animate-fade-in">
                       {languages.map((l) => (
                         <button
                           key={l}
@@ -808,7 +935,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                   disabled={assistantLoading}
                   className="py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-left text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 transition-all duration-200"
                 >
-                  <SpellCheck className="w-3.5 h-3.5 text-blue-400" />
+                  <SpellCheck className="w-3.5 h-3.5 text-[#1faab7]" />
                   <span>Grammar & Polish</span>
                 </button>
 
@@ -819,7 +946,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                   disabled={assistantLoading}
                   className="py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-left text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 transition-all duration-200"
                 >
-                  <Check className="w-3.5 h-3.5 text-green-400" />
+                  <Check className="w-3.5 h-3.5 text-[#c8a96f]" />
                   <span>Simplify Text</span>
                 </button>
 
@@ -830,7 +957,7 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
                   disabled={assistantLoading}
                   className="col-span-2 py-2 px-3 bg-neutral-900 border border-white/[0.06] hover:bg-neutral-800 text-center text-xs font-semibold text-white rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 hover:scale-[1.005] active:scale-[0.995]"
                 >
-                  <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                  <Maximize2 className="w-3.5 h-3.5 text-[#f9a748]" />
                   <span>Expand Content (Add details)</span>
                 </button>
               </div>
@@ -843,74 +970,16 @@ export default function AIPanel({ note, onUpdateNote, editor, onSaveBeforeAction
               </span>
 
               <div className="flex-1 bg-white/[0.02] border border-white/[0.05] rounded-xl p-3.5 min-h-[120px] flex flex-col relative group">
-                {assistantLoading ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center text-neutral-500 gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
-                    <span className="text-xs animate-pulse">LumiAI is transforming your writing...</span>
-                  </div>
-                ) : assistantError ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center py-6 px-4 gap-3 bg-red-950/10 border border-red-500/10 rounded-xl">
-                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
-                      <ShieldAlert className="w-5 h-5 animate-pulse" />
-                    </div>
-                    <div className="max-w-[280px]">
-                      <p className="text-xs font-bold text-red-400">Content Refusal</p>
-                      <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
-                        {assistantError}
-                      </p>
-                    </div>
-                  </div>
-                ) : assistantOutput ? (
-                  <>
-                    <div className="prose-luminote text-xs text-gray-300 leading-relaxed overflow-y-auto max-h-56 pr-1">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {assistantOutput}
-                      </ReactMarkdown>
-                    </div>
-
-                    {/* Actions overlay */}
-                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 absolute bottom-2 right-2 bg-[#17171d]/90 px-2 py-1.5 rounded-lg border border-white/[0.08] shadow transition-opacity duration-200">
-                      <button
-                        type="button"
-                        onClick={() => triggerCopyAlert("assistant-copy", assistantOutput)}
-                        className="p-1 text-[10px] text-neutral-400 hover:text-white flex items-center gap-1"
-                        title="Copy Output"
-                      >
-                        {copiedStates["assistant-copy"] ? (
-                          <>
-                            <Check className="w-3 h-3 text-green-400 animate-scale-in" />
-                            <span className="text-[9px] text-green-400 font-semibold">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span className="text-[9px]">Copy</span>
-                          </>
-                        )}
-                      </button>
-                      {editor && (
-                        <button
-                          type="button"
-                          onClick={() => handleInsertToEditor(assistantOutput)}
-                          className="p-1 text-[10px] text-neutral-400 hover:text-white border-l border-white/[0.08] pl-1.5 flex items-center gap-1"
-                          title={selectedText ? "Replace selection with AI output" : "Insert AI output at cursor"}
-                        >
-                          <Plus className="w-3 h-3 text-brand-400" />
-                          <span className="text-[9px] text-brand-300 font-semibold">
-                            {selectedText ? "Replace" : "Insert"}
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-neutral-500 gap-2">
-                    <Wand2 className="w-7 h-7 opacity-20" />
-                    <span className="text-xs italic max-w-[200px]">
-                      Your AI results will show up here. Select text & trigger an action.
-                    </span>
-                  </div>
-                )}
+                {renderAssistantOutputBody({
+                  assistantLoading,
+                  assistantError,
+                  assistantOutput,
+                  copied: Boolean(copiedStates["assistant-copy"]),
+                  editor,
+                  selectedText,
+                  onCopy: () => triggerCopyAlert("assistant-copy", assistantOutput),
+                  onInsert: handleInsertToEditor,
+                })}
               </div>
             </div>
           </div>

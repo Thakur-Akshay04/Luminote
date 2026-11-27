@@ -166,6 +166,7 @@ const ResizableImageNodeView = (props: NodeViewProps) => {
           className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 bg-brand-500 hover:bg-brand-400 rounded flex items-center justify-center cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-md border border-white/20 select-none"
         >
           <svg
+            aria-hidden="true"
             className="w-2.5 h-2.5 text-white"
             viewBox="0 0 24 24"
             fill="none"
@@ -206,6 +207,74 @@ function getEditorPanelClass(noteType: string, previewMode: boolean): string {
   if (noteType === "checklist") return `flex flex-col ${display} w-full sm:w-[65%] border-r border-white/[0.06] overflow-y-auto`;
   if (noteType === "text" || noteType === "audio") return `flex flex-col ${display} w-full overflow-y-auto`;
   return `flex flex-col ${display} w-full sm:w-1/2 border-r border-white/[0.06] overflow-y-auto`;
+}
+
+function getNoteTypeLabel(noteType: string): string {
+  if (noteType === "text") return "Text Notes";
+  if (noteType === "audio") return "Voice Notes";
+  if (noteType === "checklist") return "Checklists";
+  return "Notes";
+}
+
+function SidebarNoteTypeIcon({ noteType }: Readonly<{ noteType: string }>) {
+  if (noteType === "text") return <FileText className="w-3.5 h-3.5 text-[#6ed6de] shrink-0" />;
+  if (noteType === "audio") return <Mic className="w-3.5 h-3.5 text-[#f58c24] shrink-0" />;
+  if (noteType === "checklist") return <ListTodo className="w-3.5 h-3.5 text-[#e3af35] shrink-0" />;
+  return null;
+}
+
+function ChecklistDescriptionField({
+  value,
+  onChange,
+}: Readonly<{
+  value: string;
+  onChange: (nextVal: string) => void;
+}>) {
+  const descWordCount = value.trim() === "" ? 0 : value.trim().split(/\s+/).filter(Boolean).length;
+  return (
+    <div className="flex flex-col gap-1.5 shrink-0">
+      <label htmlFor="checklist-desc" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+        Checklist Sub-title / Short Description
+      </label>
+      <div className="relative w-full">
+        <input
+          type="text"
+          id="checklist-desc"
+          className="w-full bg-surface-900/50 border border-white/[0.04] focus:border-brand-500/50 rounded-xl pl-3 pr-20 py-2 text-xs text-gray-200 placeholder-gray-700 focus:outline-none transition-all"
+          placeholder="Add a short subtitle or description for this checklist..."
+          value={value}
+          onChange={(e) => {
+            const raw = e.target.value;
+            const words = raw.trim().split(/\s+/).filter(Boolean);
+            const nextVal = words.length <= 25 ? raw : raw.split(/\s+/).slice(0, 25).join(" ");
+            onChange(nextVal);
+          }}
+          spellCheck
+        />
+        <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider pointer-events-none select-none ${descWordCount >= 25 ? "text-red-400" : "text-gray-500"}`}>
+          {descWordCount}/25 words
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TableSubToolbar({ editor }: Readonly<{ editor: any }>) {
+  if (!editor?.isActive("table")) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/20 rounded-md text-brand-300 text-xs font-semibold animate-fade-in mt-1 select-none">
+      <span className="uppercase tracking-wider mr-2 text-[9px] text-brand-400 font-bold select-none">Table Tools:</span>
+      <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Above</button>
+      <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Below</button>
+      <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Row</button>
+      <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
+      <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Left</button>
+      <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Right</button>
+      <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Col</button>
+      <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
+      <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-semibold bg-red-500/20 border-red-500/40 text-red-100 hover:bg-red-500/30">Delete Table</button>
+    </div>
+  );
 }
 
 function NoteEditorContent() {
@@ -268,10 +337,54 @@ function NoteEditorContent() {
   const sidebarFetchTypeRef = useRef<string>("");
 
   useEffect(() => {
-    const handleClickOutside = () => setOpenMenuNoteId(null);
+    const handleClickOutside = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("[data-note-menu]")) return;
+      setOpenMenuNoteId(null);
+    };
     window.addEventListener("click", handleClickOutside);
     return () => window.removeEventListener("click", handleClickOutside);
   }, []);
+
+  const handleSelectSidebarNote = async (targetId: string) => {
+    if (targetId === noteId) return;
+    if (isDirty.current) {
+      await saveNote();
+    }
+    router.push(`/notes/${targetId}`);
+  };
+
+  const handleTogglePinNote = async (targetNote: Note) => {
+    setOpenMenuNoteId(null);
+    const newPinned = !targetNote.is_pinned;
+    try {
+      setSidebarNotes((prev) =>
+        prev.map((item) => (item.id === targetNote.id ? { ...item, is_pinned: newPinned } : item))
+      );
+      if (targetNote.id === noteId && note) {
+        setNote({ ...note, is_pinned: newPinned });
+      }
+      await notesApi.update(targetNote.id, { is_pinned: newPinned });
+      void fetchSidebarNotes(noteType);
+    } catch {
+      void fetchSidebarNotes(noteType);
+    }
+  };
+
+  const handleToggleFavoriteNote = async (targetNote: Note) => {
+    setOpenMenuNoteId(null);
+    const newFav = !targetNote.is_favorite;
+    try {
+      setSidebarNotes((prev) =>
+        prev.map((item) => (item.id === targetNote.id ? { ...item, is_favorite: newFav } : item))
+      );
+      if (targetNote.id === noteId && note) {
+        setNote({ ...note, is_favorite: newFav });
+      }
+      await notesApi.update(targetNote.id, { is_favorite: newFav });
+    } catch {
+      void fetchSidebarNotes(noteType);
+    }
+  };
 
   // Popover Refs
   const fontDropdownRef = useRef<HTMLDivElement>(null);
@@ -409,7 +522,7 @@ function NoteEditorContent() {
     }
 
     debouncedSave.current = setTimeout(() => {
-      saveNote();
+      void saveNote();
     }, 800);
   }, [saveNote, markDirty]);
 
@@ -441,7 +554,7 @@ function NoteEditorContent() {
   // Listen for copy, cut, paste events to build custom clipboard history
   useEffect(() => {
     const addClipboardItem = (text: string, isImage = false) => {
-      if (!text || !text.trim()) return;
+      if (!text?.trim()) return;
       setClipboardHistory((prev) => {
         if (prev.some((x) => x.content === text)) return prev;
         const isImg = isImage || text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
@@ -560,14 +673,19 @@ function NoteEditorContent() {
   }, [noteId]);
 
   // Keyboard shortcut Ctrl+K wrapper
-  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-      e.preventDefault();
-      const currentLinkUrl = editor?.getAttributes("link").href || "";
-      setLinkUrl(currentLinkUrl);
-      setShowLinkPopover(true);
-    }
-  };
+  useEffect(() => {
+    if (noteType !== "text") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const currentLinkUrl = editor?.getAttributes("link").href || "";
+        setLinkUrl(currentLinkUrl);
+        setShowLinkPopover(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editor, noteType]);
 
 
 
@@ -643,7 +761,7 @@ function NoteEditorContent() {
   useEffect(() => {
     if (!isLoaded) return;
     if (noteId) {
-      fetchNote();
+      void fetchNote();
     }
   }, [fetchNote, noteId, isLoaded]);
 
@@ -671,7 +789,7 @@ function NoteEditorContent() {
   useEffect(() => {
     if (!isLoaded) return;
     if (noteType) {
-      fetchSidebarNotes(noteType);
+      void fetchSidebarNotes(noteType);
     }
   }, [noteType, fetchSidebarNotes, isLoaded]);
 
@@ -820,7 +938,7 @@ function NoteEditorContent() {
     }
 
     isDirty.current = true;
-    saveNote();
+    void saveNote();
   };
 
   const handleNoteTypeChange = (type: string) => {
@@ -839,7 +957,7 @@ function NoteEditorContent() {
     setContent(updatedContent);
     contentRef.current = updatedContent;
     isDirty.current = true;
-    saveNote();
+    void saveNote();
   };
 
   const handleChecklistUpdate = (newItems: ChecklistItem[]) => {
@@ -893,7 +1011,7 @@ function NoteEditorContent() {
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (selectedText) {
-      navigator.clipboard.writeText(selectedText);
+      void navigator.clipboard.writeText(selectedText);
       editor.commands.deleteSelection();
     }
   };
@@ -903,18 +1021,8 @@ function NoteEditorContent() {
     const { from, to } = editor.state.selection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (selectedText) {
-      navigator.clipboard.writeText(selectedText);
+      void navigator.clipboard.writeText(selectedText);
     }
-  };
-
-  const handlePaste = () => {
-    if (!editor) return;
-    editor.commands.focus();
-    navigator.clipboard.readText().then((text) => {
-      if (text) {
-        editor.commands.insertContent(text);
-      }
-    }).catch(() => {});
   };
 
   const COLORS = [
@@ -972,7 +1080,7 @@ function NoteEditorContent() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Toolbar */}
-      <div className="no-print flex flex-wrap items-center gap-4 px-5 py-3.5 border-b border-white/[0.05] bg-[#0c0c0e]/80 backdrop-blur-xl shadow-lg relative z-30 select-none">
+      <div className="no-print flex flex-wrap items-center gap-4 px-5 py-3.5 border-b border-sidebar-border bg-sidebar/85 backdrop-blur-xl shadow-lg relative z-30 select-none">
         <Link
           href="/notes"
           className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.06] text-gray-400 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.1] active:scale-95 transition-all shrink-0"
@@ -1015,7 +1123,7 @@ function NoteEditorContent() {
                 onClick={() => handleNoteTypeChange(type.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300
                   ${isSelected
-                    ? "bg-gradient-to-tr from-brand-600 to-indigo-650 text-white shadow-md shadow-brand-500/10 scale-102 border border-brand-500/20"
+                    ? "bg-gradient-to-tr from-[#f58c24] to-[#f9a748] text-[#1a0f05] shadow-md shadow-brand-500/15 scale-102 border border-brand-400/30"
                     : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
                   }`}
                 title={`${type.label} Note`}
@@ -1094,8 +1202,8 @@ function NoteEditorContent() {
               onClick={() => setShowAI(!showAI)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all
                 ${showAI
-                  ? "bg-gradient-to-tr from-indigo-600 to-brand-500 text-white border border-indigo-500/30 shadow-lg shadow-indigo-500/15"
-                  : "bg-neutral-900 border border-indigo-500/15 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/30"
+                  ? "bg-gradient-to-tr from-[#f58c24] to-[#e3af35] text-[#1a0f05] border border-brand-400/30 shadow-lg shadow-brand-500/15"
+                  : "bg-neutral-900 border border-brand-500/20 text-brand-400 hover:bg-brand-500/10 hover:border-brand-500/35"
                 }`}
               id="ai-panel-toggle"
             >
@@ -1110,7 +1218,7 @@ function NoteEditorContent() {
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden animate-fade-in">
         {/* Left side-notes list navbar */}
-        <aside className="no-print w-64 border-r border-white/[0.06] bg-[#0c0c0e]/60 backdrop-blur-xl flex flex-col shrink-0 select-none">
+        <aside className="no-print w-64 border-r border-sidebar-border bg-sidebar/70 backdrop-blur-xl flex flex-col shrink-0 select-none">
           {/* Sidebar Header */}
           <div className="px-4 py-3.5 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
             <div className="flex flex-col min-w-0 pr-2">
@@ -1123,14 +1231,9 @@ function NoteEditorContent() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {noteType === "text" && <FileText className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
-                {noteType === "audio" && <Mic className="w-3.5 h-3.5 text-pink-400 shrink-0" />}
-                {noteType === "checklist" && <ListTodo className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                <SidebarNoteTypeIcon noteType={noteType} />
                 <span className="text-sm font-bold text-white tracking-tight truncate">
-                  {noteType === "text" && "Text Notes"}
-                  {noteType === "audio" && "Voice Notes"}
-                  {noteType === "checklist" && "Checklists"}
-                  {!noteType && "Notes"}
+                  {getNoteTypeLabel(noteType)}
                 </span>
               </div>
             </div>
@@ -1192,35 +1295,12 @@ function NoteEditorContent() {
                 } catch { }
 
                 return (
-                  <div key={n.id} className="relative group w-full">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        if (isActive) return;
-                        if (isDirty.current) {
-                          saveNote().then(() => {
-                            router.push(`/notes/${n.id}`);
-                          });
-                        } else {
-                          router.push(`/notes/${n.id}`);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          if (isActive) return;
-                          if (isDirty.current) {
-                            saveNote().then(() => {
-                              router.push(`/notes/${n.id}`);
-                            });
-                          } else {
-                            router.push(`/notes/${n.id}`);
-                          }
-                        }
-                      }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${isActive
-                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(168,85,247,0.12)]"
+                  <div key={n.id} className="relative group w-full flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => void handleSelectSidebarNote(n.id)}
+                      className={`w-full flex items-center justify-between gap-2 pl-3 pr-9 py-2.5 rounded-xl text-xs transition-all duration-200 border text-left relative cursor-pointer ${isActive
+                        ? "bg-brand-500/10 border-brand-500/30 text-white font-semibold shadow-[0_2px_12px_rgba(245,140,36,0.12)]"
                         : "bg-transparent border-transparent text-neutral-400 hover:text-white hover:bg-white/[0.03] hover:border-white/[0.05]"
                         }`}
                     >
@@ -1229,9 +1309,9 @@ function NoteEditorContent() {
                       )}
 
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-brand-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-pink-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
-                        {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-emerald-400" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "text" && <FileText className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#6ed6de]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "audio" && <Mic className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#f58c24]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
+                        {n.note_type === "checklist" && <ListTodo className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#e3af35]" : "text-neutral-500 group-hover:text-neutral-300"}`} />}
 
                         {n.is_pinned && (
                           <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 shrink-0 transform -rotate-45" />
@@ -1250,54 +1330,35 @@ function NoteEditorContent() {
                             {displayDate}
                           </span>
                         )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setOpenMenuNoteId(isMenuOpen ? null : n.id);
-                          }}
-                          title="Note options"
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isMenuOpen
-                            ? "bg-white/10 text-white"
-                            : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
-                            }`}
-                        >
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </button>
                       </div>
-                    </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      data-note-menu
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuNoteId(isMenuOpen ? null : n.id);
+                      }}
+                      title="Note options"
+                      className={`absolute right-2 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isMenuOpen
+                        ? "bg-white/10 text-white"
+                        : "opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] text-neutral-400 hover:text-white"
+                        }`}
+                    >
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
 
                     {/* Popover Dropdown Menu */}
                     {isMenuOpen && (
                       <div
-                        role="menu"
-                        tabIndex={-1}
-                        className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-[#121216] border border-white/[0.1] shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
+                        data-note-menu
+                        className="absolute right-2 top-9 z-50 w-48 py-1.5 rounded-xl bg-popover border border-border shadow-2xl backdrop-blur-2xl flex flex-col gap-0.5 animate-fade-in select-none"
                       >
                         {/* Pin / Unpin option */}
                         <button
                           type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            setOpenMenuNoteId(null);
-                            const newPinned = !n.is_pinned;
-                            try {
-                              setSidebarNotes((prev) =>
-                                prev.map((item) => (item.id === n.id ? { ...item, is_pinned: newPinned } : item))
-                              );
-                              if (n.id === noteId && note) {
-                                setNote({ ...note, is_pinned: newPinned });
-                              }
-                              await notesApi.update(n.id, { is_pinned: newPinned });
-                              fetchSidebarNotes(noteType);
-                            } catch {
-                              fetchSidebarNotes(noteType);
-                            }
-                          }}
+                          onClick={() => void handleTogglePinNote(n)}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
                         >
                           {n.is_pinned ? (
@@ -1316,22 +1377,7 @@ function NoteEditorContent() {
                         {/* Favorite / Unfavorite option */}
                         <button
                           type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            setOpenMenuNoteId(null);
-                            const newFav = !n.is_favorite;
-                            try {
-                              setSidebarNotes((prev) =>
-                                prev.map((item) => (item.id === n.id ? { ...item, is_favorite: newFav } : item))
-                              );
-                              if (n.id === noteId && note) {
-                                setNote({ ...note, is_favorite: newFav });
-                              }
-                              await notesApi.update(n.id, { is_favorite: newFav });
-                            } catch {
-                              fetchSidebarNotes(noteType);
-                            }
-                          }}
+                          onClick={() => void handleToggleFavoriteNote(n)}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors rounded-lg text-left"
                         >
                           <Star className={`w-3.5 h-3.5 ${n.is_favorite ? "fill-amber-400 text-amber-400" : "text-neutral-400"}`} />
@@ -1343,8 +1389,7 @@ function NoteEditorContent() {
                         {/* Delete option */}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             setOpenMenuNoteId(null);
                             handleOpenDeleteConfirm(n.id);
                           }}
@@ -1411,7 +1456,7 @@ function NoteEditorContent() {
                         type="button"
                         onClick={() => {
                           navigator.clipboard.readText().then(text => {
-                            if (text && text.trim()) {
+                            if (text?.trim()) {
                               setClipboardHistory((prev) => {
                                 if (prev.some(item => item.content === text)) return prev;
                                 const isImg = text.startsWith("data:image/") || /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(text.trim());
@@ -1693,7 +1738,6 @@ function NoteEditorContent() {
                                 setShowLinkPopover(false);
                               }
                             }}
-                            autoFocus
                           />
                           <div className="flex justify-between items-center gap-1.5 mt-1">
                             {editor?.isActive("link") && (
@@ -1766,7 +1810,6 @@ function NoteEditorContent() {
                                   setImageUrl("");
                                 }
                               }}
-                              autoFocus
                             />
                             <div className="flex gap-1 ml-auto mt-1">
                               <button
@@ -1906,20 +1949,7 @@ function NoteEditorContent() {
               </div>
 
               {/* Table Sub-Toolbar (Active when cursor is inside table) */}
-              {editor?.isActive("table") && (
-                <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 bg-brand-500/10 border border-brand-500/20 rounded-md text-brand-300 text-xs font-semibold animate-fade-in mt-1 select-none">
-                  <span className="uppercase tracking-wider mr-2 text-[9px] text-brand-400 font-bold select-none">Table Tools:</span>
-                  <button type="button" onClick={() => editor.chain().focus().addRowBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Above</button>
-                  <button type="button" onClick={() => editor.chain().focus().addRowAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Row Below</button>
-                  <button type="button" onClick={() => editor.chain().focus().deleteRow().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Row</button>
-                  <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
-                  <button type="button" onClick={() => editor.chain().focus().addColumnBefore().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Left</button>
-                  <button type="button" onClick={() => editor.chain().focus().addColumnAfter().run()} className="btn-secondary py-0.5 px-1.5 rounded-sm text-[10px] font-medium border-brand-500/30 bg-neutral-900/50 hover:bg-neutral-900">Add Col Right</button>
-                  <button type="button" onClick={() => editor.chain().focus().deleteColumn().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-medium bg-red-950/10 border-red-500/20 hover:bg-red-950/30">Delete Col</button>
-                  <div className="h-4 w-px bg-brand-500/30 mx-0.5" />
-                  <button type="button" onClick={() => editor.chain().focus().deleteTable().run()} className="btn-danger py-0.5 px-1.5 rounded-sm text-[10px] font-semibold bg-red-500/20 border-red-500/40 text-red-100 hover:bg-red-500/30">Delete Table</button>
-                </div>
-              )}
+              <TableSubToolbar editor={editor} />
             </div>
           )}
 
@@ -1929,10 +1959,7 @@ function NoteEditorContent() {
             <div className={getEditorPanelClass(noteType, previewMode)}>
 
               {noteType === "text" && (
-                <div
-                  className="flex-1 flex flex-col min-h-0 print-content overflow-y-auto"
-                  onKeyDown={handleEditorKeyDown}
-                >
+                <div className="flex-1 flex flex-col min-h-0 print-content overflow-y-auto">
                   {/* Centered Heading visible only in print */}
                   <div className="only-print flex-col items-center justify-center border-b-2 border-neutral-300 pb-4 mb-6 w-full text-center">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Luminote</span>
@@ -1978,52 +2005,18 @@ function NoteEditorContent() {
                   </div>
                   <div className="p-4 sm:p-6 flex-1 flex flex-col gap-5 overflow-y-auto">
                     {/* Description Box */}
-                    {(() => {
-                      const descWordCount = checklistDescription.trim() === "" ? 0 : checklistDescription.trim().split(/\s+/).filter(Boolean).length;
-                      return (
-                        <div className="flex flex-col gap-1.5 shrink-0">
-                          <label htmlFor="checklist-desc" className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                            Checklist Sub-title / Short Description
-                          </label>
-                          <div className="relative w-full">
-                            <input
-                              type="text"
-                              id="checklist-desc"
-                              className="w-full bg-surface-900/50 border border-white/[0.04] focus:border-brand-500/50 rounded-xl pl-3 pr-20 py-2 text-xs text-gray-200
-                                         placeholder-gray-700 focus:outline-none transition-all"
-                              placeholder="Add a short subtitle or description for this checklist..."
-                              value={checklistDescription}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const words = val.trim().split(/\s+/).filter(Boolean);
-                                if (words.length <= 25) {
-                                  setChecklistDescription(val);
-                                  descriptionRef.current = val;
-                                  contentRef.current = JSON.stringify({
-                                    description: val,
-                                    ai_context: aiContextRef.current,
-                                  });
-                                  markDirty();
-                                } else {
-                                  const truncated = val.split(/\s+/).slice(0, 25).join(" ");
-                                  setChecklistDescription(truncated);
-                                  descriptionRef.current = truncated;
-                                  contentRef.current = JSON.stringify({
-                                    description: truncated,
-                                    ai_context: aiContextRef.current,
-                                  });
-                                  markDirty();
-                                }
-                              }}
-                              spellCheck
-                            />
-                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider pointer-events-none select-none ${descWordCount >= 25 ? "text-red-400" : "text-gray-500"}`}>
-                              {descWordCount}/25 words
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <ChecklistDescriptionField
+                      value={checklistDescription}
+                      onChange={(nextVal) => {
+                        setChecklistDescription(nextVal);
+                        descriptionRef.current = nextVal;
+                        contentRef.current = JSON.stringify({
+                          description: nextVal,
+                          ai_context: aiContextRef.current,
+                        });
+                        markDirty();
+                      }}
+                    />
 
                     <div className="h-px bg-white/[0.04] shrink-0" />
 

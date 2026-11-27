@@ -15,24 +15,24 @@ export default function SearchResult({ item, rank }: Readonly<SearchResultProps>
   const getMatchTheme = (pct: number) => {
     if (pct >= 85) {
       return {
-        text: "text-emerald-400",
-        bar: "bg-gradient-to-r from-emerald-500 to-teal-400",
-        bg: "bg-emerald-500/5 border-emerald-500/15 text-emerald-400",
+        text: "text-[#6ed6de]",
+        bar: "bg-gradient-to-r from-[#1faab7] to-[#6ed6de]",
+        bg: "bg-[#1faab7]/10 border-[#1faab7]/25 text-[#6ed6de]",
         label: "High Match",
       };
     }
     if (pct >= 70) {
       return {
-        text: "text-amber-400",
-        bar: "bg-gradient-to-r from-amber-500 to-yellow-400",
-        bg: "bg-amber-500/5 border-amber-500/15 text-amber-400",
+        text: "text-[#f9a748]",
+        bar: "bg-gradient-to-r from-[#f58c24] to-[#e3af35]",
+        bg: "bg-[#f58c24]/10 border-[#f58c24]/25 text-[#f9a748]",
         label: "Medium Match",
       };
     }
     return {
-      text: "text-neutral-400",
+      text: "text-muted-foreground",
       bar: "bg-neutral-500",
-      bg: "bg-neutral-500/5 border-neutral-500/15 text-neutral-400",
+      bg: "bg-neutral-500/5 border-neutral-500/15 text-muted-foreground",
       label: "Potential Match",
     };
   };
@@ -41,7 +41,7 @@ export default function SearchResult({ item, rank }: Readonly<SearchResultProps>
 
   return (
     <Link href={`/notes/${item.id}`}>
-      <div className="bg-[#0c0c0e] border border-white/[0.04] hover:border-brand-500/30 rounded-2xl p-5 cursor-pointer shadow-lg hover:shadow-brand-500/5 transition-all duration-300 group flex flex-col gap-4 animate-slide-up hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden">
+      <div className="bg-sidebar border border-sidebar-border hover:border-brand-500/35 rounded-2xl p-5 cursor-pointer shadow-lg hover:shadow-brand-500/5 transition-all duration-300 group flex flex-col gap-4 animate-slide-up hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden">
         {/* Glow accent */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-brand-500/10 transition-colors" />
 

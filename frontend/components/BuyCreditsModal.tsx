@@ -8,7 +8,6 @@ import {
   X,
   Check,
   ShieldCheck,
-  Sparkles,
   CreditCard,
   Loader2,
   AlertCircle,
@@ -157,8 +156,8 @@ export default function BuyCreditsModal({
           package: selectedPackage,
         },
         theme: {
-          color: "#6366f1",
-          backdrop_color: "rgba(0, 0, 0, 0.8)",
+          color: "#f58c24",
+          backdrop_color: "rgba(12, 10, 8, 0.85)",
         },
         modal: {
           ondismiss: function () {
@@ -188,15 +187,15 @@ export default function BuyCreditsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-[#0f0f12] border border-white/[0.1] rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(99,102,241,0.15)] flex flex-col gap-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div className="relative w-full max-w-2xl bg-popover border border-border rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(245,140,36,0.15)] flex flex-col gap-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
         {/* Glow Top Highlight */}
         <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-brand-500 to-transparent blur-[1px]" />
 
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
-              <Zap className="w-6 h-6 text-white animate-pulse" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#f58c24] to-[#f9a748] flex items-center justify-center shadow-lg shadow-brand-500/20">
+              <Zap className="w-6 h-6 text-[#1a0f05] animate-pulse" />
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -251,12 +250,12 @@ export default function BuyCreditsModal({
                 className={clsx(
                   "relative flex flex-col justify-between p-5 rounded-2xl border text-left transition-all duration-300 group cursor-pointer",
                   isSelected
-                    ? "bg-gradient-to-b from-brand-600/20 via-brand-600/10 to-transparent border-brand-500 shadow-[0_0_30px_rgba(99,102,241,0.2)] scale-[1.02]"
+                    ? "bg-gradient-to-b from-[#f58c24]/20 via-[#f58c24]/10 to-transparent border-[#f58c24] shadow-[0_0_30px_rgba(245,140,36,0.2)] scale-[1.02]"
                     : "bg-white/[0.02] border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04]"
                 )}
               >
                 {pkg.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-brand-500 to-indigo-500 text-[9px] font-black text-white uppercase tracking-wider shadow-md">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-[#f58c24] to-[#e3af35] text-[9px] font-black text-[#1a0f05] uppercase tracking-wider shadow-md">
                     {pkg.badge}
                   </div>
                 )}
@@ -312,19 +311,19 @@ export default function BuyCreditsModal({
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-neutral-300">
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#f58c24]" />
               <span>Summarize: <strong>5 cr</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1faab7]" />
               <span>Q&A Chat: <strong>2 cr</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#f9a748]" />
               <span>Writing: <strong>3 cr</strong></span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c8a96f]" />
               <span>Transcription: <strong>10 cr</strong></span>
             </div>
           </div>
@@ -336,7 +335,7 @@ export default function BuyCreditsModal({
             type="button"
             onClick={handleCheckout}
             disabled={loading}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-extrabold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(99,102,241,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#f58c24] via-[#f9a748] to-[#e3af35] hover:from-[#f9a748] hover:to-[#f58c24] text-[#1a0f05] font-extrabold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(245,140,36,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
           >
             {loading ? (
               <>

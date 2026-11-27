@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { notesApi } from "@/lib/api";
 import {
   Mic,
@@ -15,7 +15,6 @@ import {
   Check,
   RefreshCw,
   FileText,
-  Radio,
   FileAudio,
 } from "lucide-react";
 
@@ -48,13 +47,175 @@ function getSupportedMimeType(): string {
 
 function formatAudioUrl(url: string | null, base: string): string | null {
   if (!url) return null;
-  let fullUrl = url;
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    const cleanBase = base.replace(/\/+$/, "");
-    const cleanPath = url.startsWith("/") ? url : `/${url}`;
-    fullUrl = `${cleanBase}${cleanPath}`;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
   }
-  return fullUrl;
+  let cleanBase = base;
+  while (cleanBase.endsWith("/")) {
+    cleanBase = cleanBase.slice(0, -1);
+  }
+  const cleanPath = url.startsWith("/") ? url : `/${url}`;
+  return `${cleanBase}${cleanPath}`;
+}
+
+function getAudioFileExtension(mimeType?: string): string {
+  if (!mimeType) return "webm";
+  if (mimeType.includes("mp4")) return "mp4";
+  if (mimeType.includes("ogg")) return "ogg";
+  if (mimeType.includes("wav")) return "wav";
+  return "webm";
+}
+
+function formatTime(seconds: number): string {
+  if (Number.isNaN(seconds) || seconds < 0 || !Number.isFinite(seconds)) return "00:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+function RecordingStudioView({
+  levels,
+  recordingTime,
+  onStop,
+}: Readonly<{
+  levels: number[];
+  recordingTime: number;
+  onStop: () => void;
+}>) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-6 sm:p-8 flex flex-col gap-6">
+      <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+          <span>Recording Live</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
+          <Mic className="w-3.5 h-3.5" />
+          <span>High-Quality Audio</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center justify-center gap-6 py-4">
+        <div className="flex items-center justify-center gap-1.5 h-16 w-full max-w-md px-4">
+          {levels.map((lvl, idx) => (
+            <span
+              key={`rec-bar-${idx + 1}-${Math.round(lvl)}`}
+              className="w-1.5 rounded-full bg-gradient-to-t from-rose-500 to-amber-400 transition-all duration-75"
+              style={{
+                height: `${Math.max(6, (lvl / 100) * 56)}px`,
+                opacity: 0.4 + (idx / 40) * 0.6,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="text-4xl font-mono font-medium tracking-wider text-white">
+          {formatTime(recordingTime)}
+        </div>
+
+        <button
+          type="button"
+          onClick={onStop}
+          className="flex items-center gap-2.5 px-7 py-3 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold shadow-lg shadow-rose-600/20 active:scale-95 transition-all"
+          id="stop-recording-btn"
+        >
+          <Square className="w-4 h-4 fill-white" />
+          <span>Stop & Save Recording</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function syncDurationFromMetadata(
+  player: HTMLAudioElement,
+  setDuration: (d: number) => void
+) {
+  const dur = player.duration;
+  if (Number.isFinite(dur) && !Number.isNaN(dur) && dur > 0) {
+    setDuration(dur);
+    return;
+  }
+  if (dur === Infinity) {
+    player.currentTime = 1e101;
+    setTimeout(() => {
+      const resolvedDur = player.duration;
+      if (Number.isFinite(resolvedDur) && !Number.isNaN(resolvedDur)) {
+        setDuration(resolvedDur);
+      }
+      player.currentTime = 0;
+    }, 50);
+  }
+}
+
+function TranscriptSection({
+  transcript,
+  transcribing,
+  copied,
+  onRegenerate,
+  onCopy,
+}: Readonly<{
+  transcript: string;
+  transcribing: boolean;
+  copied: boolean;
+  onRegenerate: () => void;
+  onCopy: () => void;
+}>) {
+  return (
+    <>
+      <div className="h-px bg-white/[0.06] my-1" />
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-brand-400" />
+            <span className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">
+              Voice Transcript
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={transcribing}
+              className="text-neutral-400 hover:text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 text-xs font-medium"
+              title="Regenerate transcript"
+              id="regenerate-transcript-btn"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${transcribing ? "animate-spin text-brand-400" : ""}`}
+              />
+              <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onCopy}
+              className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
+              title="Copy to clipboard"
+              id="copy-transcript-btn"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-sm text-neutral-200 leading-relaxed font-sans whitespace-pre-wrap selection:bg-brand-500/30">
+          {transcript}
+        </p>
+      </div>
+    </>
+  );
 }
 
 export default function AudioRecorder({
@@ -73,8 +234,7 @@ export default function AudioRecorder({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Real-time Audio Level State for Canvas Waveform
-  const [audioLevel, setAudioLevel] = useState<number>(0);
+  // Real-time Audio Level History for Canvas Waveform
   const audioLevelsHistory = useRef<number[]>(new Array(40).fill(10));
 
   // Audio Player Custom Controls State
@@ -118,12 +278,11 @@ export default function AudioRecorder({
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
+        for (const value of dataArray) {
+          sum += value;
         }
         const avg = sum / dataArray.length;
         const normalized = Math.min(100, Math.max(12, (avg / 128) * 100));
-        setAudioLevel(normalized);
 
         audioLevelsHistory.current.push(normalized);
         if (audioLevelsHistory.current.length > 40) {
@@ -249,13 +408,7 @@ export default function AudioRecorder({
       if (noteId === "new" && onSaveBeforeAction) {
         activeId = await onSaveBeforeAction();
       }
-      const ext = mimeType?.includes("mp4")
-        ? "mp4"
-        : mimeType?.includes("ogg")
-        ? "ogg"
-        : mimeType?.includes("wav")
-        ? "wav"
-        : "webm";
+      const ext = getAudioFileExtension(mimeType);
       const filename = `recording.${ext}`;
       const res = await notesApi.uploadAudio(activeId, audioBlob, filename);
       onMediaUrlUpdate(res.data.media_url);
@@ -291,16 +444,9 @@ export default function AudioRecorder({
 
   const copyToClipboard = () => {
     if (!transcript) return;
-    navigator.clipboard.writeText(transcript);
+    void navigator.clipboard.writeText(transcript);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds) || seconds < 0 || !isFinite(seconds)) return "00:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Custom Player Handlers
@@ -324,7 +470,7 @@ export default function AudioRecorder({
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
+    const val = Number.parseFloat(e.target.value);
     setCurrentTime(val);
     if (audioPlayerRef.current) {
       audioPlayerRef.current.currentTime = val;
@@ -346,53 +492,70 @@ export default function AudioRecorder({
     }
   };
 
+  if (isRecording) {
+    return (
+      <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto py-2">
+        <RecordingStudioView
+          levels={audioLevelsHistory.current}
+          recordingTime={recordingTime}
+          onStop={stopRecording}
+        />
+      </div>
+    );
+  }
+
+  if (!audioUrl) {
+    return (
+      <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto py-2">
+        {/* ── INITIAL NO-AUDIO RECORD STATION (HERO DECK) ───────────────────── */}
+        <div className="rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-8 sm:p-12 flex flex-col items-center justify-center gap-6 text-center">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-neutral-400 text-xs font-medium">
+            <span className="w-2 h-2 rounded-full bg-neutral-500" />
+            <span>Ready to Record</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void startRecording()}
+            disabled={loading || transcribing}
+            className="group relative w-20 h-20 rounded-full bg-surface-800 border border-white/10 hover:border-brand-500/50 flex items-center justify-center text-brand-400 hover:text-brand-300 shadow-xl shadow-black/40 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+            id="start-recording-btn"
+          >
+            <div className="absolute inset-0 rounded-full bg-brand-500/10 group-hover:scale-110 transition-transform duration-300 pointer-events-none" />
+            {loading ? (
+              <Loader2 className="w-8 h-8 animate-spin" />
+            ) : (
+              <Mic className="w-8 h-8 group-hover:scale-105 transition-transform" />
+            )}
+          </button>
+
+          <div className="space-y-1">
+            <p className="text-base font-medium text-neutral-200">
+              {loading ? "Saving audio recording..." : "Click to record audio"}
+            </p>
+            <p className="text-xs text-neutral-500 max-w-xs">
+              Captures high-fidelity voice notes for automatic transcription
+            </p>
+          </div>
+
+          {error && (
+            <div className="w-full max-w-md px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-medium">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const hasValidDuration = Number.isFinite(duration) && duration > 0;
+  const progressPct = hasValidDuration
+    ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
+    : 0;
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto py-2">
-      {/* ── LIVE RECORDING STATE ─────────────────────────────────────────────── */}
-      {isRecording ? (
-        <div className="relative overflow-hidden rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-6 sm:p-8 flex flex-col gap-6">
-          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              <span>Recording Live</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
-              <Mic className="w-3.5 h-3.5" />
-              <span>High-Quality Audio</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center justify-center gap-6 py-4">
-            <div className="flex items-center justify-center gap-1.5 h-16 w-full max-w-md px-4">
-              {audioLevelsHistory.current.map((lvl, idx) => (
-                <span
-                  key={idx}
-                  className="w-1.5 rounded-full bg-gradient-to-t from-rose-500 to-amber-400 transition-all duration-75"
-                  style={{
-                    height: `${Math.max(6, (lvl / 100) * 56)}px`,
-                    opacity: 0.4 + (idx / 40) * 0.6,
-                  }}
-                />
-              ))}
-            </div>
-
-            <div className="text-4xl font-mono font-medium tracking-wider text-white">
-              {formatTime(recordingTime)}
-            </div>
-
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="flex items-center gap-2.5 px-7 py-3 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold shadow-lg shadow-rose-600/20 active:scale-95 transition-all"
-              id="stop-recording-btn"
-            >
-              <Square className="w-4 h-4 fill-white" />
-              <span>Stop & Save Recording</span>
-            </button>
-          </div>
-        </div>
-      ) : audioUrl ? (
-        /* ── AUDIO CAPTURED STATE (UNIFIED PLAYER & TRANSCRIPT STUDIO VIEW) ──── */
+        {/* ── AUDIO CAPTURED STATE (UNIFIED PLAYER & TRANSCRIPT STUDIO VIEW) ──── */}
         <div className="rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-6 sm:p-8 flex flex-col gap-6">
           {/* Top Bar: Header Info & Compact Re-record CTA */}
           <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
@@ -404,7 +567,7 @@ export default function AudioRecorder({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={startRecording}
+                onClick={() => void startRecording()}
                 disabled={loading || transcribing}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-xs font-medium text-neutral-300 hover:text-white disabled:opacity-50 transition-all"
                 title="Record new audio to overwrite"
@@ -428,34 +591,20 @@ export default function AudioRecorder({
               setCurrentTime(0);
             }}
             onTimeUpdate={() => {
-              if (audioPlayerRef.current) {
-                const cur = audioPlayerRef.current.currentTime;
-                setCurrentTime(cur);
-                const dur = audioPlayerRef.current.duration;
-                if (isFinite(dur) && !isNaN(dur) && dur > 0) {
-                  setDuration(dur);
-                } else if (cur > duration) {
-                  setDuration(cur);
-                }
+              const player = audioPlayerRef.current;
+              if (!player) return;
+              const cur = player.currentTime;
+              setCurrentTime(cur);
+              const dur = player.duration;
+              if (Number.isFinite(dur) && !Number.isNaN(dur) && dur > 0) {
+                setDuration(dur);
+              } else if (cur > duration) {
+                setDuration(cur);
               }
             }}
             onLoadedMetadata={() => {
               if (audioPlayerRef.current) {
-                const dur = audioPlayerRef.current.duration;
-                if (isFinite(dur) && !isNaN(dur) && dur > 0) {
-                  setDuration(dur);
-                } else if (dur === Infinity) {
-                  audioPlayerRef.current.currentTime = 1e101;
-                  setTimeout(() => {
-                    if (audioPlayerRef.current) {
-                      const resolvedDur = audioPlayerRef.current.duration;
-                      if (isFinite(resolvedDur) && !isNaN(resolvedDur)) {
-                        setDuration(resolvedDur);
-                      }
-                      audioPlayerRef.current.currentTime = 0;
-                    }
-                  }, 50);
-                }
+                syncDurationFromMetadata(audioPlayerRef.current, setDuration);
               }
             }}
             onError={(e) => {
@@ -464,39 +613,33 @@ export default function AudioRecorder({
               setError("Failed to load audio format. Try refreshing the page.");
             }}
             id="voice-note-audio-player"
-          />
+          >
+            <track kind="captions" />
+          </audio>
 
           {/* Custom Media Player Scrubber & Controls */}
           <div className="flex flex-col gap-4">
             <div className="relative w-full flex items-center">
-              {(() => {
-                const progressPct =
-                  isFinite(duration) && duration > 0
-                    ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
-                    : 0;
-                return (
-                  <input
-                    type="range"
-                    min={0}
-                    max={isFinite(duration) && duration > 0 ? duration : 100}
-                    step={0.1}
-                    value={currentTime}
-                    onChange={handleSeek}
-                    style={{
-                      background: `linear-gradient(to right, #8b5cf6 0%, #a855f7 ${progressPct}%, #262626 ${progressPct}%, #262626 100%)`,
-                    }}
-                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-brand-400 focus:outline-none transition-all"
-                  />
-                );
-              })()}
+              <input
+                type="range"
+                min={0}
+                max={hasValidDuration ? duration : 100}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                style={{
+                  background: `linear-gradient(to right, #f58c24 0%, #f9a748 ${progressPct}%, #1c1c21 ${progressPct}%, #1c1c21 100%)`,
+                }}
+                className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-brand-400 focus:outline-none transition-all"
+              />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={togglePlay}
-                  className="w-10 h-10 rounded-full bg-brand-500 hover:bg-brand-400 text-white flex items-center justify-center shadow-md shadow-brand-500/20 active:scale-95 transition-all"
+                  onClick={() => void togglePlay()}
+                  className="w-10 h-10 rounded-full bg-primary hover:bg-brand-300 text-primary-foreground flex items-center justify-center shadow-md shadow-brand-500/20 active:scale-95 transition-all"
                   title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
@@ -556,7 +699,7 @@ export default function AudioRecorder({
           {!transcript && (
             <button
               type="button"
-              onClick={() => handleTranscribe(false)}
+              onClick={() => void handleTranscribe(false)}
               disabled={transcribing}
               className="mt-1 w-full py-2.5 rounded-xl bg-surface-800 border border-white/10 hover:border-brand-500/40 text-neutral-200 hover:text-white text-xs font-medium flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50 transition-all"
               id="transcribe-audio-btn"
@@ -572,60 +715,13 @@ export default function AudioRecorder({
 
           {/* Integrated Transcript Section */}
           {transcript && (
-            <>
-              <div className="h-px bg-white/[0.06] my-1" />
-
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-brand-400" />
-                    <span className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">
-                      Voice Transcript
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleTranscribe(true)}
-                      disabled={transcribing}
-                      className="text-neutral-400 hover:text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 text-xs font-medium"
-                      title="Regenerate transcript"
-                      id="regenerate-transcript-btn"
-                    >
-                      <RefreshCw
-                        className={`w-3.5 h-3.5 ${transcribing ? "animate-spin text-brand-400" : ""}`}
-                      />
-                      <span>{transcribing ? "Regenerating..." : "Regenerate"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={copyToClipboard}
-                      className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium"
-                      title="Copy to clipboard"
-                      id="copy-transcript-btn"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <p className="text-sm text-neutral-200 leading-relaxed font-sans whitespace-pre-wrap selection:bg-brand-500/30">
-                  {transcript}
-                </p>
-              </div>
-            </>
+            <TranscriptSection
+              transcript={transcript}
+              transcribing={transcribing}
+              copied={copied}
+              onRegenerate={() => void handleTranscribe(true)}
+              onCopy={copyToClipboard}
+            />
           )}
 
           {error && (
@@ -634,45 +730,6 @@ export default function AudioRecorder({
             </div>
           )}
         </div>
-      ) : (
-        /* ── INITIAL NO-AUDIO RECORD STATION (HERO DECK) ───────────────────── */
-        <div className="rounded-2xl bg-surface-900/50 border border-white/[0.06] backdrop-blur-md shadow-xl p-8 sm:p-12 flex flex-col items-center justify-center gap-6 text-center">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-neutral-400 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-neutral-500" />
-            <span>Ready to Record</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={startRecording}
-            disabled={loading || transcribing}
-            className="group relative w-20 h-20 rounded-full bg-surface-800 border border-white/10 hover:border-brand-500/50 flex items-center justify-center text-brand-400 hover:text-brand-300 shadow-xl shadow-black/40 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
-            id="start-recording-btn"
-          >
-            <div className="absolute inset-0 rounded-full bg-brand-500/10 group-hover:scale-110 transition-transform duration-300 pointer-events-none" />
-            {loading ? (
-              <Loader2 className="w-8 h-8 animate-spin" />
-            ) : (
-              <Mic className="w-8 h-8 group-hover:scale-105 transition-transform" />
-            )}
-          </button>
-
-          <div className="space-y-1">
-            <p className="text-base font-medium text-neutral-200">
-              {loading ? "Saving audio recording..." : "Click to record audio"}
-            </p>
-            <p className="text-xs text-neutral-500 max-w-xs">
-              Captures high-fidelity voice notes for automatic transcription
-            </p>
-          </div>
-
-          {error && (
-            <div className="w-full max-w-md px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-medium">
-              {error}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -68,11 +68,11 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   // Create alert handler
-  const handleCreateAlert = async (e: React.FormEvent) => {
+  const handleCreateAlert = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!noteId || !title.trim() || !alertDate || !alertTime) return;
 
@@ -90,7 +90,7 @@ export default function CalendarPage() {
       setAlerts((prev) => [...prev, res.data].sort((a, b) => new Date(a.alert_time).getTime() - new Date(b.alert_time).getTime()));
       setTitle("");
       // Refetch to sync join names if necessary
-      fetchData();
+      void fetchData();
     } catch {
       setError("Failed to create alert.");
     } finally {
@@ -202,7 +202,7 @@ export default function CalendarPage() {
                 >
                   <span className="text-sm font-semibold">{format(day, "d")}</span>
                   {hasAlerts && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent-pink shadow-glow-sm" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shadow-glow-sm" />
                   )}
                 </button>
               );

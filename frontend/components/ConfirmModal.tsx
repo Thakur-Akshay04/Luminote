@@ -40,25 +40,21 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      role="presentation"
-      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
-      onClick={() => {
-        if (!loading) onCancel();
-      }}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !loading) {
-          onCancel();
-        }
-      }}
+    <dialog
+      open
+      aria-labelledby="confirm-modal-title"
+      className="fixed inset-0 z-[99999] m-0 w-full h-full max-w-none max-h-none bg-transparent p-4 flex items-center justify-center animate-fade-in"
     >
+      <button
+        type="button"
+        aria-label="Close modal"
+        onClick={() => {
+          if (!loading) onCancel();
+        }}
+        className="fixed inset-0 w-full h-full bg-black/75 backdrop-blur-md border-0 cursor-default"
+      />
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-modal-title"
-        className="w-full max-w-[420px] bg-[#0f0f12]/95 border border-white/[0.08] rounded-2xl p-6 shadow-2xl shadow-black/80 flex flex-col gap-6 animate-scale-in relative overflow-hidden select-none"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
+        className="w-full max-w-[420px] bg-popover/95 border border-border rounded-2xl p-6 shadow-2xl shadow-black/80 flex flex-col gap-6 animate-scale-in relative overflow-hidden select-none z-10"
       >
         {/* Subtle Ambient Accent Header Line */}
         <div
@@ -66,7 +62,7 @@ export default function ConfirmModal({
             "absolute top-0 left-0 right-0 h-1",
             isDanger
               ? "bg-gradient-to-r from-rose-500 via-red-500 to-rose-500"
-              : "bg-gradient-to-r from-brand-500 via-indigo-500 to-brand-500"
+              : "bg-gradient-to-r from-[#f58c24] via-[#f9a748] to-[#1faab7]"
           )}
         />
 
@@ -129,6 +125,6 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

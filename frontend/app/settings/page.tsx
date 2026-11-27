@@ -159,7 +159,7 @@ export default function SettingsPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#030305]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
       </div>
     );
@@ -185,7 +185,7 @@ export default function SettingsPage() {
                 className="w-14 h-14 rounded-2xl border-2 border-white/10 shadow-lg object-cover"
               />
             ) : (
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-violet flex items-center justify-center shadow-lg text-white font-bold text-xl">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#f58c24] to-[#f9a748] flex items-center justify-center shadow-lg text-[#1a0f05] font-bold text-xl">
                 {fullName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -225,7 +225,7 @@ export default function SettingsPage() {
                 key={tab.id}
                 onClick={() => setActiveSection(tab.id as any)}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${isActive
-                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/25 border border-brand-400/40"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-brand-500/25 border border-brand-400/40"
                     : "bg-neutral-900/60 text-neutral-400 hover:text-white hover:bg-neutral-800/60 border border-white/[0.04]"
                   }`}
               >
@@ -359,7 +359,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6 animate-slide-up">
           <section className="glass p-6 sm:p-8 rounded-3xl flex flex-col gap-8 border border-white/[0.06]">
             <div>
-              <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-1">
+              <div className="flex items-center gap-2 text-[#6ed6de] text-xs font-bold uppercase tracking-widest mb-1">
                 <Database className="w-4 h-4" />
                 <span>Workspace Data</span>
               </div>
@@ -388,7 +388,7 @@ export default function SettingsPage() {
                 disabled={exporting}
                 className="btn-secondary mt-5 py-2.5 px-5 font-bold text-xs flex items-center gap-2 border-white/[0.1] hover:bg-white/[0.06]"
               >
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-indigo-400" />}
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-[#6ed6de]" />}
                 <span>Download Workspace Backup (.json)</span>
               </button>
             </div>
@@ -488,7 +488,7 @@ export default function SettingsPage() {
       {/* ── Danger Zone Account Deletion Confirmation Modal ──────────────── */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-[#0b0b10] border border-red-500/30 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl flex flex-col gap-5 relative">
+          <div className="bg-popover border border-red-500/30 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl flex flex-col gap-5 relative">
             <button
               type="button"
               onClick={() => {

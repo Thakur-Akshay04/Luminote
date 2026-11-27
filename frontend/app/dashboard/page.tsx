@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 
 import { notesApi, alertsApi } from "@/lib/api";
 import type { Note, Alert } from "@/types";
@@ -43,7 +43,7 @@ function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
   const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
   return (
-    <div className="bg-[#0c0c0e]/50 border border-white/[0.04] backdrop-blur-sm p-5 rounded-2xl shadow-xl relative overflow-hidden group/calendar">
+    <div className="bg-sidebar/60 border border-sidebar-border backdrop-blur-sm p-5 rounded-2xl shadow-xl relative overflow-hidden group/calendar">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs font-bold text-neutral-300 tracking-wider uppercase">
@@ -95,7 +95,7 @@ function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
                 ${isCurrentMonthDay ? "text-neutral-200" : "text-neutral-600/40"}
                 ${
                   isCurrent
-                    ? "bg-brand-500/10 border border-brand-500/50 text-brand-300 font-extrabold shadow-[0_0_12px_rgba(168,85,247,0.25)]"
+                    ? "bg-brand-500/15 border border-brand-500/50 text-brand-300 font-extrabold shadow-[0_0_12px_rgba(245,140,36,0.25)]"
                     : "hover:bg-white/[0.03] hover:border-white/[0.06] hover:scale-105 active:scale-95 cursor-pointer border border-transparent"
                 }
               `}
@@ -107,10 +107,10 @@ function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
               {hasAlerts && (
                 <div className="absolute bottom-1 flex gap-0.5 justify-center">
                   {upcoming.length > 0 && (
-                    <span className="w-1 h-1 rounded-full bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.5)] animate-pulse" />
+                    <span className="w-1 h-1 rounded-full bg-[#f58c24] shadow-[0_0_4px_rgba(245,140,36,0.5)] animate-pulse" />
                   )}
                   {completed.length > 0 && (
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+                    <span className="w-1 h-1 rounded-full bg-[#1faab7] shadow-[0_0_4px_rgba(31,170,183,0.5)]" />
                   )}
                 </div>
               )}
@@ -125,7 +125,7 @@ function MiniCalendar({ alerts }: Readonly<{ alerts: Alert[] }>) {
                   <div className="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar">
                     {dayAlerts.map((alert) => (
                       <div key={alert.id} className="text-[10px] text-white flex items-start gap-1">
-                        <span className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${alert.is_notified ? "bg-emerald-500" : "bg-pink-500 animate-pulse"}`} />
+                        <span className={`w-1 h-1 rounded-full mt-1.5 shrink-0 ${alert.is_notified ? "bg-[#1faab7]" : "bg-[#f58c24] animate-pulse"}`} />
                         <span className="truncate leading-relaxed">{alert.title}</span>
                       </div>
                     ))}
@@ -180,14 +180,14 @@ function AlertItem({ alert, onDelete }: Readonly<AlertItemProps>) {
   const dayNum = format(alertDate, "d");
 
   return (
-    <div className="flex gap-4 items-center p-3 border border-white/[0.03] bg-[#0c0c0e]/40 hover:border-brand-500/30 hover:bg-white/[0.01] rounded-xl transition-all duration-200 group relative">
-      <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-pink-500/20 text-pink-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-pink-500/40 group-hover:text-pink-300 transition-all duration-200">
+    <div className="flex gap-4 items-center p-3 border border-sidebar-border bg-sidebar/40 hover:border-brand-500/35 hover:bg-white/[0.02] rounded-xl transition-all duration-200 group relative">
+      <div className="w-11 h-11 flex flex-col items-center justify-center rounded-lg border border-brand-500/25 text-brand-400 bg-surface-900 shrink-0 shadow-inner group-hover:border-brand-500/50 group-hover:text-brand-300 transition-all duration-200">
         <span className="text-[7px] font-bold tracking-wider leading-none uppercase">{dayName}</span>
         <span className="text-sm font-extrabold leading-none mt-1">{dayNum}</span>
       </div>
 
       <div className="flex-1 min-w-0">
-        <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-pink-400 transition-colors">
+        <h4 className="text-xs font-bold text-neutral-200 truncate leading-snug group-hover:text-brand-300 transition-colors">
           {alert.title}
         </h4>
         <div className="flex items-center gap-1.5 mt-1 text-[9px] text-neutral-500">
@@ -196,7 +196,7 @@ function AlertItem({ alert, onDelete }: Readonly<AlertItemProps>) {
           {alert.note_title && (
             <Link
               href={`/notes/${alert.note_id}`}
-              className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-pink-400 hover:underline transition-colors"
+              className="truncate max-w-[120px] text-neutral-400 font-semibold hover:text-brand-400 hover:underline transition-colors"
             >
               • {alert.note_title}
             </Link>
@@ -231,7 +231,6 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
 
   useEffect(() => {
     setMounted(true);
@@ -256,7 +255,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (mounted && isLoaded && isSignedIn) {
-      fetchData();
+      void fetchData();
     }
   }, [mounted, isLoaded, isSignedIn, fetchData]);
 
@@ -296,7 +295,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
@@ -411,7 +410,7 @@ export default function DashboardPage() {
 
     if (upcomingAlerts.length === 0) {
       return (
-        <div className="text-center rounded-xl border border-dashed border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col items-center justify-center gap-2">
+        <div className="text-center rounded-xl border border-dashed border-sidebar-border bg-sidebar/30 px-6 py-8 flex flex-col items-center justify-center gap-2">
           <Bell className="w-6 h-6 text-neutral-600 animate-bounce" style={{ animationDuration: '3s' }} />
           <p className="text-neutral-400 font-medium text-xs">No upcoming alerts scheduled</p>
           <p className="text-neutral-600 text-[10px]">Create an alert inside any note to stay notified</p>
@@ -498,17 +497,17 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Right Sidebar Column (Calendar/Upcoming) ── */}
-      <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-white/[0.04] bg-[#0c0c0e]/30 px-6 py-8 flex flex-col gap-6 shrink-0 min-h-[calc(100vh-1px)]">
+      <div className="w-full xl:w-96 border-t xl:border-t-0 xl:border-l border-sidebar-border bg-sidebar/30 px-6 py-8 flex flex-col gap-6 shrink-0 min-h-[calc(100vh-1px)]">
         {/* Calendar widget */}
         <div className="flex flex-col gap-3">
           <MiniCalendar alerts={alerts} />
           {/* Legend */}
           <div className="flex justify-end gap-3 text-[10px] text-neutral-500 px-1 font-semibold">
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.4)]" /> Upcoming
+              <span className="w-1.5 h-1.5 rounded-full bg-[#f58c24] shadow-[0_0_4px_rgba(245,140,36,0.4)]" /> Upcoming
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] shadow-[0_0_4px_rgba(16,185,129,0.4)]" /> Completed
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1faab7] shadow-[0_0_4px_rgba(31,170,183,0.4)]" /> Completed
             </span>
           </div>
         </div>

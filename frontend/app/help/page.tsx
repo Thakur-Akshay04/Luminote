@@ -116,8 +116,8 @@ export default function HelpPage() {
 
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-accent-violet flex items-center justify-center shadow-lg text-white font-bold shrink-0">
-              <HelpCircle className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#f58c24] to-[#f9a748] flex items-center justify-center shadow-lg text-[#1a0f05] font-bold shrink-0">
+              <HelpCircle className="w-7 h-7 text-[#1a0f05]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export default function HelpPage() {
                 }`}
               >
                 {isActive && (
-                  <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-white">
+                  <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </div>
                 )}
@@ -294,7 +294,7 @@ export default function HelpPage() {
                     setSearchQuery("");
                     setActiveCategory("all");
                   }}
-                  className="mt-4 px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-600 transition-all"
+                  className="mt-4 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-300 transition-all"
                 >
                   Clear Search Filters
                 </button>

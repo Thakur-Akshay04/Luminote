@@ -111,11 +111,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 78,
     icon: Brain,
-    baseBorder: "border-purple-500/30",
-    hoverBorder: "border-purple-400 shadow-[0_0_25px_rgba(168,85,247,0.4)]",
-    baseIconColor: "text-purple-500/60",
-    iconColor: "text-purple-300",
-    glowColor: "rgba(168, 85, 247, 0.2)",
+    baseBorder: "border-[#f58c24]/35",
+    hoverBorder: "border-[#f58c24] shadow-[0_0_25px_rgba(245,140,36,0.45)]",
+    baseIconColor: "text-[#f58c24]/70",
+    iconColor: "text-[#f9a748]",
+    glowColor: "rgba(245, 140, 36, 0.22)",
   },
   {
     id: "voice",
@@ -126,11 +126,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 60,
     icon: AudioLines,
-    baseBorder: "border-cyan-500/30",
-    hoverBorder: "border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]",
-    baseIconColor: "text-cyan-500/60",
-    iconColor: "text-cyan-300",
-    glowColor: "rgba(6, 182, 212, 0.15)",
+    baseBorder: "border-[#1faab7]/35",
+    hoverBorder: "border-[#6ed6de] shadow-[0_0_20px_rgba(31,170,183,0.4)]",
+    baseIconColor: "text-[#1faab7]/70",
+    iconColor: "text-[#6ed6de]",
+    glowColor: "rgba(31, 170, 183, 0.18)",
   },
   {
     id: "editor",
@@ -141,11 +141,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 60,
     icon: FileText,
-    baseBorder: "border-indigo-500/30",
-    hoverBorder: "border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.4)]",
-    baseIconColor: "text-indigo-500/60",
-    iconColor: "text-indigo-300",
-    glowColor: "rgba(99, 102, 241, 0.15)",
+    baseBorder: "border-[#f9a748]/35",
+    hoverBorder: "border-[#f9a748] shadow-[0_0_20px_rgba(249,167,72,0.4)]",
+    baseIconColor: "text-[#f9a748]/70",
+    iconColor: "text-[#f9a748]",
+    glowColor: "rgba(249, 167, 72, 0.18)",
   },
   {
     id: "tasks",
@@ -156,11 +156,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 60,
     icon: Zap,
-    baseBorder: "border-amber-500/30",
-    hoverBorder: "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]",
-    baseIconColor: "text-amber-500/60",
-    iconColor: "text-amber-300",
-    glowColor: "rgba(245, 158, 11, 0.15)",
+    baseBorder: "border-[#e3af35]/35",
+    hoverBorder: "border-[#e3af35] shadow-[0_0_20px_rgba(227,175,53,0.4)]",
+    baseIconColor: "text-[#e3af35]/70",
+    iconColor: "text-[#e3af35]",
+    glowColor: "rgba(227, 175, 53, 0.18)",
   },
   {
     id: "calendar",
@@ -171,11 +171,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 64,
     icon: Calendar,
-    baseBorder: "border-emerald-500/30",
-    hoverBorder: "border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]",
-    baseIconColor: "text-emerald-500/60",
-    iconColor: "text-emerald-300",
-    glowColor: "rgba(16, 185, 129, 0.15)",
+    baseBorder: "border-[#0e6a81]/40",
+    hoverBorder: "border-[#1faab7] shadow-[0_0_20px_rgba(14,106,129,0.45)]",
+    baseIconColor: "text-[#1faab7]/70",
+    iconColor: "text-[#6ed6de]",
+    glowColor: "rgba(14, 106, 129, 0.2)",
   },
   {
     id: "agent",
@@ -186,11 +186,11 @@ const INITIAL_NODES: Node[] = [
     vy: 0,
     size: 64,
     icon: Bot,
-    baseBorder: "border-fuchsia-500/30",
-    hoverBorder: "border-fuchsia-400 shadow-[0_0_20px_rgba(217,70,239,0.4)]",
-    baseIconColor: "text-fuchsia-500/60",
-    iconColor: "text-fuchsia-300",
-    glowColor: "rgba(217, 70, 239, 0.15)",
+    baseBorder: "border-[#c8a96f]/35",
+    hoverBorder: "border-[#c8a96f] shadow-[0_0_20px_rgba(200,169,111,0.4)]",
+    baseIconColor: "text-[#c8a96f]/70",
+    iconColor: "text-[#c8a96f]",
+    glowColor: "rgba(200, 169, 111, 0.18)",
   },
 ];
 
@@ -304,9 +304,9 @@ export default function InteractiveThoughtMap() {
       {/* Connected Lines */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
         <defs>
-          <linearGradient id="purple-cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.45" />
+          <linearGradient id="amber-cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f58c24" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#1faab7" stopOpacity="0.5" />
           </linearGradient>
         </defs>
         {coreNode &&
@@ -321,7 +321,7 @@ export default function InteractiveThoughtMap() {
                   y1={coreNode.y}
                   x2={node.x}
                   y2={node.y}
-                  stroke={isHoveredLine ? "url(#purple-cyan-glow)" : "rgba(255, 255, 255, 0.04)"}
+                  stroke={isHoveredLine ? "url(#amber-cyan-glow)" : "rgba(255, 255, 255, 0.04)"}
                   strokeWidth={isHoveredLine ? 2.5 : 1}
                   className="transition-all duration-300"
                 />
@@ -378,7 +378,7 @@ export default function InteractiveThoughtMap() {
 
             {/* Hub specific rotating core element */}
             {isCore && (
-              <div className="absolute inset-[-8px] rounded-full border border-dashed border-purple-500/25 animate-spin-slow" style={{ animationDuration: "24s" }} />
+              <div className="absolute inset-[-8px] rounded-full border border-dashed border-[#f58c24]/30 animate-spin-slow" style={{ animationDuration: "24s" }} />
             )}
 
             {/* Pulsing back glow */}
@@ -392,7 +392,7 @@ export default function InteractiveThoughtMap() {
 
             {/* Obsidian Glass Circle Bubble */}
             <div
-              className={`w-full h-full rounded-full bg-[#0a0a0c]/90 backdrop-blur-md border flex items-center justify-center transition-all duration-300 ${bubbleStyle}`}
+              className={`w-full h-full rounded-full bg-sidebar/90 backdrop-blur-md border flex items-center justify-center transition-all duration-300 ${bubbleStyle}`}
             >
               <Icon
                 className={`transition-all duration-300 ${iconStyle}`}
@@ -406,8 +406,8 @@ export default function InteractiveThoughtMap() {
             {/* Node Label Tooltip */}
             <div
               className={`absolute top-[112%] left-1/2 -translate-x-1/2 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider whitespace-nowrap transition-all duration-300 pointer-events-none select-none ${isHovered
-                ? "text-white bg-[#0c0c0e]/90 border border-white/[0.1] shadow-2xl scale-105"
-                : "text-neutral-500/70 bg-transparent border border-transparent scale-100"
+                ? "text-foreground bg-popover/95 border border-border shadow-2xl scale-105"
+                : "text-muted-foreground/70 bg-transparent border border-transparent scale-100"
                 }`}
             >
               {node.name}

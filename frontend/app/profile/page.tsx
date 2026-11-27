@@ -9,13 +9,13 @@ export default function ProfilePage() {
         routing="hash"
         appearance={{
           variables: {
-            colorPrimary: "#6366f1",
-            colorBackground: "#18181b",
+            colorPrimary: "#f58c24",
+            colorBackground: "#17171b",
             borderRadius: "12px",
           },
           elements: {
-            card: "border border-surface-border shadow-2xl bg-[#18181b]",
-            navbar: "border-r border-surface-border",
+            card: "border border-border shadow-2xl bg-[#17171b]",
+            navbar: "border-r border-border",
           },
         }}
       />
