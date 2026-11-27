@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # AI model configuration
     groq_whisper_model: str = "whisper-large-v3-turbo"
-    groq_task_model: str = "qwen/qwen3.6-27b"
+    groq_task_model: str = "openai/gpt-oss-120b"
 
     # JWT — secret generated securely if not provided via env
     jwt_secret: str = ""

@@ -132,34 +132,53 @@ Note content:
     return result
 
 
+_local_embed_model = None
+
+
+def _get_local_embedding_sync(text: str) -> list[float]:
+    global _local_embed_model
+    if _local_embed_model is None:
+        from fastembed import TextEmbedding
+
+        _local_embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    vec = next(iter(_local_embed_model.embed([text[:8000]])))
+    return [float(x) for x in vec]
+
+
 async def get_embedding(text: str) -> list[float]:
     """
-    Generate a 384-dimensional embedding using BAAI/bge-small-en-v1.5 via Hugging Face Serverless API.
+    Generate a 384-dimensional embedding using BAAI/bge-small-en-v1.5.
+    Uses Hugging Face Inference API when HF_API_KEY is configured, otherwise runs locally via fastembed.
     """
+    hf_key = (getattr(settings, "hf_api_key", "") or "").strip()
+    if hf_key:
+        try:
+            api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5"
+            headers = {"Authorization": f"Bearer {hf_key}"}
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.post(
+                    api_url,
+                    headers=headers,
+                    json={"inputs": text[:8000]},
+                    timeout=15.0,
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    if isinstance(result, list) and len(result) > 0:
+                        if isinstance(result[0], list):
+                            return [float(x) for x in result[0]]
+                        return [float(x) for x in result]
+                logger.warning(
+                    "Hugging Face API returned status code %s; falling back to local fastembed",
+                    response.status_code,
+                )
+        except Exception as e:
+            logger.warning("Hugging Face embedding failed (%s); falling back to local fastembed", e)
+
     try:
-        api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5"
-        headers = {}
-        if getattr(settings, "hf_api_key", None):
-            headers["Authorization"] = f"Bearer {settings.hf_api_key}"
-        
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                api_url,
-                headers=headers,
-                json={"inputs": text[:8000]},
-                timeout=15.0
-            )
-            if response.status_code == 200:
-                result = response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    # Hugging Face feature extraction can return flat list [...] or nested list [[...]]
-                    if isinstance(result[0], list):
-                        return [float(x) for x in result[0]]
-                    return [float(x) for x in result]
-            logger.error("Hugging Face API returned status code %s: %s", response.status_code, response.text)
-            return []
+        return await asyncio.to_thread(_get_local_embedding_sync, text)
     except Exception as e:
-        logger.exception("Hugging Face embedding error: %s", e)
+        logger.exception("Local fastembed embedding error: %s", e)
         return []
 
 
@@ -211,9 +230,14 @@ Answer the user's questions based on the note content. Be concise and accurate. 
         if response.choices and response.choices[0].message.content:
             return response.choices[0].message.content.strip()
         return "Sorry, I could not generate an answer at this time."
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Groq Q&A error: %s", e)
-        return "Sorry, I could not generate an answer at this time."
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service failed to generate an answer. Please try again.",
+        )
 
 
 async def summarize_note_with_ai(
@@ -282,9 +306,14 @@ Note content:
             result["alerts"] = []
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error generating AI summary: %s", e)
-        return {"summary": "Failed to generate summary.", "tags": [], "alerts": []}
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service failed to generate summary. Please try again.",
+        )
 
 
 async def execute_ai_action(action: str, text: str, param: Optional[str] = None) -> str:
@@ -316,7 +345,12 @@ async def execute_ai_action(action: str, text: str, param: Optional[str] = None)
             max_tokens=1500,
         )
         return (response.choices[0].message.content or "").strip()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error executing AI writing action %s: %s", action, e)
-        return "Failed to process text with AI. Please try again."
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service failed to process text. Please try again.",
+        )
 

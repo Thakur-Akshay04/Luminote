@@ -1,7 +1,7 @@
 import logging
 import uuid
 from fastapi import HTTPException, status
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -12,6 +12,32 @@ from app.models.credit_transaction import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def ensure_sufficient_credits(
+    user_id: str | uuid.UUID,
+    feature: str,
+    cost: int,
+    db: AsyncSession,
+) -> None:
+    """Verify the user has enough credits before calling an external AI provider (no deduction yet)."""
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    result = await db.execute(select(User.credit_balance).where(User.id == uid))
+    balance = result.scalar_one_or_none()
+    if balance is None or balance < cost:
+        logger.warning(
+            "Insufficient credits for user %s attempting feature '%s' (cost: %d)",
+            user_id, feature, cost
+        )
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "insufficient_credits",
+                "message": f"Not enough credits for {feature}. Required: {cost} credits.",
+                "feature": feature,
+                "cost": cost,
+            },
+        )
 
 
 async def check_and_deduct_credits(
