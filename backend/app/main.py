@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime, timezone
 import logging
 import mimetypes
@@ -109,38 +109,47 @@ async def check_alerts_loop(manager: ConnectionManager):
             logger.exception("Error in check_alerts_loop: %s", exc)
 
 
+async def _shutdown_background_task(task: asyncio.Task[None]) -> None:
+    """Cancel a background task on shutdown and log any non-cancellation error."""
+    task.cancel()
+    await asyncio.wait({task})
+    if not task.cancelled():
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Background alerts task exited with error: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing database...")
-    try:
-        await init_db()
-        logger.info("Database initialized successfully.")
-    except Exception as exc:
-        logger.error("Failed to initialize database: %s", exc)
+    async with AsyncExitStack() as stack:
+        stack.push_async_callback(close_redis)
+        stack.push_async_callback(close_http_client)
 
-    try:
-        from app.auth.clerk import get_jwks
+        logger.info("Initializing database...")
+        try:
+            await init_db()
+            logger.info("Database initialized successfully.")
+        except Exception as exc:
+            logger.error("Failed to initialize database: %s", exc)
 
-        await get_jwks()
-        logger.info("Clerk JWKS pre-fetched successfully.")
-    except Exception as exc:
-        logger.warning("Failed to pre-fetch Clerk JWKS on startup: %s", exc)
+        try:
+            from app.auth.clerk import get_jwks
 
-    media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
-    os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
-    os.makedirs(os.path.join(media_base, "uploads"), exist_ok=True)
-    os.makedirs(os.path.join(media_base, "avatars"), exist_ok=True)
+            await get_jwks()
+            logger.info("Clerk JWKS pre-fetched successfully.")
+        except Exception as exc:
+            logger.warning("Failed to pre-fetch Clerk JWKS on startup: %s", exc)
 
-    app.state.alert_manager = ConnectionManager()
-    app.state.alerts_task = asyncio.create_task(check_alerts_loop(app.state.alert_manager))
-    yield
-    app.state.alerts_task.cancel()
-    try:
-        await app.state.alerts_task
-    except asyncio.CancelledError:
-        pass
-    await close_http_client()
-    await close_redis()
+        media_base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")
+        os.makedirs(os.path.join(media_base, "audio"), exist_ok=True)
+        os.makedirs(os.path.join(media_base, "uploads"), exist_ok=True)
+        os.makedirs(os.path.join(media_base, "avatars"), exist_ok=True)
+
+        app.state.alert_manager = ConnectionManager()
+        alerts_task = asyncio.create_task(check_alerts_loop(app.state.alert_manager))
+        app.state.alerts_task = alerts_task
+        stack.push_async_callback(_shutdown_background_task, alerts_task)
+        yield
 
 
 app = FastAPI(

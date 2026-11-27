@@ -402,5 +402,71 @@ class RedisKeySanitizationAndUserCacheTests(unittest.IsolatedAsyncioTestCase):
             )
 
 
+class LifespanCancellationSafetyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lifespan_normal_shutdown_cancels_background_task_cleanly(self):
+        from fastapi import FastAPI
+        from app.main import lifespan
+
+        started = asyncio.Event()
+        cleaned_up = False
+
+        async def fake_loop(manager):
+            nonlocal cleaned_up
+            started.set()
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                cleaned_up = True
+                raise
+
+        test_app = FastAPI()
+        mock_http_close = AsyncMock()
+        mock_redis_close = AsyncMock()
+        with (
+            patch("app.main.init_db", new=AsyncMock()),
+            patch("app.auth.clerk.get_jwks", new=AsyncMock()),
+            patch("app.main.check_alerts_loop", side_effect=fake_loop),
+            patch("app.main.close_http_client", mock_http_close),
+            patch("app.main.close_redis", mock_redis_close),
+        ):
+            async with lifespan(test_app):
+                await asyncio.wait_for(started.wait(), timeout=1.0)
+                self.assertFalse(test_app.state.alerts_task.done())
+
+        self.assertTrue(cleaned_up)
+        self.assertTrue(test_app.state.alerts_task.cancelled())
+        mock_http_close.assert_awaited_once()
+        mock_redis_close.assert_awaited_once()
+
+    async def test_lifespan_propagates_external_cancellation_and_runs_cleanup(self):
+        from fastapi import FastAPI
+        from app.main import lifespan
+
+        started = asyncio.Event()
+
+        async def fake_loop(manager):
+            started.set()
+            await asyncio.sleep(60)
+
+        test_app = FastAPI()
+        mock_http_close = AsyncMock()
+        mock_redis_close = AsyncMock()
+        with (
+            patch("app.main.init_db", new=AsyncMock()),
+            patch("app.auth.clerk.get_jwks", new=AsyncMock()),
+            patch("app.main.check_alerts_loop", side_effect=fake_loop),
+            patch("app.main.close_http_client", mock_http_close),
+            patch("app.main.close_redis", mock_redis_close),
+        ):
+            with self.assertRaises(asyncio.CancelledError):
+                async with lifespan(test_app):
+                    await asyncio.wait_for(started.wait(), timeout=1.0)
+                    raise asyncio.CancelledError()
+
+        self.assertTrue(test_app.state.alerts_task.cancelled())
+        mock_http_close.assert_awaited_once()
+        mock_redis_close.assert_awaited_once()
+
+
 if __name__ == "__main__":
     unittest.main()
