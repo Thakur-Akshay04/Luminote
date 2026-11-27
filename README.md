@@ -56,9 +56,6 @@ Luminote supports generating 384-dimensional `BAAI/bge-small-en-v1.5` embeddings
 
 ```text
 Luminote/
-├── .github/
-│   ├── dependabot.yml             # Weekly pip, npm, and Docker dependency updates
-│   └── workflows/ci.yml           # Unit tests, pip-audit, and Trivy container scan
 ├── backend/
 │   ├── alembic/                   # Alembic migration environment & revisions
 │   ├── alembic.ini
